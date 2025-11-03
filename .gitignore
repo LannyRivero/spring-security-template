@@ -34,3 +34,7 @@ build/
 
 # Local configs
 .env
+
+# 🔐 RSA keys (never commit real ones)
+src/main/resources/keys/*.pem
+!src/main/resources/keys/rsa-public.pem
