@@ -1,0 +1,96 @@
+# ================================================================
+# 🚀 SPRING SECURITY TEMPLATE - PRODUCTION CONFIGURATION
+# ================================================================
+
+# =============================
+# DATASOURCE (PostgreSQL)
+# =============================
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:spring_security_prod}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+  sql:
+    init:
+      mode: never
+
+# =============================
+# SERVER
+# =============================
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+
+# =============================
+# JWT CONFIGURATION (RSA)
+# =============================
+security:
+  jwt:
+    issuer: security-template
+    audience: security-template-app
+    algorithm: RSA
+    expiration-seconds: 3600
+    service-expiration-seconds: 300
+    allowed-clock-skew-seconds: 60
+    rsa:
+      private-location: ${JWT_PRIVATE_PATH:file:/opt/keys/rsa-private.pem}
+      public-location: ${JWT_PUBLIC_PATH:file:/opt/keys/rsa-public.pem}
+
+# =============================
+# RATE LIMITING (Stricter)
+# =============================
+rate-limiting:
+  enabled: true
+  strategy: IP_USER
+  max-attempts: 3
+  window: 60
+  block-seconds: 600
+  retry-after: 60
+  login-path: /api/v1/auth/login
+
+# =============================
+# CORS (Restricted)
+# =============================
+cors:
+  enabled: true
+  allow-credentials: true
+  allowed-origins:
+    - https://app.security-template.com
+  allowed-methods: [ "GET", "POST", "PUT", "DELETE" ]
+  allowed-headers:
+    - Content-Type
+    - Authorization
+    - X-Requested-With
+  exposed-headers:
+    - Authorization
+  max-age-seconds: 3600
+
+# =============================
+# LOGGING (Production)
+# =============================
+logging:
+  level:
+    root: WARN
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
+    com.lanny.spring_security_template: INFO
+
+# =============================
+# ACTUATOR
+# =============================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
