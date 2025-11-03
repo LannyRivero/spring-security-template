@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.lanny.spring_security_template.SpringSecurityTemplateApplicationTests
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.984 s -- in com.lanny.spring_security_template.SpringSecurityTemplateApplicationTests
