@@ -28,7 +28,7 @@ spring:
       platform: mysql
 
 # =============================
-# SERVER (port, headers, etc.)
+# SERVER
 # =============================
 server:
   port: 8080
@@ -41,14 +41,18 @@ security:
   jwt:
     issuer: security-template
     audience: security-template-app
-    secret-base64: ${JWT_SECRET_BASE64}
+    algorithm: RSA
     expiration-seconds: 3600
     service-expiration-seconds: 300
-    not-before-skew-seconds: 0
     allowed-clock-skew-seconds: 60
+    rsa:
+      private-location: classpath:keys/rsa-private.pem
+      public-location: classpath:keys/rsa-public.pem
+    hmac:
+      secret-base64: ${JWT_SECRET_BASE64}
 
 # =============================
-# RATE LIMITING (Brute-force Guard)
+# RATE LIMITING
 # =============================
 rate-limiting:
   enabled: true
@@ -60,7 +64,7 @@ rate-limiting:
   login-path: /api/v1/auth/login
 
 # =============================
-# CORS CONFIG (for local dev)
+# CORS
 # =============================
 cors:
   enabled: true
@@ -81,7 +85,7 @@ cors:
   max-age-seconds: 3600
 
 # =============================
-# LOGGING (development)
+# LOGGING
 # =============================
 logging:
   level:
@@ -92,7 +96,7 @@ logging:
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 
 # =============================
-# ACTUATOR (dev endpoints)
+# ACTUATOR
 # =============================
 management:
   endpoints:
