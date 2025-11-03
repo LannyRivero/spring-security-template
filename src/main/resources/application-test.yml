@@ -1,0 +1,58 @@
+# ================================================================
+# 🧪 SPRING SECURITY TEMPLATE - TEST CONFIGURATION
+# ================================================================
+
+# =============================
+# DATASOURCE (H2 In-Memory)
+# =============================
+spring:
+  datasource:
+    url: jdbc:h2:mem:security_template_test;DB_CLOSE_DELAY=-1;MODE=MYSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+    show-sql: false
+  sql:
+    init:
+      mode: embedded
+
+# =============================
+# SERVER (Test Port)
+# =============================
+server:
+  port: 0 # usa un puerto aleatorio para evitar conflictos en tests
+
+# =============================
+# JWT CONFIGURATION (HMAC simple)
+# =============================
+security:
+  jwt:
+    issuer: security-template-test
+    audience: security-template-test-suite
+    algorithm: HMAC
+    expiration-seconds: 1800
+    hmac:
+      secret-base64: test-secret-12345
+
+# =============================
+# LOGGING (Minimal)
+# =============================
+logging:
+  level:
+    root: WARN
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
+    com.lanny.spring_security_template: INFO
+
+# =============================
+# ACTUATOR
+# =============================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
