@@ -49,23 +49,23 @@
       <artifactId>spring-boot-starter-data-jpa</artifactId>
     </dependency>
 
-    <!-- 💾 Base de datos para cada perfil -->
+    <!-- 💾 Base de datos -->
     <dependency>
-    <groupId>com.mysql</groupId>
-    <artifactId>mysql-connector-j</artifactId>
-    <scope>runtime</scope>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
-    <groupId>org.postgresql</groupId>
-    <artifactId>postgresql</artifactId>
-    <scope>runtime</scope>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
-    <groupId>com.h2database</groupId>
-    <artifactId>h2</artifactId>
-    <scope>test</scope>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
     </dependency>
 
     <!-- 🔐 JWT (Nimbus) -->
@@ -75,13 +75,13 @@
       <version>${nimbus.version}</version>
     </dependency>
 
-    <!-- 📈 Actuator (monitoring / health checks) -->
+    <!-- 📈 Actuator -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
-    <!-- 🧠 MapStruct (mappers) -->
+    <!-- 🧠 MapStruct -->
     <dependency>
       <groupId>org.mapstruct</groupId>
       <artifactId>mapstruct</artifactId>
@@ -102,7 +102,7 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- 🧩 Lombok (for simplicity) -->
+    <!-- 🧩 Lombok -->
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
@@ -161,6 +161,7 @@
 
   <build>
     <plugins>
+
       <!-- ☕ Java Compiler -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -184,14 +185,15 @@
         </configuration>
       </plugin>
 
-      <!-- ✅ Code formatting (Spotless) -->
+      <!-- ✅ Spotless (formatter) -->
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
         <version>2.43.0</version>
         <executions>
           <execution>
-            <goals><goal>apply</goal></goals>
+            <phase>verify</phase> <!-- ✅ añade fase -->
+            <goals><goal>check</goal></goals>
           </execution>
         </executions>
         <configuration>
@@ -207,6 +209,13 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>3.2.0</version>
+        <executions>
+          <execution>
+            <id>validate-style</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+          </execution>
+        </executions>
         <configuration>
           <configLocation>checkstyle.xml</configLocation>
           <encoding>UTF-8</encoding>
@@ -222,16 +231,29 @@
         <version>0.8.11</version>
         <executions>
           <execution>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
+            <goals><goal>prepare-agent</goal></goals>
           </execution>
           <execution>
             <id>report</id>
-            <phase>test</phase>
+            <phase>verify</phase> <!-- ✅ mover a verify -->
             <goals><goal>report</goal></goals>
           </execution>
         </executions>
+        <configuration>
+          <!-- ✅ Quality gate -->
+          <rules>
+            <rule>
+              <element>BUNDLE</element>
+              <limits>
+                <limit>
+                  <counter>INSTRUCTION</counter>
+                  <value>COVEREDRATIO</value>
+                  <minimum>0.70</minimum>
+                </limit>
+              </limits>
+            </rule>
+          </rules>
+        </configuration>
       </plugin>
 
       <!-- 🚀 Spring Boot Plugin -->
@@ -247,6 +269,7 @@
           </excludes>
         </configuration>
       </plugin>
+
     </plugins>
   </build>
 </project>
