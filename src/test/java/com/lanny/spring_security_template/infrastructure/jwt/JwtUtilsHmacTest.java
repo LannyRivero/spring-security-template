@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.jwt;
+package com.lanny.spring_security_template.infrastructure.jwt;
 
 import static org.junit.jupiter.api.Assertions.*;
 
