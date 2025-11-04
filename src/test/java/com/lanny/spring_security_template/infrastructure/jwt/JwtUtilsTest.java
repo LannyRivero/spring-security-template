@@ -1,7 +1,5 @@
 package com.lanny.spring_security_template.infrastructure.jwt;
 
-import com.lanny.spring_security_template.infrastructure.jwt.JwtUtils;
-import com.lanny.spring_security_template.infrastructure.jwt.KeyProviderClasspath;
 import com.nimbusds.jwt.JWTClaimsSet;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,8 +22,12 @@ class JwtUtilsTest {
 
     public JwtUtilsTest() {
         KeyProviderClasspath keyProvider = new KeyProviderClasspath();
-        this.jwtUtils = new JwtUtils(keyProvider);
-    }
+        String issuer = "test-issuer";
+        String audience = "test-audience";
+        long accessExpiration = 3600; // 1 hour in seconds
+        long refreshExpiration = 86400; // 1 day in seconds
+        this.jwtUtils = new JwtUtils(keyProvider, issuer, audience, accessExpiration, refreshExpiration);
+   }
 
     @Test
     @DisplayName("🔐 Should generate and validate a valid RSA JWT")

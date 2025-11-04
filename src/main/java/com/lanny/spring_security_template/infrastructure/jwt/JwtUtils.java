@@ -24,6 +24,7 @@ public class JwtUtils {
             KeyProvider keyProvider,
             @Value("${security.jwt.issuer}") String issuer,
             @Value("${security.jwt.audience}") String audience,
+
             @Value("${security.jwt.expiration-seconds}") long accessExpiration,
             @Value("${security.jwt.refresh-expiration-seconds:2592000}") long refreshExpiration
     ) {
@@ -51,11 +52,10 @@ public class JwtUtils {
 
             JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256)
                     .type(JOSEObjectType.JWT)
-                    .keyID("dev-key")
                     .build();
 
             SignedJWT jwt = new SignedJWT(header, claims);
-            jwt.sign(new RSASSASigner((RSAPrivateKey) keyProvider.getPrivateKey()));
+            jwt.sign(new RSASSASigner(keyProvider.getPrivateKey()));
             return jwt.serialize();
 
         } catch (Exception e) {

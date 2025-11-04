@@ -54,21 +54,30 @@ public class PemUtils {
      * Loads a PEM file from the classpath or filesystem.
      */
     private static String loadPem(String location) throws IOException {
-        //  1. Try as classpath resource
-        String normalized = location.startsWith("/") ? location : "/" + location;
-        try (InputStream is = PemUtils.class.getResourceAsStream(normalized)) {
+        // Try as classpath resource first with original location
+        // Try as classpath resource first with original location
+        try (InputStream is = PemUtils.class.getResourceAsStream(location)) {
             if (is != null) {
                 return new String(is.readAllBytes(), StandardCharsets.UTF_8);
             }
         }
 
-        //  2. Try as absolute or relative file path (useful in prod)
+        // Also try with leading '/' for classpath (only if not already present)
+        if (!location.startsWith("/")) {
+            try (InputStream is = PemUtils.class.getResourceAsStream("/" + location)) {
+                if (is != null) {
+                    return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                }
+            }
+        }
+
+        // Try as absolute or relative file path (use original location)
         Path path = Path.of(location);
         if (Files.exists(path)) {
             return Files.readString(path, StandardCharsets.UTF_8);
         }
 
-        //  3. If not found
+        // If not found
         throw new IllegalArgumentException("Key file not found at: " + location);
     }
 }

@@ -5,6 +5,6 @@ import java.security.interfaces.RSAPublicKey;
 
 public interface KeyProvider {
     RSAPrivateKey getPrivateKey();
-
+    
     RSAPublicKey getPublicKey();
 }
