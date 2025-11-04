@@ -1,0 +1,29 @@
+package com.lanny.spring_security_template.application.auth.service;
+
+import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
+import com.lanny.spring_security_template.web.dto.AuthRequest;
+import com.lanny.spring_security_template.web.dto.AuthResponse;
+import org.springframework.stereotype.Service;
+
+@Service
+public class AuthService implements AuthUseCase {
+
+    @Override
+    public AuthResponse login(AuthRequest request) {
+        // TODO: Implement JWT authentication (Phase F2)
+        return new AuthResponse("dummy-access-token", "dummy-refresh-token");
+    }
+
+    @Override
+    public AuthResponse refresh(String refreshToken) {
+        // TODO: Implement token refresh logic (Phase F2)
+        return new AuthResponse("new-access-token", "new-refresh-token");
+    }
+
+    @Override
+    public AuthResponse me(String username) {
+        // TODO: Implement user info retrieval (Phase F2)
+        return new AuthResponse("token", "refresh");
+    }
+}
+
