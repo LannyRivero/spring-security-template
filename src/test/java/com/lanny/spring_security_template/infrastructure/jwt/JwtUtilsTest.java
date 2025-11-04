@@ -20,9 +20,12 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("dev")
 class JwtUtilsTest {
 
-    private final KeyProviderClasspath keyProvider = new KeyProviderClasspath();
+    private final JwtUtils jwtUtils;
 
-    private final JwtUtils jwtUtils = new JwtUtils(keyProvider);
+    public JwtUtilsTest() {
+        KeyProviderClasspath keyProvider = new KeyProviderClasspath();
+        this.jwtUtils = new JwtUtils(keyProvider);
+    }
 
     @Test
     @DisplayName("🔐 Should generate and validate a valid RSA JWT")
