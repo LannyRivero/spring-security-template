@@ -5,6 +5,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
 import com.lanny.spring_security_template.web.dto.AuthRequest;
 import com.lanny.spring_security_template.web.dto.AuthResponse;
+import com.lanny.spring_security_template.web.dto.RegisterRequest;
+
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,13 +24,8 @@ public class AuthController {
         return authUseCase.login(request);
     }
 
-    @PostMapping("/refresh")
-    public AuthResponse refresh(@RequestParam String refreshToken) {
-        return authUseCase.refresh(refreshToken);
-    }
-
-    @GetMapping("/me")
-    public AuthResponse me(@RequestParam String username) {
-        return authUseCase.me(username);
+    @PostMapping("/register")
+    public AuthResponse register(@RequestBody RegisterRequest request) {
+        return authUseCase.register(request);
     }
 }

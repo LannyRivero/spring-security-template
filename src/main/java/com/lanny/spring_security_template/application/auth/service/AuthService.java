@@ -20,18 +20,6 @@ public class AuthService implements AuthUseCase {
     public AuthResponse register(RegisterRequest request) {
         // TODO: Implement user registration (Phase F2)
         return new AuthResponse("dummy-access-token", "dummy-refresh-token");
-    }
-
-    @Override
-    public AuthResponse refresh(String refreshToken) {
-        // TODO: Implement token refresh logic (Phase F2)
-        return new AuthResponse("new-access-token", "new-refresh-token");
-    }
-
-    @Override
-    public AuthResponse me(String username) {
-        // TODO: Implement user info retrieval (Phase F2)
-        return new AuthResponse("token", "refresh");
-    }
+    }    
 }
 

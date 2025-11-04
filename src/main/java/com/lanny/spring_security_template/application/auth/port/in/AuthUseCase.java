@@ -28,20 +28,5 @@ public interface AuthUseCase {
      */
 
     AuthResponse register(RegisterRequest request);
-
-    /**
-     * Refreshes an expired access token using a valid refresh token.
-     *
-     * @param refreshToken the valid refresh token.
-     * @return AuthResponse with new access and refresh tokens.
-     */
-    AuthResponse refresh(String refreshToken);
-
-    /**
-     * Retrieves user details (authenticated principal).
-     *
-     * @param username the current authenticated username.
-     * @return an AuthResponse or user profile information.
-     */
-    AuthResponse me(String username);
+   
 }
