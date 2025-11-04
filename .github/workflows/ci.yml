@@ -1,0 +1,42 @@
+name: CI Pipeline
+
+on:
+    push:
+        branches: ["**"]
+    pull_request:
+        branches: ["**"]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: 🧱 Checkout repository
+              uses: actions/checkout@v4
+
+            - name: ☕ Set up Java
+              uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: "21"
+                  cache: maven
+
+            - name: 🧩 Build and verify
+              run: mvn -B clean verify
+
+            - name: 🧹 Run Checkstyle
+              run: mvn -q checkstyle:check
+
+            - name: 🎨 Run Spotless
+              run: mvn -q spotless:check
+
+            - name: 🧪 Run tests
+              run: mvn -q test
+
+            - name: 📊 Generate Jacoco coverage report
+              if: success()
+              run: mvn -q jacoco:report
+
+            - name: 📦 Build Docker image
+              run: |
+                  docker build -t ghcr.io/${{ github.repository_owner }}/spring-security-template:${{ github.sha }} .
