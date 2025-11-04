@@ -28,5 +28,5 @@ public interface AuthUseCase {
      */
 
     AuthResponse register(RegisterRequest request);
-   
+
 }

@@ -1,13 +1,14 @@
 package com.lanny.spring_security_template.web.controller;
 
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
 import com.lanny.spring_security_template.web.dto.AuthRequest;
 import com.lanny.spring_security_template.web.dto.AuthResponse;
 import com.lanny.spring_security_template.web.dto.RegisterRequest;
-
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/auth")
