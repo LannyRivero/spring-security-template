@@ -39,4 +39,5 @@ jobs:
 
             - name: 📦 Build Docker image
               run: |
-                  docker build -t ghcr.io/${{ github.repository_owner }}/spring-security-template:${{ github.sha }} .
+                   docker build -t ghcr.io/${{ github.repository_owner || 'owner' }}.toLowerCase()/spring-security-template:${{ github.sha }} .
+
