@@ -73,10 +73,8 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
             // 3️⃣ Unir roles y scopes en un solo conjunto de autoridades
             var authorities = Stream.concat(
                     roles.stream()
-                            .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r)
                             .map(SimpleGrantedAuthority::new),
                     scopes.stream()
-                            .map(s -> s.startsWith("SCOPE_") ? s : "SCOPE_" + s)
                             .map(SimpleGrantedAuthority::new)
             ).toList();
 
