@@ -7,6 +7,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,10 +21,19 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Stream;
 
+/**
+ * 🔐 JwtAuthorizationFilter
+ *
+ * Filtro encargado de:
+ *  - Extraer el token JWT del encabezado Authorization.
+ *  - Validar y parsear el token con JwtUtils.
+ *  - Construir las autoridades (roles + scopes) esperadas por Spring Security.
+ *  - Poblar el SecurityContext con la autenticación válida.
+ */
 @Component
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JwtAuthorizationFilter.class);
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthorizationFilter.class);
     private static final String BEARER_PREFIX = "Bearer ";
     private static final int BEARER_PREFIX_LENGTH = 7;
 
@@ -35,32 +46,53 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(@NonNull HttpServletRequest req, @NonNull HttpServletResponse res,
-            @NonNull FilterChain chain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain chain
+    ) throws ServletException, IOException {
 
-        String header = req.getHeader(HttpHeaders.AUTHORIZATION);
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        if (header != null && header.startsWith(BEARER_PREFIX)) {
-            String token = header.substring(BEARER_PREFIX_LENGTH);
-            try {
-                JWTClaimsSet claims = jwtUtils.validateAndParse(token);
-                String username = claims.getSubject();
-                List<String> roles = extractor.extractRoles(claims);
-                List<String> scopes = extractor.extractScopes(claims);
-
-                var authorities = Stream.concat(
-                        roles.stream().map(r -> new SimpleGrantedAuthority("ROLE_" + r)),
-                        scopes.stream().map(s -> new SimpleGrantedAuthority("SCOPE_" + s))).toList();
-
-                var authentication = new UsernamePasswordAuthenticationToken(username, null, authorities);
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            } catch (Exception e) {
-                logger.warn("JWT validation failed: {}", e.getMessage());
-                // Let the EntryPoint handle the 401
-                SecurityContextHolder.clearContext();
-            }
+        // No token → continuar la cadena sin autenticación
+        if (header == null || !header.startsWith(BEARER_PREFIX)) {
+            chain.doFilter(request, response);
+            return;
         }
-        chain.doFilter(req, res);
+
+        String token = header.substring(BEARER_PREFIX_LENGTH);
+        try {
+            // 1️⃣ Validar y obtener claims
+            JWTClaimsSet claims = jwtUtils.validateAndParse(token);
+            String username = claims.getSubject();
+
+            // 2️⃣ Extraer roles y scopes normalizados
+            List<String> roles = extractor.extractRoles(claims);
+            List<String> scopes = extractor.extractScopes(claims);
+
+            // 3️⃣ Unir roles y scopes en un solo conjunto de autoridades
+            var authorities = Stream.concat(
+                    roles.stream()
+                            .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r)
+                            .map(SimpleGrantedAuthority::new),
+                    scopes.stream()
+                            .map(s -> s.startsWith("SCOPE_") ? s : "SCOPE_" + s)
+                            .map(SimpleGrantedAuthority::new)
+            ).toList();
+
+            // 4️⃣ Construir el objeto de autenticación
+            var authentication = new UsernamePasswordAuthenticationToken(username, null, authorities);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            logger.debug("✅ JWT authenticated user '{}' with authorities: {}", username, authorities);
+
+        } catch (Exception e) {
+            logger.warn("❌ JWT validation failed: {}", e.getMessage());
+            SecurityContextHolder.clearContext();
+            // Dejar que el AuthenticationEntryPoint maneje el 401
+        }
+
+        chain.doFilter(request, response);
     }
 }
+
