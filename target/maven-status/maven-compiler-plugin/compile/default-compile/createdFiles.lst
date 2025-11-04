@@ -1,2 +1,14 @@
+com\lanny\spring_security_template\application\auth\port\out\TokenProvider.class
+com\lanny\spring_security_template\application\auth\service\AuthServiceImpl.class
+com\lanny\spring_security_template\application\auth\port\out\UserAccountGateway.class
 com\lanny\spring_security_template\util\GenerateRsaKeys.class
+com\lanny\spring_security_template\web\controller\HealthController.class
+com\lanny\spring_security_template\infrastructure\security\filters\JwtAuthorizationFilter.class
+com\lanny\spring_security_template\application\auth\port\out\RoleProvider.class
+com\lanny\spring_security_template\web\controller\AuthController.class
+com\lanny\spring_security_template\infrastructure\config\SecurityConfig.class
+com\lanny\spring_security_template\application\auth\port\out\ScopePolicy.class
+com\lanny\spring_security_template\application\auth\port\out\AuthPersistencePort.class
+com\lanny\spring_security_template\domain\model\User.class
 com\lanny\spring_security_template\SpringSecurityTemplateApplication.class
+com\lanny\spring_security_template\application\auth\port\in\AuthUseCase.class
