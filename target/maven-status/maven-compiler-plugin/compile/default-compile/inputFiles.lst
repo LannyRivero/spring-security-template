@@ -1,2 +1,14 @@
-D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\util\GenerateRsaKeys.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\application\auth\port\out\AuthPersistencePort.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\config\SecurityConfig.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\application\auth\port\out\RoleProvider.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\application\auth\port\out\TokenProvider.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\security\filters\JwtAuthorizationFilter.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\SpringSecurityTemplateApplication.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\web\controller\HealthController.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\application\auth\port\out\ScopePolicy.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\util\GenerateRsaKeys.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\domain\model\User.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\application\auth\port\in\AuthUseCase.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\web\controller\AuthController.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\application\auth\service\AuthServiceImpl.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\application\auth\port\out\UserAccountGateway.java

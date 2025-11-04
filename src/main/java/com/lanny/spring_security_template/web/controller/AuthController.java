@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.web.auth;
+package com.lanny.spring_security_template.web.controller;
 
 import org.springframework.web.bind.annotation.RestController;
 
