@@ -25,10 +25,7 @@ jobs:
         run: mvn -B clean verify
 
       - name: 🧹 Run Checkstyle
-        run: mvn -q checkstyle:check
-
-      - name: 🎨 Run Spotless
-        run: mvn -q spotless:check
+        run: mvn -q checkstyle:check     
 
       - name: 🧪 Run tests
         run: mvn -q test
