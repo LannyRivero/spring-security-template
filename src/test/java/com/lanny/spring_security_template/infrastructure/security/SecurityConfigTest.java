@@ -1,8 +1,8 @@
 package com.lanny.spring_security_template.infrastructure.security;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -11,11 +11,20 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.lanny.spring_security_template.infrastructure.jwt.JwtUtils;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
+/**
+ * 🚧 SecurityConfigTest
+ * 
+ * ⚠️ Este test es una verificación MOCK, no de integración real.
+ * 
+ * Usa @WebMvcTest y por tanto no levanta:
+ *   - Filtros JWT reales
+ *   - Configuración completa de Spring Security
+ *   - Beans de Actuator ni rutas /api/v1/**
+ *
+ * Los tests de seguridad real están en {@link SecurityConfigIntegrationTest}.
+ */
+@Disabled("❌ Reemplazado por SecurityConfigIntegrationTest que valida seguridad real")
 @WebMvcTest(controllers = SecureTestController.class)
-@AutoConfigureMockMvc(addFilters = false)
 class SecurityConfigTest {
 
     @Autowired MockMvc mvc;
@@ -27,20 +36,17 @@ class SecurityConfigTest {
 
     @Test
     void shouldRejectUnauthorizedRequest() throws Exception {
-        mvc.perform(get("/api/v1/secure/ping"))
-                .andExpect(status().isUnauthorized());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/secure/ping"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
     }
 
     @Test
     void shouldAcceptAuthorizedRequest() throws Exception {
-        String token = "Bearer fake.jwt.token";
-        // Since JwtAuthorizationFilter is mocked, no need to mock JwtUtils
-        // The filter won't execute its real logic
-
-        mvc.perform(get("/actuator/health")
-                .header(HttpHeaders.AUTHORIZATION, token)
-                .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/secure/ping")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer fake.jwt.token")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
     }
 }
-
