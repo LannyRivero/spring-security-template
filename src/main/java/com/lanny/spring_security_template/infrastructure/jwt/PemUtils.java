@@ -1,7 +1,10 @@
 package com.lanny.spring_security_template.infrastructure.jwt;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
@@ -11,11 +14,13 @@ import java.util.Base64;
 
 public class PemUtils {
 
-    public static RSAPrivateKey readPrivateKey(String resourcePath) {
-        try (InputStream is = PemUtils.class.getResourceAsStream(resourcePath)) {
-            if (is == null)
-                throw new IllegalArgumentException("Private key not found: " + resourcePath);
-            String key = new String(is.readAllBytes(), StandardCharsets.UTF_8)
+    /**
+     * Reads an RSA private key from either the classpath or an absolute file path.
+     */
+    public static RSAPrivateKey readPrivateKey(String location) {
+        try {
+            String pem = loadPem(location);
+            String key = pem
                     .replace("-----BEGIN PRIVATE KEY-----", "")
                     .replace("-----END PRIVATE KEY-----", "")
                     .replaceAll("\\s+", "");
@@ -27,11 +32,13 @@ public class PemUtils {
         }
     }
 
-    public static RSAPublicKey readPublicKey(String resourcePath) {
-        try (InputStream is = PemUtils.class.getResourceAsStream(resourcePath)) {
-            if (is == null)
-                throw new IllegalArgumentException("Public key not found: " + resourcePath);
-            String key = new String(is.readAllBytes(), StandardCharsets.UTF_8)
+    /**
+     * Reads an RSA public key from either the classpath or an absolute file path.
+     */
+    public static RSAPublicKey readPublicKey(String location) {
+        try {
+            String pem = loadPem(location);
+            String key = pem
                     .replace("-----BEGIN PUBLIC KEY-----", "")
                     .replace("-----END PUBLIC KEY-----", "")
                     .replaceAll("\\s+", "");
@@ -41,5 +48,27 @@ public class PemUtils {
         } catch (Exception e) {
             throw new IllegalStateException("Cannot read public key", e);
         }
+    }
+
+    /**
+     * Loads a PEM file from the classpath or filesystem.
+     */
+    private static String loadPem(String location) throws IOException {
+        //  1. Try as classpath resource
+        String normalized = location.startsWith("/") ? location : "/" + location;
+        try (InputStream is = PemUtils.class.getResourceAsStream(normalized)) {
+            if (is != null) {
+                return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        }
+
+        //  2. Try as absolute or relative file path (useful in prod)
+        Path path = Path.of(location);
+        if (Files.exists(path)) {
+            return Files.readString(path, StandardCharsets.UTF_8);
+        }
+
+        //  3. If not found
+        throw new IllegalArgumentException("Key file not found at: " + location);
     }
 }
