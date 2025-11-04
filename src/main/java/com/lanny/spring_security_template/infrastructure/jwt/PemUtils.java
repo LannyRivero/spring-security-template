@@ -55,7 +55,6 @@ public class PemUtils {
      */
     private static String loadPem(String location) throws IOException {
         // Try as classpath resource first with original location
-        // Try as classpath resource first with original location
         try (InputStream is = PemUtils.class.getResourceAsStream(location)) {
             if (is != null) {
                 return new String(is.readAllBytes(), StandardCharsets.UTF_8);
