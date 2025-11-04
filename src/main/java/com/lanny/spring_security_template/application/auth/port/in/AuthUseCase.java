@@ -2,6 +2,7 @@ package com.lanny.spring_security_template.application.auth.port.in;
 
 import com.lanny.spring_security_template.web.dto.AuthRequest;
 import com.lanny.spring_security_template.web.dto.AuthResponse;
+import com.lanny.spring_security_template.web.dto.RegisterRequest;
 
 /**
  * Defines the input port for authentication-related use cases.
@@ -20,6 +21,15 @@ public interface AuthUseCase {
     AuthResponse login(AuthRequest request);
 
     /**
+     * Registers a new user account.
+     *
+     * @param request contains username, password, and email.
+     * @return AuthResponse with tokens for the newly registered user.
+     */
+
+    AuthResponse register(RegisterRequest request);
+
+    /**
      * Refreshes an expired access token using a valid refresh token.
      *
      * @param refreshToken the valid refresh token.
@@ -35,4 +45,3 @@ public interface AuthUseCase {
      */
     AuthResponse me(String username);
 }
-
