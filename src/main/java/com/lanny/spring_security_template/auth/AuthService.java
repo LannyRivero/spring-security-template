@@ -3,7 +3,7 @@ package com.lanny.spring_security_template.auth;
 import com.lanny.spring_security_template.auth.dto.JwtResponse;
 import com.lanny.spring_security_template.auth.dto.LoginRequest;
 import com.lanny.spring_security_template.infrastructure.jwt.JwtClaimsExtractor;
-import com.lanny.spring_security_template.infrastructure.jwt.JwtUtils;
+import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
 import com.nimbusds.jwt.JWTClaimsSet;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;

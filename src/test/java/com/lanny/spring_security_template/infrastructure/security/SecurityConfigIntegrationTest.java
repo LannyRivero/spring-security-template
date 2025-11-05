@@ -1,6 +1,5 @@
 package com.lanny.spring_security_template.infrastructure.security;
 
-import com.lanny.spring_security_template.infrastructure.jwt.JwtUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +9,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+
+import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
 
 import java.util.List;
 

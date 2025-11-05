@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.jwt;
+package com.lanny.spring_security_template.infrastructure.jwt.nimbus;
 
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.*;

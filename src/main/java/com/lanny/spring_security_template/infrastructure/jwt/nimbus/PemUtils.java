@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.jwt;
+package com.lanny.spring_security_template.infrastructure.jwt.nimbus;
 
 import java.io.IOException;
 import java.io.InputStream;

@@ -17,7 +17,7 @@
   <artifactId>spring-security-template</artifactId>
   <version>0.1.0</version>
   <name>spring-security-template</name>
-  <description>Reusable Spring Security Template with JWT, Roles, Scopes, Swagger and QA</description>
+  <description>Reusable Spring Security Template with JWT (Nimbus + JJWT), Roles, Scopes, Swagger and QA</description>
 
   <!-- 🧾 Metadata -->
   <url>https://github.com/lanny/spring-security-template</url>
@@ -90,6 +90,25 @@
       <groupId>com.nimbusds</groupId>
       <artifactId>nimbus-jose-jwt</artifactId>
       <version>${nimbus.version}</version>
+    </dependency>
+
+    <!-- 🔐 JWT (JJWT - alternativa moderna) -->
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-api</artifactId>
+      <version>0.12.5</version>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-impl</artifactId>
+      <version>0.12.5</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-jackson</artifactId>
+      <version>0.12.5</version>
+      <scope>runtime</scope>
     </dependency>
 
     <!-- 📈 Actuator -->
@@ -243,7 +262,6 @@
           </execution>
         </executions>
         <configuration>
-          <!-- ✅ Quality gate -->
           <rules>
             <rule>
               <element>BUNDLE</element>
@@ -293,3 +311,4 @@
   </profiles>
 
 </project>
+
