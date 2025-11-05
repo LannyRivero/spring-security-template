@@ -1,7 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.jwt.nimbus;
 
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
-import com.lanny.spring_security_template.application.auth.port.out.TokenProvider.TokenClaims;
 import com.nimbusds.jwt.JWTClaimsSet;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
