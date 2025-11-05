@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.web.dto;
+package com.lanny.spring_security_template.infrastructure.web.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

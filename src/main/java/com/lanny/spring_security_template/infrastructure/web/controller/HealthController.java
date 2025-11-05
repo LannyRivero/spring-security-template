@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.web.controller;
+package com.lanny.spring_security_template.infrastructure.web.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

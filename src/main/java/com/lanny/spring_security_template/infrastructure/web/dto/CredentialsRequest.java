@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.web.dto;
+package com.lanny.spring_security_template.infrastructure.web.dto;
 
 /**
  * Defines a contract for credential request DTOs.
