@@ -1,14 +1,12 @@
 package com.lanny.spring_security_template.application.auth.port.in;
 
-import com.lanny.spring_security_template.auth.dto.JwtResponse;
-import com.lanny.spring_security_template.auth.dto.LoginRequest;
-import com.lanny.spring_security_template.auth.dto.MeResponse;
-import com.lanny.spring_security_template.auth.dto.RefreshRequest;
+import com.lanny.spring_security_template.application.auth.command.*;
+import com.lanny.spring_security_template.application.auth.result.*;
 
 public interface AuthUseCase {
-    JwtResponse login(LoginRequest request);
+    JwtResult login(LoginCommand command);
 
-    JwtResponse refresh(RefreshRequest request);
+    JwtResult refresh(RefreshCommand command);
 
-    MeResponse me(String username);
+    MeResult me(String username);
 }
