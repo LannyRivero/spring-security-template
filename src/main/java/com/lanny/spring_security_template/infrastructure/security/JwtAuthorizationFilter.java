@@ -1,96 +1,48 @@
 package com.lanny.spring_security_template.infrastructure.security;
 
-import com.lanny.spring_security_template.infrastructure.jwt.JwtClaimsExtractor;
-import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
-import com.nimbusds.jwt.JWTClaimsSet;
+import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.stream.Stream;
+import java.util.ArrayList;
 
-/**
- * 🔐 JwtAuthorizationFilter
- *
- * Filtro encargado de:
- *  - Extraer el token JWT del encabezado Authorization.
- *  - Validar y parsear el token con JwtUtils.
- *  - Construir las autoridades (roles + scopes) esperadas por Spring Security.
- *  - Poblar el SecurityContext con la autenticación válida.
- */
-@Component
+@RequiredArgsConstructor
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
+  private final TokenProvider tokenProvider; 
+  private final GrantedAuthoritiesMapper authoritiesMapper;
 
-    private static final Logger logger = LoggerFactory.getLogger(JwtAuthorizationFilter.class);
-    private static final String BEARER_PREFIX = "Bearer ";
-    private static final int BEARER_PREFIX_LENGTH = 7;
+  @Override
+  protected void doFilterInternal(@NonNull HttpServletRequest req, @NonNull HttpServletResponse res, @NonNull FilterChain chain)
+      throws ServletException, IOException {
 
-    private final JwtUtils jwtUtils;
-    private final JwtClaimsExtractor extractor;
+    String header = req.getHeader(HttpHeaders.AUTHORIZATION);
+    if (header != null && header.startsWith("Bearer ")) {
+      String token = header.substring(7);
 
-    public JwtAuthorizationFilter(JwtUtils jwtUtils, JwtClaimsExtractor extractor) {
-        this.jwtUtils = jwtUtils;
-        this.extractor = extractor;
+      tokenProvider.parseClaims(token).ifPresent(claims -> {
+        var auths = new ArrayList<GrantedAuthority>();
+        claims.roles().forEach(r -> auths.add(new SimpleGrantedAuthority("ROLE_" + r)));
+        claims.scopes().forEach(s -> auths.add(new SimpleGrantedAuthority("SCOPE_" + s)));
+
+        var authentication = new UsernamePasswordAuthenticationToken(
+            claims.sub(), null, authoritiesMapper.mapAuthorities(auths));
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+      });
     }
-
-    @Override
-    protected void doFilterInternal(
-            @NonNull HttpServletRequest request,
-            @NonNull HttpServletResponse response,
-            @NonNull FilterChain chain
-    ) throws ServletException, IOException {
-
-        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-
-        // No token → continuar la cadena sin autenticación
-        if (header == null || !header.startsWith(BEARER_PREFIX)) {
-            chain.doFilter(request, response);
-            return;
-        }
-
-        String token = header.substring(BEARER_PREFIX_LENGTH);
-        try {
-            // 1️⃣ Validar y obtener claims
-            JWTClaimsSet claims = jwtUtils.validateAndParse(token);
-            String username = claims.getSubject();
-
-            // 2️⃣ Extraer roles y scopes normalizados
-            List<String> roles = extractor.extractRoles(claims);
-            List<String> scopes = extractor.extractScopes(claims);
-
-            // 3️⃣ Unir roles y scopes en un solo conjunto de autoridades
-            var authorities = Stream.concat(
-                    roles.stream()
-                            .map(SimpleGrantedAuthority::new),
-                    scopes.stream()
-                            .map(SimpleGrantedAuthority::new)
-            ).toList();
-
-            // 4️⃣ Construir el objeto de autenticación
-            var authentication = new UsernamePasswordAuthenticationToken(username, null, authorities);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            logger.debug("✅ JWT authenticated user '{}' with authorities: {}", username, authorities);
-
-        } catch (Exception e) {
-            logger.warn("❌ JWT validation failed: {}", e.getMessage());
-            SecurityContextHolder.clearContext();
-            // Dejar que el AuthenticationEntryPoint maneje el 401
-        }
-
-        chain.doFilter(request, response);
-    }
+    chain.doFilter(req, res);
+  }
 }
-
