@@ -7,8 +7,8 @@ import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import com.lanny.spring_security_template.infrastructure.jwt.KeyProvider;
 import com.lanny.spring_security_template.infrastructure.jwt.TokenProvider;
+import com.lanny.spring_security_template.infrastructure.jwt.nimbus.KeyProvider;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;

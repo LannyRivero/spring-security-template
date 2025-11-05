@@ -5,7 +5,6 @@ import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import com.lanny.spring_security_template.infrastructure.jwt.JwtUtils;
 import com.lanny.spring_security_template.infrastructure.jwt.TokenProvider;
 
 @Component

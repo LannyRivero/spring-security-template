@@ -1,7 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.security;
 
 import com.lanny.spring_security_template.infrastructure.jwt.JwtClaimsExtractor;
-import com.lanny.spring_security_template.infrastructure.jwt.JwtUtils;
+import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
 import com.nimbusds.jwt.JWTClaimsSet;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
