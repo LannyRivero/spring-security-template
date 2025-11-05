@@ -1,41 +1,74 @@
 package com.lanny.spring_security_template.domain.model;
 
-public class User {
-    private Long id;
-    private String username;
-    private String password;
-    private String role;
+import java.util.List;
+import java.util.Objects;
 
-    // Getters and Setters
-    public Long getId() {
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+/**
+ * Domain aggregate representing an authenticated user.
+ */
+public class User {
+
+    private final String id;
+    private final String username;
+    private final String email;
+    private final String passwordHash;
+    private final boolean enabled;
+    private final List<String> roles;
+    private final List<String> scopes;
+
+    public User(String id, String username, String email, String passwordHash,
+            boolean enabled, List<String> roles, List<String> scopes) {
+        this.id = id;
+        this.username = username;
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.enabled = enabled;
+        this.roles = List.copyOf(roles);
+        this.scopes = List.copyOf(scopes);
+    }
+
+    public String id() {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getUsername() {
+    public String username() {
         return username;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
+    public String email() {
+        return email;
     }
 
-    public String getPassword() {
-        return password;
+    public List<String> roles() {
+        return roles;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
+    public List<String> scopes() {
+        return scopes;
     }
 
-    public String getRole() {
-        return role;
+    public boolean isEnabled() {
+        return enabled;
     }
 
-    public void setRole(String role) {
-        this.role = role;
+    /** ✅ Dominio controla la validación de contraseñas */
+    public boolean passwordMatches(String rawPassword, PasswordEncoder encoder) {
+        return enabled && encoder.matches(rawPassword, passwordHash);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (!(o instanceof User user))
+            return false;
+        return Objects.equals(id, user.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
     }
 }
