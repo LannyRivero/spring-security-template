@@ -6,7 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,30 +19,44 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 
+@Slf4j
 @RequiredArgsConstructor
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
-  private final TokenProvider tokenProvider; 
+
+  private final TokenProvider tokenProvider;
   private final GrantedAuthoritiesMapper authoritiesMapper;
 
   @Override
-  protected void doFilterInternal(@NonNull HttpServletRequest req, @NonNull HttpServletResponse res, @NonNull FilterChain chain)
-      throws ServletException, IOException {
+  protected void doFilterInternal(
+      @NonNull HttpServletRequest req,
+      @NonNull HttpServletResponse res,
+      @NonNull FilterChain chain) throws ServletException, IOException {
 
-    String header = req.getHeader(HttpHeaders.AUTHORIZATION);
-    if (header != null && header.startsWith("Bearer ")) {
-      String token = header.substring(7);
+    try {
+      String header = req.getHeader(HttpHeaders.AUTHORIZATION);
+      if (header != null && header.startsWith("Bearer ")) {
+        String token = header.substring(7);
 
-      tokenProvider.parseClaims(token).ifPresent(claims -> {
-        var auths = new ArrayList<GrantedAuthority>();
-        claims.roles().forEach(r -> auths.add(new SimpleGrantedAuthority("ROLE_" + r)));
-        claims.scopes().forEach(s -> auths.add(new SimpleGrantedAuthority("SCOPE_" + s)));
+        if (tokenProvider.validateToken(token)) {
+          tokenProvider.parseClaims(token).ifPresent(claims -> {
+            var authorities = new ArrayList<GrantedAuthority>();
+            claims.roles().forEach(r -> authorities.add(new SimpleGrantedAuthority("ROLE_" + r)));
+            claims.scopes().forEach(s -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + s)));
 
-        var authentication = new UsernamePasswordAuthenticationToken(
-            claims.sub(), null, authoritiesMapper.mapAuthorities(auths));
+            var authentication = new UsernamePasswordAuthenticationToken(
+                claims.sub(), null, authoritiesMapper.mapAuthorities(authorities));
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-      });
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            log.debug("✅ Authenticated '{}' (roles={}, scopes={})", claims.sub(), claims.roles(), claims.scopes());
+          });
+        } else {
+          log.warn("❌ Invalid JWT from {}", req.getRemoteAddr());
+        }
+      }
+
+      chain.doFilter(req, res);
+    } finally {
+
     }
-    chain.doFilter(req, res);
   }
 }

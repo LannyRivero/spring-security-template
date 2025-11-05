@@ -4,11 +4,18 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserAccountGateway {
-    Optional<AuthUser> findByUsernameOrEmail(String usernameOrEmail);
 
-    void save(AuthUser user); // para /register (perfil dev)
+    Optional<UserAccountRecord> findByUsernameOrEmail(String usernameOrEmail);
 
-    record AuthUser(String id, String username, String email, String passwordHash, boolean enabled, List<String> roles,
+    void save(UserAccountRecord user);
+
+    record UserAccountRecord(
+            String id,
+            String username,
+            String email,
+            String passwordHash,
+            boolean enabled,
+            List<String> roles,
             List<String> scopes) {
     }
 }
