@@ -3,7 +3,7 @@
 # ================================================================
 
 # =============================
-# DATASOURCE (PostgreSQL)
+# 🗄️ DATASOURCE (PostgreSQL)
 # =============================
 spring:
   datasource:
@@ -24,7 +24,7 @@ spring:
       mode: never
 
 # =============================
-# SERVER
+# ⚙️ SERVER CONFIG
 # =============================
 server:
   port: ${PORT:8080}
@@ -33,24 +33,33 @@ server:
     include-message: never
 
 # =============================
-# JWT CONFIGURATION (RSA)
+# 🔐 JWT CONFIGURATION (RSA)
 # =============================
 security:
   jwt:
-    provider: nimbus
+    provider: nimbus          # o jjwt si usas el otro
+    kid: prod-rsa-1
     issuer: security-template
     audience: security-template-app
     algorithm: RSA
     expiration-seconds: 3600
     service-expiration-seconds: 300
     allowed-clock-skew-seconds: 60
+
+    # --- Option A: PEM (default RSA files) ---
     rsa:
       private-key-location: ${JWT_PRIVATE_PATH:file:/opt/keys/rsa-private.pem}
       public-key-location: ${JWT_PUBLIC_PATH:file:/opt/keys/rsa-public.pem}
 
+    # --- Option B: Keystore (Enterprise) ---
+    keystore:
+      path: ${KEYSTORE_PATH:/opt/keys/security-template.p12}
+      password: ${KEYSTORE_PASSWORD:changeit}
+      key-alias: ${KEY_ALIAS:jwt-signing-key}
+      key-password: ${KEY_PASSWORD:changeit}
 
 # =============================
-# RATE LIMITING (Stricter)
+# 🚦 RATE LIMITING (Strict)
 # =============================
 rate-limiting:
   enabled: true
@@ -62,7 +71,7 @@ rate-limiting:
   login-path: /api/v1/auth/login
 
 # =============================
-# CORS (Restricted)
+# 🌐 CORS (Restricted)
 # =============================
 cors:
   enabled: true
@@ -79,7 +88,7 @@ cors:
   max-age-seconds: 3600
 
 # =============================
-# LOGGING (Production)
+# 🧾 LOGGING
 # =============================
 logging:
   level:
@@ -89,10 +98,11 @@ logging:
     com.lanny.spring_security_template: INFO
 
 # =============================
-# ACTUATOR
+# 📈 ACTUATOR
 # =============================
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
