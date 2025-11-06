@@ -2,6 +2,7 @@ package com.lanny.spring_security_template.application.auth.service;
 
 import com.lanny.spring_security_template.application.auth.command.LoginCommand;
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
+import com.lanny.spring_security_template.application.auth.command.RegisterCommand;
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
 import com.lanny.spring_security_template.application.auth.port.out.*;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
@@ -9,6 +10,8 @@ import com.lanny.spring_security_template.application.auth.result.MeResult;
 import com.lanny.spring_security_template.domain.model.User;
 
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -73,4 +76,11 @@ public class AuthUseCaseImpl implements AuthUseCase {
 
         return new MeResult(user.id(), username, roles, scopes);
     }
+
+    @Override
+    @Profile("dev")
+    public void registerDev(RegisterCommand command) {
+        // Lógica para crear usuario de desarrollo (solo dev)
+    }
+
 }
