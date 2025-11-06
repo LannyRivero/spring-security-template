@@ -1,7 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.jwt.jjwt;
 
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
-import com.lanny.spring_security_template.infrastructure.jwt.nimbus.KeyProvider;
+import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -19,12 +19,12 @@ import java.util.*;
 @ConditionalOnProperty(name = "security.jwt.provider", havingValue = "jjwt",  matchIfMissing = true)
 public class JjwtTokenProvider implements TokenProvider {
 
-    private final KeyProvider keyProvider;
+    private final RsaKeyProvider keyProvider;
     private final String issuer;
     private final String audience;
 
     public JjwtTokenProvider(
-            KeyProvider keyProvider,
+            RsaKeyProvider keyProvider,
             @Value("${security.jwt.issuer}") String issuer,
             @Value("${security.jwt.audience}") String audience) {
         this.keyProvider = keyProvider;
@@ -45,7 +45,7 @@ public class JjwtTokenProvider implements TokenProvider {
                 .id(UUID.randomUUID().toString())
                 .claim("roles", roles)
                 .claim("scopes", scopes)
-                .signWith((RSAPrivateKey) keyProvider.getPrivateKey(), Jwts.SIG.RS256)
+                .signWith((RSAPrivateKey) keyProvider.privateKey(), Jwts.SIG.RS256)
                 .compact();
     }
 
@@ -61,7 +61,7 @@ public class JjwtTokenProvider implements TokenProvider {
                 .expiration(Date.from(exp))
                 .id(UUID.randomUUID().toString())
                 .claim("type", "refresh")
-                .signWith((RSAPrivateKey) keyProvider.getPrivateKey(), Jwts.SIG.RS256)
+                .signWith((RSAPrivateKey) keyProvider.privateKey(), Jwts.SIG.RS256)
                 .compact();
     }
 
@@ -69,7 +69,7 @@ public class JjwtTokenProvider implements TokenProvider {
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
-                    .verifyWith((RSAPublicKey) keyProvider.getPublicKey())
+                    .verifyWith((RSAPublicKey) keyProvider.publicKey())
                     .build()
                     .parseSignedClaims(token);
             return true;
@@ -82,7 +82,7 @@ public class JjwtTokenProvider implements TokenProvider {
     public String extractSubject(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith((RSAPublicKey) keyProvider.getPublicKey())
+                    .verifyWith((RSAPublicKey) keyProvider.publicKey())
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -96,7 +96,7 @@ public class JjwtTokenProvider implements TokenProvider {
     public Optional<TokenClaims> parseClaims(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith((RSAPublicKey) keyProvider.getPublicKey())
+                    .verifyWith((RSAPublicKey) keyProvider.publicKey())
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();

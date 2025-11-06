@@ -1,5 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.jwt.nimbus;
 
+import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.*;
 import com.nimbusds.jwt.*;
@@ -13,14 +14,14 @@ import java.util.*;
 @Component
 public class JwtUtils {
 
-    private final KeyProvider keyProvider;
+    private final RsaKeyProvider keyProvider;
     private final String issuer;
     private final String audience;
     private final long accessExpiration;
     private final long refreshExpiration;
 
     public JwtUtils(
-            KeyProvider keyProvider,
+            RsaKeyProvider keyProvider,
             @Value("${security.jwt.issuer}") String issuer,
             @Value("${security.jwt.audience}") String audience,
             @Value("${security.jwt.expiration-seconds}") long accessExpiration,
@@ -61,7 +62,7 @@ public class JwtUtils {
                     .build();
 
             SignedJWT jwt = new SignedJWT(header, claims);
-            jwt.sign(new RSASSASigner((RSAPrivateKey) keyProvider.getPrivateKey()));
+            jwt.sign(new RSASSASigner((RSAPrivateKey) keyProvider.privateKey()));
             return jwt.serialize();
 
         } catch (Exception e) {
@@ -80,7 +81,7 @@ public class JwtUtils {
     public JWTClaimsSet validateAndParse(String token) {
         try {
             SignedJWT jwt = SignedJWT.parse(token);
-            JWSVerifier verifier = new RSASSAVerifier((RSAPublicKey) keyProvider.getPublicKey());
+            JWSVerifier verifier = new RSASSAVerifier((RSAPublicKey) keyProvider.publicKey());
 
             if (!jwt.verify(verifier)) {
                 throw new JOSEException("Invalid signature");
