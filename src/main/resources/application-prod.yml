@@ -37,6 +37,7 @@ server:
 # =============================
 security:
   jwt:
+    provider: nimbus
     issuer: security-template
     audience: security-template-app
     algorithm: RSA
@@ -44,8 +45,9 @@ security:
     service-expiration-seconds: 300
     allowed-clock-skew-seconds: 60
     rsa:
-      private-location: ${JWT_PRIVATE_PATH:file:/opt/keys/rsa-private.pem}
-      public-location: ${JWT_PUBLIC_PATH:file:/opt/keys/rsa-public.pem}
+      private-key-location: ${JWT_PRIVATE_PATH:file:/opt/keys/rsa-private.pem}
+      public-key-location: ${JWT_PUBLIC_PATH:file:/opt/keys/rsa-public.pem}
+
 
 # =============================
 # RATE LIMITING (Stricter)
