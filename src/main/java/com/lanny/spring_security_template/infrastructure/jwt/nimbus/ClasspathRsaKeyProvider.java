@@ -3,7 +3,7 @@ package com.lanny.spring_security_template.infrastructure.jwt.nimbus;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
-public interface KeyProvider {
+public interface ClasspathRsaKeyProvider {
     RSAPrivateKey getPrivateKey();
     
     RSAPublicKey getPublicKey();

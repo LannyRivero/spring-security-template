@@ -8,7 +8,7 @@ import java.security.interfaces.RSAPublicKey;
 
 @Component
 @Profile({ "dev", "test" })
-public class KeyProviderClasspath implements KeyProvider {
+public class KeyProviderClasspath implements ClasspathRsaKeyProvider {
 
     private final RSAPrivateKey privateKey;
     private final RSAPublicKey publicKey;

@@ -1,7 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.jwt.jjwt;
 
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
-import com.lanny.spring_security_template.infrastructure.jwt.nimbus.KeyProvider;
+import com.lanny.spring_security_template.infrastructure.jwt.nimbus.ClasspathRsaKeyProvider;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -19,12 +19,12 @@ import java.util.*;
 @ConditionalOnProperty(name = "security.jwt.provider", havingValue = "jjwt",  matchIfMissing = true)
 public class JjwtTokenProvider implements TokenProvider {
 
-    private final KeyProvider keyProvider;
+    private final ClasspathRsaKeyProvider keyProvider;
     private final String issuer;
     private final String audience;
 
     public JjwtTokenProvider(
-            KeyProvider keyProvider,
+            ClasspathRsaKeyProvider keyProvider,
             @Value("${security.jwt.issuer}") String issuer,
             @Value("${security.jwt.audience}") String audience) {
         this.keyProvider = keyProvider;
