@@ -1,12 +1,16 @@
 package com.lanny.spring_security_template.infrastructure.security;
 
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
+import com.lanny.spring_security_template.infrastructure.security.filter.FilterOrder;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,6 +25,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 @Slf4j
+@Order(FilterOrder.JWT_AUTHORIZATION)
 @Component
 @RequiredArgsConstructor
 public class JwtAuthorizationFilter extends OncePerRequestFilter {

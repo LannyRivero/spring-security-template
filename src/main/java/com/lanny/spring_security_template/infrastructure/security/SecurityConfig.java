@@ -37,6 +37,7 @@ public class SecurityConfig {
     private final LoginRateLimitingFilter loginRateLimitingFilter;
     private final SecurityHeadersFilter securityHeadersFilter;
     private final AuthNoCacheFilter authNoCacheFilter;
+    private final CorrelationIdFilter correlationIdFilter;
 
     public SecurityConfig(
             JwtAuthorizationFilter jwtAuthz,
@@ -44,13 +45,15 @@ public class SecurityConfig {
             CustomAccessDeniedHandler deniedHandler,
             LoginRateLimitingFilter loginRateLimitingFilter,
             SecurityHeadersFilter securityHeadersFilter,
-            AuthNoCacheFilter authNoCacheFilter) {
+            AuthNoCacheFilter authNoCacheFilter,
+            CorrelationIdFilter correlationIdFilter) {
         this.jwtAuthz = jwtAuthz;
         this.entryPoint = entryPoint;
         this.deniedHandler = deniedHandler;
         this.loginRateLimitingFilter = loginRateLimitingFilter;
         this.securityHeadersFilter = securityHeadersFilter;
         this.authNoCacheFilter = authNoCacheFilter;
+        this.correlationIdFilter = correlationIdFilter;
     }
 
     @Bean
@@ -82,6 +85,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(deniedHandler));
 
         // Filters in recommended order:
+        http.addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(loginRateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(securityHeadersFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterAfter(authNoCacheFilter, SecurityHeadersFilter.class);
@@ -95,7 +99,8 @@ public class SecurityConfig {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOrigins(split(env.getProperty("cors.allowed-origins", "*")));
         cfg.setAllowedMethods(split(env.getProperty("cors.allowed-methods", "GET,POST,PUT,DELETE,OPTIONS")));
-        cfg.setAllowedHeaders(split(env.getProperty("cors.allowed-headers", "Authorization,Content-Type,X-Correlation-Id")));
+        cfg.setAllowedHeaders(
+                split(env.getProperty("cors.allowed-headers", "Authorization,Content-Type,X-Correlation-Id")));
         cfg.setExposedHeaders(split(env.getProperty("cors.exposed-headers", "X-Correlation-Id")));
         cfg.setAllowCredentials(Boolean.parseBoolean(env.getProperty("cors.allow-credentials", "true")));
         cfg.setMaxAge(Long.parseLong(env.getProperty("cors.max-age", "3600")));
@@ -109,4 +114,3 @@ public class SecurityConfig {
         return Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
     }
 }
-
