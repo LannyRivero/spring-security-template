@@ -18,9 +18,9 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class AuthService implements AuthUseCase {
+public class AuthUseCaseImpl implements AuthUseCase {
 
-    private final AuthPersistencePort authPersistence;
+    private final UserAccountGateway userAccountGateway;
     private final RoleProvider roleProvider;
     private final ScopePolicy scopePolicy;
     private final TokenProvider tokenProvider;
@@ -28,7 +28,7 @@ public class AuthService implements AuthUseCase {
 
     @Override
     public JwtResult login(LoginCommand command) {
-        User user = authPersistence.findByUsernameOrEmail(command.username())
+        User user = userAccountGateway.findByUsernameOrEmail(command.username())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         if (!user.passwordMatches(command.password(), passwordEncoder)) {
@@ -65,7 +65,7 @@ public class AuthService implements AuthUseCase {
 
     @Override
     public MeResult me(String username) {
-        User user = authPersistence.findByUsernameOrEmail(username)
+        User user = userAccountGateway.findByUsernameOrEmail(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         List<String> roles = roleProvider.resolveRoles(username);

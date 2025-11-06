@@ -1,21 +1,12 @@
 package com.lanny.spring_security_template.application.auth.port.out;
 
-import java.util.List;
+import com.lanny.spring_security_template.domain.model.User;
 import java.util.Optional;
 
 public interface UserAccountGateway {
 
-    Optional<UserAccountRecord> findByUsernameOrEmail(String usernameOrEmail);
+    Optional<User> findByUsernameOrEmail(String usernameOrEmail);
 
-    void save(UserAccountRecord user);
-
-    record UserAccountRecord(
-            String id,
-            String username,
-            String email,
-            String passwordHash,
-            boolean enabled,
-            List<String> roles,
-            List<String> scopes) {
-    }
+    void save(User user);
 }
+
