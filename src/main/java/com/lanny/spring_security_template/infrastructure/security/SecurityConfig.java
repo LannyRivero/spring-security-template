@@ -1,6 +1,9 @@
 package com.lanny.spring_security_template.infrastructure.security;
 
 import com.lanny.spring_security_template.infrastructure.security.filter.*;
+import com.lanny.spring_security_template.infrastructure.security.handler.CustomAccessDeniedHandler;
+import com.lanny.spring_security_template.infrastructure.security.handler.CustomAuthEntryPoint;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;

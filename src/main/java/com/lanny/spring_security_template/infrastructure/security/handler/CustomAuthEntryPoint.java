@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.security;
+package com.lanny.spring_security_template.infrastructure.security.handler;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
