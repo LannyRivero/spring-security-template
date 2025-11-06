@@ -11,6 +11,7 @@ cors:
 
 security:
   jwt:
+    provider: jjwt
     issuer: security-template
     algorithm: RSA
 

@@ -16,7 +16,7 @@ import java.time.Instant;
 import java.util.*;
 
 @Component
-@ConditionalOnProperty(name = "security.jwt.provider", havingValue = "jjwt")
+@ConditionalOnProperty(name = "security.jwt.provider", havingValue = "jjwt",  matchIfMissing = true)
 public class JjwtTokenProvider implements TokenProvider {
 
     private final KeyProvider keyProvider;

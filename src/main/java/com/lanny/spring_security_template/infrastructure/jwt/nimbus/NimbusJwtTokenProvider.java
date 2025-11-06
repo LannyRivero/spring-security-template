@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Component
-@ConditionalOnProperty(name = "security.jwt.provider", havingValue = "nimbus", matchIfMissing = true)
+@ConditionalOnProperty(name = "security.jwt.provider", havingValue = "nimbus")
 public class NimbusJwtTokenProvider implements TokenProvider {
 
     private final JwtUtils jwtUtils;
