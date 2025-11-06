@@ -13,14 +13,14 @@ import java.util.*;
 @Component
 public class JwtUtils {
 
-    private final ClasspathRsaKeyProvider keyProvider;
+    private final KeyProvider keyProvider;
     private final String issuer;
     private final String audience;
     private final long accessExpiration;
     private final long refreshExpiration;
 
     public JwtUtils(
-            ClasspathRsaKeyProvider keyProvider,
+            KeyProvider keyProvider,
             @Value("${security.jwt.issuer}") String issuer,
             @Value("${security.jwt.audience}") String audience,
             @Value("${security.jwt.expiration-seconds}") long accessExpiration,

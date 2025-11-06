@@ -1,7 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.jwt;
 
 import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
-import com.lanny.spring_security_template.infrastructure.jwt.nimbus.KeyProviderClasspath;
+import com.lanny.spring_security_template.infrastructure.jwt.nimbus.ClasspathRsaKeyProvider;
 import com.nimbusds.jwt.JWTClaimsSet;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +23,7 @@ class JwtUtilsTest {
     private final JwtUtils jwtUtils;
 
     public JwtUtilsTest() {
-        KeyProviderClasspath keyProvider = new KeyProviderClasspath();
+        ClasspathRsaKeyProvider keyProvider = new ClasspathRsaKeyProvider();
         String issuer = "test-issuer";
         String audience = "test-audience";
         long accessExpiration = 3600; // 1 hour in seconds
