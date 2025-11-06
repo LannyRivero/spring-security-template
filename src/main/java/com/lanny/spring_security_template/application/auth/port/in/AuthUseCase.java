@@ -1,32 +1,32 @@
 package com.lanny.spring_security_template.application.auth.port.in;
 
-import com.lanny.spring_security_template.web.dto.AuthRequest;
-import com.lanny.spring_security_template.web.dto.AuthResponse;
-import com.lanny.spring_security_template.web.dto.RegisterRequest;
+import com.lanny.spring_security_template.application.auth.command.*;
+import com.lanny.spring_security_template.application.auth.result.*;
 
 /**
- * Defines the input port for authentication-related use cases.
- * 
- * This interface is intentionally generic to serve as a reusable template
- * for future projects implementing Spring Security with JWT.
+ * ✅ High-level use case boundary for authentication and token management.
+ * Defines core operations exposed to controllers or other application layers.
  */
 public interface AuthUseCase {
 
     /**
-     * Authenticates a user and issues a JWT token pair.
-     *
-     * @param request contains username/email and password.
-     * @return AuthResponse containing access and refresh tokens.
+     * Perform user authentication and issue JWT access + refresh tokens.
      */
-    AuthResponse login(AuthRequest request);
+    JwtResult login(LoginCommand command);
 
     /**
-     * Registers a new user account.
-     *
-     * @param request contains username, password, and email.
-     * @return AuthResponse with tokens for the newly registered user.
+     * Validate and renew access token using refresh token.
      */
+    JwtResult refresh(RefreshCommand command);
 
-    AuthResponse register(RegisterRequest request);
+    /**
+     * Return profile and authorities of the authenticated user.
+     */
+    MeResult me(String username);
 
+    /**
+     * Create a developer account in dev environments only.
+     */
+    void registerDev(RegisterCommand command);
 }
+

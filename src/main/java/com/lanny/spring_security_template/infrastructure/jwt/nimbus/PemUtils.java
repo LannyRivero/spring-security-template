@@ -12,71 +12,106 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
-public class PemUtils {
+/**
+ * Utility class for loading RSA keys from PEM files.
+ * Supports both classpath, filesystem, and InputStream sources.
+ */
+public final class PemUtils {
 
-    /**
-     * Reads an RSA private key from either the classpath or an absolute file path.
+    private PemUtils() {
+    }
+
+    /*
+     * ==========================================================
+     * 🔐 Read by file path (current behaviour)
+     * ==========================================================
      */
     public static RSAPrivateKey readPrivateKey(String location) {
         try {
             String pem = loadPem(location);
-            String key = pem
-                    .replace("-----BEGIN PRIVATE KEY-----", "")
-                    .replace("-----END PRIVATE KEY-----", "")
-                    .replaceAll("\\s+", "");
-            byte[] decoded = Base64.getDecoder().decode(key);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            return (RSAPrivateKey) kf.generatePrivate(new PKCS8EncodedKeySpec(decoded));
+            return parsePrivateKey(pem);
         } catch (Exception e) {
             throw new IllegalStateException("Cannot read private key", e);
         }
     }
 
-    /**
-     * Reads an RSA public key from either the classpath or an absolute file path.
-     */
     public static RSAPublicKey readPublicKey(String location) {
         try {
             String pem = loadPem(location);
-            String key = pem
-                    .replace("-----BEGIN PUBLIC KEY-----", "")
-                    .replace("-----END PUBLIC KEY-----", "")
-                    .replaceAll("\\s+", "");
-            byte[] decoded = Base64.getDecoder().decode(key);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            return (RSAPublicKey) kf.generatePublic(new X509EncodedKeySpec(decoded));
+            return parsePublicKey(pem);
         } catch (Exception e) {
             throw new IllegalStateException("Cannot read public key", e);
         }
     }
 
-    /**
-     * Loads a PEM file from the classpath or filesystem.
+    /*
+     * ==========================================================
+     * 🔄 New: read directly from InputStream (for KMS / remote)
+     * ==========================================================
      */
+    public static RSAPrivateKey readPrivateKey(InputStream is) {
+        try {
+            String pem = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            return parsePrivateKey(pem);
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot read private key from stream", e);
+        }
+    }
+
+    public static RSAPublicKey readPublicKey(InputStream is) {
+        try {
+            String pem = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            return parsePublicKey(pem);
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot read public key from stream", e);
+        }
+    }
+
+    /*
+     * ==========================================================
+     * 🧩 Internal helpers
+     * ==========================================================
+     */
+    private static RSAPrivateKey parsePrivateKey(String pem) throws Exception {
+        String key = pem.replace("-----BEGIN PRIVATE KEY-----", "")
+                .replace("-----END PRIVATE KEY-----", "")
+                .replaceAll("\\s+", "");
+        byte[] decoded = Base64.getDecoder().decode(key);
+        return (RSAPrivateKey) KeyFactory.getInstance("RSA")
+                .generatePrivate(new PKCS8EncodedKeySpec(decoded));
+    }
+
+    private static RSAPublicKey parsePublicKey(String pem) throws Exception {
+        String key = pem.replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replaceAll("\\s+", "");
+        byte[] decoded = Base64.getDecoder().decode(key);
+        return (RSAPublicKey) KeyFactory.getInstance("RSA")
+                .generatePublic(new X509EncodedKeySpec(decoded));
+    }
+
     private static String loadPem(String location) throws IOException {
-        // Try as classpath resource first with original location
+        // Try as classpath
         try (InputStream is = PemUtils.class.getResourceAsStream(location)) {
-            if (is != null) {
+            if (is != null)
                 return new String(is.readAllBytes(), StandardCharsets.UTF_8);
-            }
         }
 
-        // Also try with leading '/' for classpath (only if not already present)
+        // Try with leading slash (classpath root)
         if (!location.startsWith("/")) {
             try (InputStream is = PemUtils.class.getResourceAsStream("/" + location)) {
-                if (is != null) {
+                if (is != null)
                     return new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                }
             }
         }
 
-        // Try as absolute or relative file path (use original location)
+        // Try as file path
         Path path = Path.of(location);
         if (Files.exists(path)) {
             return Files.readString(path, StandardCharsets.UTF_8);
         }
 
-        // If not found
-        throw new IllegalArgumentException("Key file not found at: " + location);
+        throw new IllegalArgumentException("Key file not found: " + location);
     }
 }
+    

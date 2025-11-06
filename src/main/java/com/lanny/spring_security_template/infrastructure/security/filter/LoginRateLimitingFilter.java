@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -21,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 🚦 Simple rate limiting filter for /api/v1/auth/login endpoint.
  * Blocks brute-force attempts using a per-IP sliding window counter.
  */
+@Order(FilterOrder.RATE_LIMITING)
 @Component
 public class LoginRateLimitingFilter extends OncePerRequestFilter {
 

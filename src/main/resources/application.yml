@@ -4,14 +4,5 @@ spring:
   profiles:
     active: dev
 
-cors:
-  allowed-origins: "http://localhost:5173,http://localhost:4200"
-  allowed-methods: "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-  allowed-headers: "*"
-
-security:
-  jwt:
-    issuer: security-template
-    algorithm: RSA
 
 

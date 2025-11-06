@@ -1,5 +1,12 @@
 package com.lanny.spring_security_template.application.auth.port.out;
 
+import com.lanny.spring_security_template.domain.model.User;
+import java.util.Optional;
+
 public interface UserAccountGateway {
-    // Acceso a datos del usuario (JPA / in-memory)
+
+    Optional<User> findByUsernameOrEmail(String usernameOrEmail);
+
+    void save(User user);
 }
+

@@ -10,6 +10,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
+import com.lanny.spring_security_template.infrastructure.security.handler.CustomAccessDeniedHandler;
+import com.lanny.spring_security_template.infrastructure.security.handler.CustomAuthEntryPoint;
 
 /**
  * 🚧 SecurityConfigTest
