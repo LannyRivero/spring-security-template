@@ -103,6 +103,7 @@ Disponible en:
 ```
 
 Usa el botón Authorize → Bearer Token para probar endpoints protegidos.
+---
 
 🧪 Tests y Calidad
 
@@ -116,6 +117,7 @@ Usa el botón Authorize → Bearer Token para probar endpoints protegidos.
 -  Cobertura: ≥70% (JaCoCo)
 -  Checkstyle + Spotless: enforce style rules
 -  CI/CD: GitHub Actions (build + test + cobertura + docker build)
+---
 
 🧰 Stack Técnico
 | Componente    | Tecnología                         |
@@ -129,9 +131,15 @@ Usa el botón Authorize → Bearer Token para probar endpoints protegidos.
 | Calidad       | JaCoCo, Checkstyle, Spotless       |
 | DevOps        | Docker, GitHub Actions             |
 
+---
 
 ⚙️ Ejecución local
 ```bash
 java -jar target/spring-security-template.jar
 ```
+---
+
+📑 Licencia
+
+MIT © 2025 Lanny Rivero Canino
 
