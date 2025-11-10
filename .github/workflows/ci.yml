@@ -1,19 +1,25 @@
-name: CI Pipeline
+name: 🧪 CI Pipeline — Build, Test & Quality Gate
 
 on:
   push:
-    branches: ["**"]
+    branches: [ main, develop ]
   pull_request:
-    branches: ["**"]
+    branches: [ main, develop ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+      # ------------------------------------------------------------
+      # 1️⃣ Checkout repository
+      # ------------------------------------------------------------
       - name: 🧱 Checkout repository
         uses: actions/checkout@v4
 
+      # ------------------------------------------------------------
+      # 2️⃣ Set up Java (Temurin 21)
+      # ------------------------------------------------------------
       - name: ☕ Set up Java
         uses: actions/setup-java@v4
         with:
@@ -21,19 +27,52 @@ jobs:
           java-version: "21"
           cache: maven
 
+      # ------------------------------------------------------------
+      # 3️⃣ Build & Verify
+      # ------------------------------------------------------------
       - name: 🧩 Build and verify
         run: mvn -B clean verify
 
+      # ------------------------------------------------------------
+      # 4️⃣ Code style check (Checkstyle)
+      # ------------------------------------------------------------
       - name: 🧹 Run Checkstyle
-        run: mvn -q checkstyle:check     
+        run: mvn -q checkstyle:check
 
-      - name: 🧪 Run tests
-        run: mvn -q test
+      # ------------------------------------------------------------
+      # 5️⃣ Run tests + Coverage report
+      # ------------------------------------------------------------
+      - name: 🧪 Run tests with coverage
+        run: mvn -q test jacoco:report
 
-      - name: 📊 Generate Jacoco coverage report
-        if: success()
-        run: mvn -q jacoco:report
+      # ------------------------------------------------------------
+      # 6️⃣ Enforce coverage threshold (≥70%)
+      # ------------------------------------------------------------
+      - name: 🔒 Enforce coverage threshold
+        run: |
+          TOTAL=$(grep -oPm1 "(?<=<counter type=\"INSTRUCTION\" missed=\")\d+\" covered=\"\K\d+" target/site/jacoco/jacoco.xml | awk '{sum+=$1} END {print sum/NR}')
+          if [ -z "$TOTAL" ]; then
+            echo "⚠️  No coverage data found. Check if tests ran correctly."; exit 1;
+          fi
+          COV=$(printf "%.0f" "$TOTAL")
+          echo "Coverage: $COV%"
+          if (( COV < 70 )); then
+            echo "❌ Coverage below threshold (70%)"; exit 1;
+          fi
 
+      # ------------------------------------------------------------
+      # 7️⃣ Upload JaCoCo report as artifact
+      # ------------------------------------------------------------
+      - name: 📊 Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+
+      # ------------------------------------------------------------
+      # 8️⃣ Build Docker image (optional for deploy)
+      # ------------------------------------------------------------
       - name: 📦 Build Docker image
         env:
           IMAGE_NAME: spring-security-template
