@@ -2,12 +2,14 @@ package com.lanny.spring_security_template.domain.model;
 
 import java.util.List;
 import java.util.Objects;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.lanny.spring_security_template.domain.model.exception.UserLockedException;
 
 /**
  * Domain aggregate representing an authenticated user.
+ * Contains business rules to determine if a user can authenticate.
  */
 public class User {
 
@@ -30,6 +32,28 @@ public class User {
         this.scopes = List.copyOf(scopes);
     }
 
+    // --- Business rules ---
+
+    /**
+     * Ensures the user is allowed to authenticate.
+     * Throws a domain exception if the account is locked or disabled.
+     */
+    public void ensureCanAuthenticate() {
+        if (!enabled) {
+            throw new UserLockedException("User " + username + " is locked or disabled");
+        }
+    }
+
+    /**
+     * Domain-controlled password validation.
+     * Reuses ensureCanAuthenticate() to apply security rules.
+     */
+    public boolean passwordMatches(String rawPassword, PasswordEncoder encoder) {
+        ensureCanAuthenticate();
+        return encoder.matches(rawPassword, passwordHash);
+    }
+
+    // --- Getters ---
     public String id() {
         return id;
     }
@@ -54,19 +78,11 @@ public class User {
         return enabled;
     }
 
-    /** Getter interno (infraestructura puede acceder) */
     public String passwordHash() {
         return passwordHash;
     }
 
-    /** ✅ Dominio controla la validación de contraseñas */
-    public boolean passwordMatches(String rawPassword, PasswordEncoder encoder) {
-        if (!enabled) {
-            throw new UserLockedException(username);
-        }
-        return encoder.matches(rawPassword, passwordHash);
-    }
-
+    // --- Equality ---
     @Override
     public boolean equals(Object o) {
         if (this == o)
