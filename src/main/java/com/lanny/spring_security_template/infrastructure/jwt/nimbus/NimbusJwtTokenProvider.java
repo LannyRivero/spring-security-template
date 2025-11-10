@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.Optional;
 
 @Component
-@ConditionalOnProperty(name = "security.jwt.provider", havingValue = "nimbus")
+@ConditionalOnProperty(name = "security.jwt.provider", havingValue = "nimbus", matchIfMissing = true)
+
 public class NimbusJwtTokenProvider implements TokenProvider {
 
     private final JwtUtils jwtUtils;
@@ -32,12 +33,7 @@ public class NimbusJwtTokenProvider implements TokenProvider {
 
     @Override
     public boolean validateToken(String token) {
-        try {
-            jwtUtils.validateAndParse(token);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        return parseClaims(token).isPresent();
     }
 
     @Override
@@ -50,15 +46,14 @@ public class NimbusJwtTokenProvider implements TokenProvider {
         try {
             JWTClaimsSet claims = jwtUtils.validateAndParse(token);
             return Optional.of(new TokenClaims(
-                claims.getSubject(),
-                claims.getStringListClaim("roles"),
-                claims.getStringListClaim("scopes"),
-                claims.getIssueTime().toInstant().getEpochSecond(),
-                claims.getExpirationTime().toInstant().getEpochSecond(),
-                claims.getJWTID(),
-                claims.getIssuer(),
-                claims.getStringListClaim("aud") != null ? claims.getStringListClaim("aud") : List.of()
-            ));
+                    claims.getSubject(),
+                    claims.getStringListClaim("roles"),
+                    claims.getStringListClaim("scopes"),
+                    claims.getIssueTime().toInstant().getEpochSecond(),
+                    claims.getExpirationTime().toInstant().getEpochSecond(),
+                    claims.getJWTID(),
+                    claims.getIssuer(),
+                    claims.getStringListClaim("aud") != null ? claims.getStringListClaim("aud") : List.of()));
         } catch (Exception e) {
             return Optional.empty();
         }

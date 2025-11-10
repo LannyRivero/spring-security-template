@@ -20,9 +20,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 🔐 Authentication Controller — handles login, refresh, user info, and dev registration.
+ */
 @Tag(name = "Authentication", description = "Endpoints for JWT authentication and user info")
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -34,7 +36,9 @@ public class AuthController {
     @Value("${app.auth.register-enabled:false}")
     private boolean registerEnabled;
 
-    // --- LOGIN --------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // 🔸 LOGIN
+    // -------------------------------------------------------------------------
     @Operation(
             summary = "Authenticate user and issue JWT tokens",
             responses = {
@@ -51,7 +55,9 @@ public class AuthController {
         );
     }
 
-    // --- REFRESH ------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // 🔸 REFRESH TOKEN
+    // -------------------------------------------------------------------------
     @Operation(
             summary = "Refresh access token using a valid refresh token",
             responses = {
@@ -68,7 +74,9 @@ public class AuthController {
         );
     }
 
-    // --- ME -----------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // 🔸 CURRENT USER INFO
+    // -------------------------------------------------------------------------
     @Operation(
             summary = "Get current authenticated user info",
             security = @SecurityRequirement(name = "bearerAuth"),
@@ -79,14 +87,16 @@ public class AuthController {
             }
     )
     @GetMapping("/me")
-    public ResponseEntity<MeResponse> me(@AuthenticationPrincipal UserDetails principal) {
-        MeResult result = authUseCase.me(principal.getUsername());
+    public ResponseEntity<MeResponse> me(@AuthenticationPrincipal(expression = "username") String username) {
+        MeResult result = authUseCase.me(username);
         return ResponseEntity.ok(
                 new MeResponse(result.userId(), result.username(), result.roles(), result.scopes())
         );
     }
 
-    // --- REGISTER -----------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // 🔸 REGISTER (DEV ONLY)
+    // -------------------------------------------------------------------------
     @Operation(
             summary = "Register a new user (only enabled in dev mode)",
             responses = {
@@ -101,7 +111,6 @@ public class AuthController {
                     .body("User registration is disabled in this environment");
         }
 
-        // Future: delegate to RegisterUseCase
         var response = new MessageResponse(
                 "User '%s' registered successfully (dev mode)".formatted(request.username())
         );
@@ -109,7 +118,10 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // --- SIMPLE MESSAGE DTO (local) ----------------------------------------
+    // -------------------------------------------------------------------------
+    // 🔸 LOCAL DTO
+    // -------------------------------------------------------------------------
     private record MessageResponse(String message) {}
 }
+
 
