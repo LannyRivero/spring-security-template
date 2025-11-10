@@ -63,7 +63,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // ✅ Flexible y seguro (bcrypt, noop, pbkdf2, argon2, etc.)
+        //  Flexible y seguro (bcrypt, noop, pbkdf2, argon2, etc.)
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
