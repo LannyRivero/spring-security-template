@@ -1,12 +1,10 @@
 package com.lanny.spring_security_template.infrastructure.security;
 
+import com.lanny.spring_security_template.infrastructure.config.SecurityCorsProperties;
 import com.lanny.spring_security_template.infrastructure.security.filter.*;
-import com.lanny.spring_security_template.infrastructure.security.handler.CustomAccessDeniedHandler;
-import com.lanny.spring_security_template.infrastructure.security.handler.CustomAuthEntryPoint;
-
+import com.lanny.spring_security_template.infrastructure.security.handler.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
@@ -19,12 +17,7 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.List;
+import org.springframework.web.cors.*;
 
 @Configuration
 @EnableWebSecurity
@@ -63,7 +56,6 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        //  Flexible y seguro (bcrypt, noop, pbkdf2, argon2, etc.)
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
@@ -73,44 +65,35 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(headers -> headers
-                        .frameOptions(frame -> frame.deny())
-                        .xssProtection(xss -> xss.disable()))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(entryPoint)
+                        .accessDeniedHandler(deniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
-                        .anyRequest().authenticated())
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(entryPoint)
-                        .accessDeniedHandler(deniedHandler));
+                        .anyRequest().authenticated());
 
-        // Filters in recommended order:
         http.addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(loginRateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
-        http.addFilterBefore(securityHeadersFilter, UsernamePasswordAuthenticationFilter.class);
-        http.addFilterAfter(authNoCacheFilter, SecurityHeadersFilter.class);
         http.addFilterBefore(jwtAuthz, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(securityHeadersFilter, JwtAuthorizationFilter.class);
+        http.addFilterAfter(authNoCacheFilter, SecurityHeadersFilter.class);
 
         return http.build();
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource(Environment env) {
+    public CorsConfigurationSource corsConfigurationSource(SecurityCorsProperties props) {
         CorsConfiguration cfg = new CorsConfiguration();
-        cfg.setAllowedOrigins(split(env.getProperty("cors.allowed-origins", "*")));
-        cfg.setAllowedMethods(split(env.getProperty("cors.allowed-methods", "GET,POST,PUT,DELETE,OPTIONS")));
-        cfg.setAllowedHeaders(
-                split(env.getProperty("cors.allowed-headers", "Authorization,Content-Type,X-Correlation-Id")));
-        cfg.setExposedHeaders(split(env.getProperty("cors.exposed-headers", "X-Correlation-Id")));
-        cfg.setAllowCredentials(Boolean.parseBoolean(env.getProperty("cors.allow-credentials", "true")));
-        cfg.setMaxAge(Long.parseLong(env.getProperty("cors.max-age", "3600")));
+        cfg.setAllowedOrigins(props.allowedOrigins());
+        cfg.setAllowedMethods(props.allowedMethods());
+        cfg.setAllowedHeaders(props.allowedHeaders());
+        cfg.setExposedHeaders(props.exposedHeaders());
+        cfg.setAllowCredentials(props.allowCredentials());
+        cfg.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);
         return source;
-    }
-
-    private static List<String> split(String csv) {
-        return Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
     }
 }
