@@ -1,60 +1,76 @@
 package com.lanny.spring_security_template.infrastructure.config;
 
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import io.swagger.v3.oas.annotations.info.Contact;
+import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.servers.Server;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
-import io.swagger.v3.oas.models.info.Contact;
-import io.swagger.v3.oas.models.security.SecurityRequirement;
-import io.swagger.v3.oas.models.security.SecurityScheme;
-import io.swagger.v3.oas.models.servers.Server;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
 /**
- * ✅ OpenAPI / Swagger configuration for JWT-secured REST APIs.
- * 
- * Automatically integrates the bearerAuth scheme for token-based
- * authentication.
+ * OpenAPI configuration for JWT-secured Spring Boot applications.
+ *
+ * Provides global metadata (title, version, contact),
+ * defines bearerAuth scheme for Swagger UI,
+ * and registers environment-aware servers dynamically.
  */
 @Configuration
+@OpenAPIDefinition(info = @Info(title = "Spring Security Template API", version = "1.0.0", description = """
+                🔐 Plantilla base para autenticación y autorización JWT.
+                Incluye login, refresh, scopes y roles RBAC/ABAC.
+                """, contact = @Contact(name = "Lanny Rivero Canino", email = "contact@springtemplate.dev", url = "https://github.com/lannyrc")), servers = {
+                @Server(url = "http://localhost:8080", description = "Local Dev Server"),
+                @Server(url = "https://api.springtemplate.dev", description = "Production Server")
+}, security = { @SecurityRequirement(name = "bearerAuth") })
+@SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT", in = SecuritySchemeIn.HEADER, description = """
+                Provide your JWT access token.
+                Example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                """)
 public class OpenApiConfig {
 
-    @Bean
-    public OpenAPI springSecurityTemplateAPI() {
-        return new OpenAPI()
-                .info(new Info()
-                        .title("Spring Security Template API")
-                        .description("""
-                                🔐 JWT-based authentication & authorization template for Spring Boot.
+        /**
+         * Creates an OpenAPI instance with license and dynamic server URL based on
+         * the active Spring profile.
+         */
+        @Bean
+        public OpenAPI customOpenAPI(@Value("${spring.profiles.active:dev}") String profile) {
 
-                                Provides login, refresh, and user profile endpoints with RBAC & scopes.
-                                """)
-                        .version("v1.0.0")
-                        .license(new License()
-                                .name("MIT License")
-                                .url("https://opensource.org/licenses/MIT"))
-                        .contact(new Contact()
-                                .name("Lanny Rivero Canino")
-                                .email("lanny@example.com")
-                                .url("https://github.com/lanny")))
-                .servers(List.of(
-                        new Server().url("http://localhost:8080").description("Local Dev Server"),
-                        new Server().url("https://api.example.com").description("Production Server")))
-                // --- Global security requirement ---
-                .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
-                // --- Define the JWT bearer scheme ---
-                .components(new io.swagger.v3.oas.models.Components()
-                        .addSecuritySchemes("bearerAuth",
-                                new SecurityScheme()
-                                        .type(SecurityScheme.Type.HTTP)
-                                        .scheme("bearer")
-                                        .bearerFormat("JWT")
-                                        .name("Authorization")
-                                        .description("""
-                                                Provide the JWT access token.
-                                                Example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-                                                """)));
-    }
+                // Determinar la URL del servidor según el perfil activo
+                String serverUrl;
+                switch (profile) {
+                        case "prod" -> serverUrl = "https://api.springtemplate.dev";
+                        case "test" -> serverUrl = "http://localhost:8081";
+                        default -> serverUrl = "http://localhost:8080";
+                }
+
+                // Construir el objeto OpenAPI
+                OpenAPI openAPI = new OpenAPI()
+                                .info(new io.swagger.v3.oas.models.info.Info()
+                                                .title("Spring Security Template API")
+                                                .version("1.0.0")
+                                                .description("""
+                                                                Template base para autenticación JWT con Spring Boot 3.x.
+                                                                Incluye control de roles, scopes, refresh tokens y filtros de seguridad.
+                                                                """)
+                                                .license(new License()
+                                                                .name("MIT License")
+                                                                .url("https://opensource.org/licenses/MIT")));
+
+                // Añadir el servidor dinámico
+                io.swagger.v3.oas.models.servers.Server dynamicServer = new io.swagger.v3.oas.models.servers.Server()
+                                .url(serverUrl)
+                                .description(profile.toUpperCase() + " environment");
+
+                openAPI.setServers(List.of(dynamicServer));
+                return openAPI;
+        }
 }
