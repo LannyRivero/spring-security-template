@@ -1,8 +1,27 @@
+# =============================
+# ⚙️ ACTUATOR + METRICS
+# =============================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: spring-security-template
+
+# =============================
+# 🌱 SPRING APPLICATION CONFIG
+# =============================
 spring:
   application:
     name: spring-security-template
   profiles:
     active: dev
+
 
 
 
