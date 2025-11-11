@@ -2,6 +2,8 @@ package com.lanny.spring_security_template.infrastructure.persistence;
 
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.domain.model.User;
+import com.lanny.spring_security_template.domain.model.UserStatus;
+
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +22,7 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
                     "admin",
                     "admin@example.com",
                     "{noop}admin123",
-                    true,
+                    UserStatus.ACTIVE,
                     List.of("ROLE_ADMIN"),
                     List.of("profile:read", "profile:write")
             ));
@@ -32,7 +34,7 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
                     "user",
                     "user@example.com",
                     "{noop}user123",
-                    true,
+                    UserStatus.ACTIVE,
                     List.of("ROLE_USER"),
                     List.of("profile:read")
             ));
