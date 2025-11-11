@@ -15,12 +15,14 @@ import com.lanny.spring_security_template.application.auth.command.RegisterComma
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
 import com.lanny.spring_security_template.application.auth.port.out.ScopePolicy;
+import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
 import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.model.exception.InvalidCredentialsException;
+import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.shared.ClockProvider;
 
 import lombok.RequiredArgsConstructor;
@@ -35,60 +37,82 @@ public class AuthUseCaseImpl implements AuthUseCase {
     private final TokenProvider tokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final ClockProvider clockProvider;
+    private final SecurityJwtProperties securityJwtProperties;
+    private final TokenBlacklistGateway tokenBlacklistGateway;
 
+    // ===========================
+    // LOGIN
+    // ===========================
     @Override
     public JwtResult login(LoginCommand command) {
-        // 1) Buscar usuario
         User user = userAccountGateway.findByUsernameOrEmail(command.username())
                 .orElseThrow(() -> new UsernameNotFoundException(command.username()));
 
-        // 2) Validar estado de la cuenta (regla de dominio)
         user.ensureCanAuthenticate();
 
-        // 3) Validar credenciales
         if (!user.passwordMatches(command.password(), passwordEncoder)) {
             throw new InvalidCredentialsException("Invalid username or password");
         }
 
-        // 4) Calcular roles y scopes
         List<String> roles = roleProvider.resolveRoles(user.username());
         List<String> scopes = scopePolicy.resolveScopes(roles);
 
-        // 5) Duraciones (pueden venir de SecurityJwtProperties)
-        Duration accessTtl = Duration.ofMinutes(15);
-        Duration refreshTtl = Duration.ofDays(30);
+        Duration accessTtl = securityJwtProperties.accessTtl();
+        Duration refreshTtl = securityJwtProperties.refreshTtl();
 
-        // 6) Instantes deterministas desde ClockProvider
         Instant issuedAt = clockProvider.now();
         Instant accessExp = issuedAt.plus(accessTtl);
 
-        // 7) Generar tokens
         String accessToken = tokenProvider.generateAccessToken(user.username(), roles, scopes, accessTtl);
         String refreshToken = tokenProvider.generateRefreshToken(user.username(), refreshTtl);
 
-        // 8) Devolver resultado con expiración exacta
         return new JwtResult(accessToken, refreshToken, accessExp);
     }
 
+    // ===========================
+    // REFRESH TOKEN (con rotación opcional)
+    // ===========================
     @Override
     public JwtResult refresh(RefreshCommand command) {
         return tokenProvider.parseClaims(command.refreshToken())
                 .map(claims -> {
+                    // Si está revocado, se rechaza
+                    if (tokenBlacklistGateway.isRevoked(claims.jti())) {
+                        throw new IllegalArgumentException("Refresh token revoked");
+                    }
+
                     String username = claims.sub();
                     List<String> roles = roleProvider.resolveRoles(username);
                     List<String> scopes = scopePolicy.resolveScopes(roles);
 
-                    Duration accessTtl = Duration.ofMinutes(15);
+                    Duration accessTtl = securityJwtProperties.accessTtl();
+                    Duration refreshTtl = securityJwtProperties.refreshTtl();
+
                     Instant issuedAt = clockProvider.now();
-                    Instant expiresAt = issuedAt.plus(accessTtl);
+                    Instant accessExp = issuedAt.plus(accessTtl);
 
+                    // Si la política de rotación está activa
+                    if (securityJwtProperties.rotateRefreshTokens()) {
+                        // Revocar el refresh token actual
+                        tokenBlacklistGateway.revoke(claims.jti(), Instant.ofEpochSecond(claims.exp()));
+
+                        // Emitir uno nuevo
+                        String newRefresh = tokenProvider.generateRefreshToken(username, refreshTtl);
+                        String newAccess = tokenProvider.generateAccessToken(username, roles, scopes, accessTtl);
+
+                        return new JwtResult(newAccess, newRefresh, accessExp);
+                    }
+
+                    // Sin rotación: solo generar un nuevo access token
                     String newAccess = tokenProvider.generateAccessToken(username, roles, scopes, accessTtl);
-
-                    return new JwtResult(newAccess, command.refreshToken(), expiresAt);
+                    return new JwtResult(newAccess, command.refreshToken(), accessExp);
                 })
                 .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
     }
 
+    // ===========================
+    //  ME
+    // ===========================
     @Override
     public MeResult me(String username) {
         User user = userAccountGateway.findByUsernameOrEmail(username)
@@ -100,6 +124,9 @@ public class AuthUseCaseImpl implements AuthUseCase {
         return new MeResult(user.id(), username, roles, scopes);
     }
 
+    // ===========================
+    // DEV REGISTER
+    // ===========================
     @Override
     @Profile("dev")
     public void registerDev(RegisterCommand command) {
