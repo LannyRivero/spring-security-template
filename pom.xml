@@ -98,6 +98,13 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
+    <!-- 📊 Metrics (Micrometer + Prometheus) -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+    </dependency>
+
+
     <!-- 🧠 MapStruct -->
     <dependency>
       <groupId>org.mapstruct</groupId>

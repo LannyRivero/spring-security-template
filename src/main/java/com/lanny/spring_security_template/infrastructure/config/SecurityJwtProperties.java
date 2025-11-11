@@ -10,6 +10,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * Central configuration for JWT generation and validation.
  * Maps values from application.yml (security.jwt.*).
  */
+
 @ConfigurationProperties(prefix = "security.jwt")
 public record SecurityJwtProperties(
         /** Token issuer (iss claim) */
