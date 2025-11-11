@@ -26,8 +26,8 @@ class JwtUtilsTest {
         ClasspathRsaKeyProvider keyProvider = new ClasspathRsaKeyProvider();
         String issuer = "test-issuer";
         String audience = "test-audience";
-        long accessExpiration = 3600; // 1 hour in seconds
-        long refreshExpiration = 86400; // 1 day in seconds
+        long accessExpiration = 3600000L; // 1 hour in milliseconds
+        long refreshExpiration = 86400000L; // 1 day in milliseconds
         this.jwtUtils = new JwtUtils(keyProvider, issuer, audience, accessExpiration, refreshExpiration);
    }
 

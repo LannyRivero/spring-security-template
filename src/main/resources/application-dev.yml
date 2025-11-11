@@ -40,19 +40,24 @@ security:
   jwt:
     issuer: security-template
     audience: security-template-app
+    access-audience: security-template-app
+    refresh-audience: security-template-app
     algorithm: RSA
-    expiration-seconds: 3600           # Access token (1h)
-    refresh-expiration-seconds: 604800 # Refresh token (7d)
-    allowed-clock-skew-seconds: 60
+    access-ttl: PT1H     # Access token: 1 hour (ISO 8601 format)
+    refresh-ttl: P7D     # Refresh token: 7 days
+    rotate-refresh-tokens: true
+    default-roles:
+      - ROLE_USER
+    default-scopes:
+      - profile:read
 
-    # RSA mode (used in dev/prod)
     rsa:
       private-key-location: keys/rsa-private.pem
       public-key-location: keys/rsa-public.pem
 
-    # HMAC fallback (used for test or lightweight profiles)
     hmac:
       secret-base64: ${JWT_SECRET_BASE64:dev-secret-12345}
+
 
 # =============================
 # 🛡️ RATE LIMITING

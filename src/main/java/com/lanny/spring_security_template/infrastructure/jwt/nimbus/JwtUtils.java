@@ -1,67 +1,93 @@
 package com.lanny.spring_security_template.infrastructure.jwt.nimbus;
 
-import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
-import com.nimbusds.jose.*;
-import com.nimbusds.jose.crypto.*;
-import com.nimbusds.jwt.*;
-import org.springframework.beans.factory.annotation.Value;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.springframework.stereotype.Component;
 
-import java.security.interfaces.*;
-import java.time.*;
-import java.util.*;
+import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
+import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JOSEObjectType;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSVerifier;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.crypto.RSASSAVerifier;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 
+/**
+ * Utility for generating and validating JWTs (Access + Refresh) using RSA keys.
+ */
 @Component
 public class JwtUtils {
 
     private final RsaKeyProvider keyProvider;
-    private final String issuer;
-    private final String audience;
-    private final long accessExpiration;
-    private final long refreshExpiration;
+    private final SecurityJwtProperties props;
+    private final Clock clock;
 
-    public JwtUtils(
-            RsaKeyProvider keyProvider,
-            @Value("${security.jwt.issuer}") String issuer,
-            @Value("${security.jwt.audience}") String audience,
-            @Value("${security.jwt.expiration-seconds}") long accessExpiration,
-            @Value("${security.jwt.refresh-expiration-seconds:2592000}") long refreshExpiration) {
+    public JwtUtils(RsaKeyProvider keyProvider,
+            SecurityJwtProperties props,
+            Clock clock) {
         this.keyProvider = keyProvider;
-        this.issuer = issuer;
-        this.audience = audience;
-        this.accessExpiration = accessExpiration;
-        this.refreshExpiration = refreshExpiration;
+        this.props = props;
+        this.clock = clock;
     }
 
+    /**  Generate access token (with roles & scopes) */
+    public String generateAccessToken(String subject, List<String> roles, List<String> scopes) {
+        return generateToken(subject, roles, scopes, null, false);
+    }
+
+    /** Generate refresh token */
+    public String generateRefreshToken(String subject) {
+        return generateToken(subject, List.of(), List.of(), null, true);
+    }
+
+    /**
+     *  Public overload allowing a custom TTL (used by TokenProvider)
+     */
     public String generateToken(String subject, List<String> roles, List<String> scopes, Duration ttl,
             boolean isRefresh) {
         try {
-            Instant now = Instant.now();
-            long expirationSeconds = ttl != null ? ttl.toSeconds()
-                    : (isRefresh ? refreshExpiration : accessExpiration);
+            Instant now = Instant.now(clock);
+            Instant exp = (ttl != null)
+                    ? now.plus(ttl)
+                    : now.plus(isRefresh ? props.refreshTtl() : props.accessTtl());
 
-            JWTClaimsSet.Builder claimsBuilder = new JWTClaimsSet.Builder()
+            String audience = isRefresh
+                    ? Optional.ofNullable(props.refreshAudience()).orElse(props.accessAudience())
+                    : props.accessAudience();
+
+            JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
                     .subject(subject)
-                    .issuer(issuer)
+                    .issuer(props.issuer())
                     .audience(audience)
                     .issueTime(Date.from(now))
-                    .expirationTime(Date.from(now.plusSeconds(expirationSeconds)))
+                    .expirationTime(Date.from(exp))
                     .jwtID(UUID.randomUUID().toString());
 
-            if (!isRefresh) {
-                claimsBuilder.claim("roles", roles);
-                claimsBuilder.claim("scopes", scopes);
+            if (isRefresh) {
+                claims.claim("type", "refresh");
             } else {
-                claimsBuilder.claim("type", "refresh");
+                claims.claim("roles", roles);
+                claims.claim("scopes", scopes);
             }
-
-            JWTClaimsSet claims = claimsBuilder.build();
 
             JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256)
                     .type(JOSEObjectType.JWT)
                     .build();
 
-            SignedJWT jwt = new SignedJWT(header, claims);
+            SignedJWT jwt = new SignedJWT(header, claims.build());
             jwt.sign(new RSASSASigner((RSAPrivateKey) keyProvider.privateKey()));
             return jwt.serialize();
 
@@ -70,14 +96,7 @@ public class JwtUtils {
         }
     }
 
-    public String generateAccessToken(String subject, List<String> roles, List<String> scopes) {
-        return generateToken(subject, roles, scopes, Duration.ofSeconds(accessExpiration), false);
-    }
-
-    public String generateRefreshToken(String subject) {
-        return generateToken(subject, List.of(), List.of(), Duration.ofSeconds(refreshExpiration), true);
-    }
-
+    /**  Validate signature and expiration */
     public JWTClaimsSet validateAndParse(String token) {
         try {
             SignedJWT jwt = SignedJWT.parse(token);
@@ -88,17 +107,22 @@ public class JwtUtils {
             }
 
             JWTClaimsSet claims = jwt.getJWTClaimsSet();
-            Date now = new Date();
+            Instant now = Instant.now(clock);
 
-            if (claims.getExpirationTime().before(now)) {
+            if (claims.getExpirationTime() == null || claims.getExpirationTime().toInstant().isBefore(now)) {
                 throw new JOSEException("Token expired");
             }
 
-            if (!Objects.equals(claims.getIssuer(), issuer)) {
+            if (!Objects.equals(claims.getIssuer(), props.issuer())) {
                 throw new JOSEException("Invalid issuer");
             }
 
-            if (claims.getAudience() != null && !claims.getAudience().contains(audience)) {
+            List<String> aud = claims.getAudience();
+            String expectedAud = isRefreshClaim(claims)
+                    ? Optional.ofNullable(props.refreshAudience()).orElse(props.accessAudience())
+                    : props.accessAudience();
+
+            if (aud != null && !aud.contains(expectedAud)) {
                 throw new JOSEException("Invalid audience");
             }
 
@@ -106,6 +130,14 @@ public class JwtUtils {
 
         } catch (Exception e) {
             throw new RuntimeException("Invalid token: " + e.getMessage(), e);
+        }
+    }
+
+    private boolean isRefreshClaim(JWTClaimsSet claims) {
+        try {
+            return "refresh".equals(claims.getStringClaim("type"));
+        } catch (Exception e) {
+            return false;
         }
     }
 
