@@ -2,7 +2,6 @@ package com.lanny.spring_security_template.infrastructure.jwt.nimbus;
 
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
@@ -15,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
+import com.lanny.spring_security_template.shared.ClockProvider;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -33,17 +33,17 @@ public class JwtUtils {
 
     private final RsaKeyProvider keyProvider;
     private final SecurityJwtProperties props;
-    private final Clock clock;
+    private final ClockProvider clockProvider;
 
     public JwtUtils(RsaKeyProvider keyProvider,
             SecurityJwtProperties props,
-            Clock clock) {
+            ClockProvider clockProvider) {
         this.keyProvider = keyProvider;
         this.props = props;
-        this.clock = clock;
+        this.clockProvider = clockProvider;
     }
 
-    /**  Generate access token (with roles & scopes) */
+    /** Generate access token (with roles & scopes) */
     public String generateAccessToken(String subject, List<String> roles, List<String> scopes) {
         return generateToken(subject, roles, scopes, null, false);
     }
@@ -54,12 +54,12 @@ public class JwtUtils {
     }
 
     /**
-     *  Public overload allowing a custom TTL (used by TokenProvider)
+     * Public overload allowing a custom TTL (used by TokenProvider)
      */
     public String generateToken(String subject, List<String> roles, List<String> scopes, Duration ttl,
             boolean isRefresh) {
         try {
-            Instant now = Instant.now(clock);
+            Instant now = clockProvider.now();
             Instant exp = (ttl != null)
                     ? now.plus(ttl)
                     : now.plus(isRefresh ? props.refreshTtl() : props.accessTtl());
@@ -96,7 +96,7 @@ public class JwtUtils {
         }
     }
 
-    /**  Validate signature and expiration */
+    /** Validate signature and expiration */
     public JWTClaimsSet validateAndParse(String token) {
         try {
             SignedJWT jwt = SignedJWT.parse(token);
@@ -107,7 +107,7 @@ public class JwtUtils {
             }
 
             JWTClaimsSet claims = jwt.getJWTClaimsSet();
-            Instant now = Instant.now(clock);
+            Instant now = clockProvider.now();
 
             if (claims.getExpirationTime() == null || claims.getExpirationTime().toInstant().isBefore(now)) {
                 throw new JOSEException("Token expired");
