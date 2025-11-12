@@ -40,6 +40,15 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
       @NonNull HttpServletResponse response,
       @NonNull FilterChain chain) throws ServletException, IOException {
 
+    //  Excluir los endpoints de Actuator y Swagger de la validación JWT
+    String path = request.getRequestURI();
+    if (path.startsWith("/actuator") ||
+        path.startsWith("/v3/api-docs") ||
+        path.startsWith("/swagger-ui")) {
+      chain.doFilter(request, response);
+      return;
+    }
+
     try {
       String token = resolveToken(request);
       if (token == null) {

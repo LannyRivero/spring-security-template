@@ -6,6 +6,7 @@ com\lanny\spring_security_template\infrastructure\security\provider\InMemoryScop
 com\lanny\spring_security_template\infrastructure\web\auth\dto\CredentialsRequest.class
 com\lanny\spring_security_template\infrastructure\web\auth\controller\AuthController$MessageResponse.class
 com\lanny\spring_security_template\infrastructure\security\filter\LoginRateLimitingFilter$SlidingWindow.class
+com\lanny\spring_security_template\infrastructure\metrics\AuthMetricsService.class
 com\lanny\spring_security_template\domain\exception\UserDisabledException.class
 com\lanny\spring_security_template\infrastructure\security\filter\LoginRateLimitingFilter.class
 com\lanny\spring_security_template\infrastructure\security\handler\CustomAuthEntryPoint.class

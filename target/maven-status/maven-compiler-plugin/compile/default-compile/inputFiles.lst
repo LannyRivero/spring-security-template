@@ -4,6 +4,7 @@ D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_t
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\web\auth\dto\CredentialsRequest.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\application\auth\result\JwtResult.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\security\JwtAuthorizationFilter.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\metrics\AuthMetricsService.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\persistence\AuthPersistenceAdapter.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\security\filter\LoginRateLimitingFilter.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\security\filter\SecurityHeadersFilter.java

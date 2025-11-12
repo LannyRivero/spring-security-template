@@ -99,10 +99,12 @@
     </dependency>
 
     <!-- 📊 Metrics (Micrometer + Prometheus) -->
-    <dependency>
-      <groupId>io.micrometer</groupId>
-      <artifactId>micrometer-registry-prometheus</artifactId>
-    </dependency>
+   <dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-registry-prometheus</artifactId>
+    <version>1.15.1</version>
+</dependency>
+
 
 
     <!-- 🧠 MapStruct -->

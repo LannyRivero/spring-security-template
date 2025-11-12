@@ -23,6 +23,7 @@ import com.lanny.spring_security_template.application.auth.result.MeResult;
 import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.model.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
+import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
 import com.lanny.spring_security_template.shared.ClockProvider;
 
 import lombok.RequiredArgsConstructor;
@@ -39,44 +40,53 @@ public class AuthUseCaseImpl implements AuthUseCase {
     private final ClockProvider clockProvider;
     private final SecurityJwtProperties securityJwtProperties;
     private final TokenBlacklistGateway tokenBlacklistGateway;
+    private final AuthMetricsService metrics; // 📊 Nuevo servicio de métricas
 
     // ===========================
-    // LOGIN
+    // 🔑 LOGIN
     // ===========================
     @Override
     public JwtResult login(LoginCommand command) {
-        User user = userAccountGateway.findByUsernameOrEmail(command.username())
-                .orElseThrow(() -> new UsernameNotFoundException(command.username()));
+        try {
+            User user = userAccountGateway.findByUsernameOrEmail(command.username())
+                    .orElseThrow(() -> new UsernameNotFoundException(command.username()));
 
-        user.ensureCanAuthenticate();
+            user.ensureCanAuthenticate();
 
-        if (!user.passwordMatches(command.password(), passwordEncoder)) {
-            throw new InvalidCredentialsException("Invalid username or password");
+            if (!user.passwordMatches(command.password(), passwordEncoder)) {
+                metrics.recordLoginFailure(command.username());
+                throw new InvalidCredentialsException("Invalid username or password");
+            }
+
+            List<String> roles = roleProvider.resolveRoles(user.username());
+            List<String> scopes = scopePolicy.resolveScopes(roles);
+
+            Duration accessTtl = securityJwtProperties.accessTtl();
+            Duration refreshTtl = securityJwtProperties.refreshTtl();
+
+            Instant issuedAt = clockProvider.now();
+            Instant accessExp = issuedAt.plus(accessTtl);
+
+            String accessToken = tokenProvider.generateAccessToken(user.username(), roles, scopes, accessTtl);
+            String refreshToken = tokenProvider.generateRefreshToken(user.username(), refreshTtl);
+
+            metrics.recordLoginSuccess(user.username()); // ✅ login exitoso
+
+            return new JwtResult(accessToken, refreshToken, accessExp);
+
+        } catch (InvalidCredentialsException e) {
+            metrics.recordLoginFailure(command.username()); // ❌ login fallido
+            throw e;
         }
-
-        List<String> roles = roleProvider.resolveRoles(user.username());
-        List<String> scopes = scopePolicy.resolveScopes(roles);
-
-        Duration accessTtl = securityJwtProperties.accessTtl();
-        Duration refreshTtl = securityJwtProperties.refreshTtl();
-
-        Instant issuedAt = clockProvider.now();
-        Instant accessExp = issuedAt.plus(accessTtl);
-
-        String accessToken = tokenProvider.generateAccessToken(user.username(), roles, scopes, accessTtl);
-        String refreshToken = tokenProvider.generateRefreshToken(user.username(), refreshTtl);
-
-        return new JwtResult(accessToken, refreshToken, accessExp);
     }
 
     // ===========================
-    // REFRESH TOKEN (con rotación opcional)
+    // 🔁 REFRESH TOKEN
     // ===========================
     @Override
     public JwtResult refresh(RefreshCommand command) {
         return tokenProvider.parseClaims(command.refreshToken())
                 .map(claims -> {
-                    // Si está revocado, se rechaza
                     if (tokenBlacklistGateway.isRevoked(claims.jti())) {
                         throw new IllegalArgumentException("Refresh token revoked");
                     }
@@ -91,19 +101,17 @@ public class AuthUseCaseImpl implements AuthUseCase {
                     Instant issuedAt = clockProvider.now();
                     Instant accessExp = issuedAt.plus(accessTtl);
 
-                    // Si la política de rotación está activa
                     if (securityJwtProperties.rotateRefreshTokens()) {
-                        // Revocar el refresh token actual
                         tokenBlacklistGateway.revoke(claims.jti(), Instant.ofEpochSecond(claims.exp()));
 
-                        // Emitir uno nuevo
                         String newRefresh = tokenProvider.generateRefreshToken(username, refreshTtl);
                         String newAccess = tokenProvider.generateAccessToken(username, roles, scopes, accessTtl);
+
+                        metrics.recordTokenRotation(); // 📊 token rotado
 
                         return new JwtResult(newAccess, newRefresh, accessExp);
                     }
 
-                    // Sin rotación: solo generar un nuevo access token
                     String newAccess = tokenProvider.generateAccessToken(username, roles, scopes, accessTtl);
                     return new JwtResult(newAccess, command.refreshToken(), accessExp);
                 })
@@ -111,7 +119,7 @@ public class AuthUseCaseImpl implements AuthUseCase {
     }
 
     // ===========================
-    //  ME
+    // 👤 ME
     // ===========================
     @Override
     public MeResult me(String username) {
@@ -125,11 +133,12 @@ public class AuthUseCaseImpl implements AuthUseCase {
     }
 
     // ===========================
-    // DEV REGISTER
+    // 🧩 DEV REGISTER
     // ===========================
     @Override
     @Profile("dev")
     public void registerDev(RegisterCommand command) {
-        // Pendiente: crear usuario de desarrollo
+        // 🚧 Pendiente: crear usuario de desarrollo
     }
 }
+
