@@ -4,7 +4,7 @@ import com.lanny.spring_security_template.application.auth.command.*;
 import com.lanny.spring_security_template.application.auth.result.*;
 
 /**
- * ✅ High-level use case boundary for authentication and token management.
+ * High-level use case boundary for authentication and token management.
  * Defines core operations exposed to controllers or other application layers.
  */
 public interface AuthUseCase {

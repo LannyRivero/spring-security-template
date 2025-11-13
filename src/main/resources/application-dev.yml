@@ -114,5 +114,15 @@ management:
     prometheus:
       enabled: true
   metrics:
+    export:
+      prometheus:
+        enabled: true
     tags:
       application: spring-security-template
+
+
+
+
+
+
+  

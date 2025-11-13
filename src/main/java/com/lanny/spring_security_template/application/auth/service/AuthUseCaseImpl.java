@@ -40,10 +40,10 @@ public class AuthUseCaseImpl implements AuthUseCase {
     private final ClockProvider clockProvider;
     private final SecurityJwtProperties securityJwtProperties;
     private final TokenBlacklistGateway tokenBlacklistGateway;
-    private final AuthMetricsService metrics; // 📊 Nuevo servicio de métricas
+    private final AuthMetricsService metrics; 
 
     // ===========================
-    // 🔑 LOGIN
+    //  LOGIN
     // ===========================
     @Override
     public JwtResult login(LoginCommand command) {
@@ -54,7 +54,7 @@ public class AuthUseCaseImpl implements AuthUseCase {
             user.ensureCanAuthenticate();
 
             if (!user.passwordMatches(command.password(), passwordEncoder)) {
-                metrics.recordLoginFailure(command.username());
+                metrics.recordLoginFailure();
                 throw new InvalidCredentialsException("Invalid username or password");
             }
 
@@ -70,18 +70,18 @@ public class AuthUseCaseImpl implements AuthUseCase {
             String accessToken = tokenProvider.generateAccessToken(user.username(), roles, scopes, accessTtl);
             String refreshToken = tokenProvider.generateRefreshToken(user.username(), refreshTtl);
 
-            metrics.recordLoginSuccess(user.username()); // ✅ login exitoso
+            metrics.recordLoginSuccess(); 
 
             return new JwtResult(accessToken, refreshToken, accessExp);
 
         } catch (InvalidCredentialsException e) {
-            metrics.recordLoginFailure(command.username()); // ❌ login fallido
+            metrics.recordLoginFailure(); 
             throw e;
         }
     }
 
     // ===========================
-    // 🔁 REFRESH TOKEN
+    // REFRESH TOKEN
     // ===========================
     @Override
     public JwtResult refresh(RefreshCommand command) {
@@ -107,7 +107,7 @@ public class AuthUseCaseImpl implements AuthUseCase {
                         String newRefresh = tokenProvider.generateRefreshToken(username, refreshTtl);
                         String newAccess = tokenProvider.generateAccessToken(username, roles, scopes, accessTtl);
 
-                        metrics.recordTokenRotation(); // 📊 token rotado
+                        metrics.recordTokenRefresh(); 
 
                         return new JwtResult(newAccess, newRefresh, accessExp);
                     }
@@ -119,7 +119,7 @@ public class AuthUseCaseImpl implements AuthUseCase {
     }
 
     // ===========================
-    // 👤 ME
+    //  ME
     // ===========================
     @Override
     public MeResult me(String username) {
@@ -133,7 +133,7 @@ public class AuthUseCaseImpl implements AuthUseCase {
     }
 
     // ===========================
-    // 🧩 DEV REGISTER
+    //  DEV REGISTER
     // ===========================
     @Override
     @Profile("dev")

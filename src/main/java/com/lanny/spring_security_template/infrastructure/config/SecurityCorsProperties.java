@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import java.util.List;
 
 /**
- * ✅ Security CORS properties — configurable desde application.yml
+ *  Security CORS properties — configurable desde application.yml
  * 
  * Ejemplo:
  * security:

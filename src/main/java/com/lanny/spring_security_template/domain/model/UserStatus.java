@@ -1,7 +1,7 @@
 package com.lanny.spring_security_template.domain.model;
 
 /**
- * 🧩 Enumeración que representa el estado del usuario dentro del sistema.
+ *  Enum que representa el estado del usuario dentro del sistema.
  *
  * <p>
  * El estado de un usuario controla si puede autenticarse y acceder

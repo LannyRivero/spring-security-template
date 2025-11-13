@@ -51,6 +51,7 @@ D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_t
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\jwt\nimbus\PemUtils.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\security\SecurityConfig.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\application\auth\command\RefreshCommand.java
+D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\metrics\PrometheusConfigBean.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\security\filter\AuthNoCacheFilter.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\application\auth\port\out\TokenProvider.java
 D:\Superacion\spring-security-template\src\main\java\com\lanny\spring_security_template\infrastructure\config\WebCommonConfig.java

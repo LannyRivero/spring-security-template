@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * 🔐 Value Object que representa un permiso granular dentro del dominio.
+ *  Value Object que representa un permiso granular dentro del dominio.
  * 
  * Ejemplo de formato: {@code simulation:read}, {@code user:update}.
  *

@@ -6,7 +6,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * 🧩 Entidad de dominio que representa un Rol del sistema.
+ *  Entidad de dominio que representa un Rol del sistema.
  * 
  * Un {@code Role} agrupa un conjunto de {@link Scope} que definen permisos
  * finos
