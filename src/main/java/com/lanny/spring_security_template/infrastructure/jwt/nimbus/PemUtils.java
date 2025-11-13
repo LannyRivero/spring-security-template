@@ -23,7 +23,7 @@ public final class PemUtils {
 
     /*
      * ==========================================================
-     * 🔐 Read by file path (current behaviour)
+     *  Read by file path (current behaviour)
      * ==========================================================
      */
     public static RSAPrivateKey readPrivateKey(String location) {
@@ -46,7 +46,7 @@ public final class PemUtils {
 
     /*
      * ==========================================================
-     * 🔄 New: read directly from InputStream (for KMS / remote)
+     *  New: read directly from InputStream (for KMS / remote)
      * ==========================================================
      */
     public static RSAPrivateKey readPrivateKey(InputStream is) {
@@ -69,7 +69,7 @@ public final class PemUtils {
 
     /*
      * ==========================================================
-     * 🧩 Internal helpers
+     *  Internal helpers
      * ==========================================================
      */
     private static RSAPrivateKey parsePrivateKey(String pem) throws Exception {

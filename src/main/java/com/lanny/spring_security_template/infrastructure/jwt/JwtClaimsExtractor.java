@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * 🧩 JwtClaimsExtractor
+ *  JwtClaimsExtractor
  * 
  * Extrae y normaliza roles y scopes desde los claims del JWT.
  * Garantiza que:

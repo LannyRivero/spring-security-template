@@ -15,7 +15,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
 /**
- * 🔐 KeystoreRsaKeyProvider
+ *  KeystoreRsaKeyProvider
  *
  * Loads RSA keypair from a secure PKCS12 / JKS keystore in production.
  * Supports file path or environment variable-based configuration.
@@ -44,7 +44,7 @@ public class KeystoreRsaKeyProvider implements RsaKeyProvider {
             @Value("${security.jwt.keystore.key-password}") String keyPassword) {
         this.kid = kid;
         try (InputStream fis = new FileInputStream(keystorePath)) {
-            KeyStore ks = KeyStore.getInstance("PKCS12"); // ✅ Puedes usar JKS si lo prefieres
+            KeyStore ks = KeyStore.getInstance("PKCS12"); 
             ks.load(fis, ksPassword.toCharArray());
 
             Key key = ks.getKey(keyAlias, keyPassword.toCharArray());
