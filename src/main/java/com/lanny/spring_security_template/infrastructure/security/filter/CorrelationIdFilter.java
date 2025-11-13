@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * 🧩 CorrelationIdFilter
+ * CorrelationIdFilter
  *
  * Adds or propagates a correlation ID across incoming HTTP requests.
  * This enables request tracing across logs and distributed systems.

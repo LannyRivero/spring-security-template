@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 /**
- * 🔐 CustomAuthEntryPoint — maneja errores 401 en formato JSON.
+ *  CustomAuthEntryPoint — maneja errores 401 en formato JSON.
  */
 @Component
 public class CustomAuthEntryPoint implements AuthenticationEntryPoint {

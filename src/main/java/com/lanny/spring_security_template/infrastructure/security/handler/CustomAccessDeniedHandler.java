@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 /**
- * 🛑 CustomAccessDeniedHandler — maneja errores 403 en formato JSON.
+ * CustomAccessDeniedHandler — maneja errores 403 en formato JSON.
  */
 @Component
 public class CustomAccessDeniedHandler implements AccessDeniedHandler {

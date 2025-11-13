@@ -45,7 +45,7 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
 
     @Override
     public void save(User user) {
-        // 🚀 No-op para demo (no persistimos realmente)
+        //  No-op para demo (no persistimos realmente)
         System.out.printf("[DEMO] Simulating save of user: %s%n", user.username());
     }
 }

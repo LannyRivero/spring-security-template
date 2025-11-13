@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-@Profile({ "dev", "demo", "prod" }) // disponible en todos los perfiles
+@Profile({ "dev", "demo", "prod" }) 
 public class InMemoryRoleProvider implements RoleProvider {
 
     @Override

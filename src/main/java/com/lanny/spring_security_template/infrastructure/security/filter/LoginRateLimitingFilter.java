@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 🚦 Simple rate limiting filter for /api/v1/auth/login endpoint.
+ *  Simple rate limiting filter for /api/v1/auth/login endpoint.
  * Blocks brute-force attempts using a per-IP sliding window counter.
  */
 @Order(FilterOrder.RATE_LIMITING)

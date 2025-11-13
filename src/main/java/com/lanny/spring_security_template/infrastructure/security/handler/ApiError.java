@@ -4,7 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 
 /**
- * 📦 ApiError
+ *  ApiError
  *
  * Estructura estándar para respuestas JSON de error.
  * Usado por AuthenticationEntryPoint y AccessDeniedHandler.

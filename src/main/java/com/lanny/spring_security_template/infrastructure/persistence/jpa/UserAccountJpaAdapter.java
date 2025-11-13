@@ -39,7 +39,7 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
         userRepository.save(toEntity(user));
     }
 
-    /** ✅ Convierte entidad JPA → modelo de dominio */
+    /**  Convierte entidad JPA → modelo de dominio */
     private User toDomain(UserEntity entity) {
         UserStatus status = entity.isEnabled() ? UserStatus.ACTIVE : UserStatus.DISABLED;
 
@@ -60,7 +60,7 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
                 roles,
                 scopes);
     }
-    /** ✅ Convierte modelo de dominio → entidad JPA */
+    /**  Convierte modelo de dominio → entidad JPA */
     @NonNull
     private UserEntity toEntity(User domain) {
         UserEntity entity = new UserEntity();
@@ -68,7 +68,7 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
         entity.setUsername(domain.username());
         entity.setEmail(domain.email());
         entity.setPasswordHash(domain.passwordHash());
-        // ✅ Traducimos el enum a boolean
+        //  Traducimos el enum a boolean
         entity.setEnabled(domain.status() == UserStatus.ACTIVE);
         return entity;
     }

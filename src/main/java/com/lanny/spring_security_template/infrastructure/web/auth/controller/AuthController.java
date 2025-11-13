@@ -23,7 +23,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 🔐 Authentication Controller — handles login, refresh, user info, and dev registration.
+ *  Authentication Controller — handles login, refresh, user info, and dev registration.
  */
 @Tag(name = "Authentication", description = "Endpoints for JWT authentication and user info")
 @RestController
@@ -37,7 +37,7 @@ public class AuthController {
     private boolean registerEnabled;
 
     // -------------------------------------------------------------------------
-    // 🔸 LOGIN
+    //  LOGIN
     // -------------------------------------------------------------------------
     @Operation(
             summary = "Authenticate user and issue JWT tokens",
@@ -56,7 +56,7 @@ public class AuthController {
     }
 
     // -------------------------------------------------------------------------
-    // 🔸 REFRESH TOKEN
+    // REFRESH TOKEN
     // -------------------------------------------------------------------------
     @Operation(
             summary = "Refresh access token using a valid refresh token",
@@ -75,7 +75,7 @@ public class AuthController {
     }
 
     // -------------------------------------------------------------------------
-    // 🔸 CURRENT USER INFO
+    //  CURRENT USER INFO
     // -------------------------------------------------------------------------
     @Operation(
             summary = "Get current authenticated user info",
@@ -95,7 +95,7 @@ public class AuthController {
     }
 
     // -------------------------------------------------------------------------
-    // 🔸 REGISTER (DEV ONLY)
+    //  REGISTER (DEV ONLY)
     // -------------------------------------------------------------------------
     @Operation(
             summary = "Register a new user (only enabled in dev mode)",
@@ -119,7 +119,7 @@ public class AuthController {
     }
 
     // -------------------------------------------------------------------------
-    // 🔸 LOCAL DTO
+    //  LOCAL DTO
     // -------------------------------------------------------------------------
     private record MessageResponse(String message) {}
 }
