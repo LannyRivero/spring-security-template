@@ -1,62 +1,62 @@
-# 📚 Documentación General — Spring Security Template
+# 📚 Documentacion General — Spring Security Template
 
-Este directorio contiene toda la documentación técnica, arquitectónica y operativa del proyecto **Spring Security Template**, una plantilla empresarial basada en Spring Boot 3.4.x y Nimbus JOSE + JWT.
+Este directorio contiene toda la documentacion tecnica, arquitectonica y operativa del proyecto **Spring Security Template**, una plantilla empresarial basada en Spring Boot 3.4.x y Nimbus JOSE + JWT.
 
-Toda la documentación se organiza siguiendo estándares corporativos utilizados en entornos de alta seguridad.
+Toda la documentacion se estructura de forma modular siguiendo estandares corporativos (C4, ADR, Security Specs, DevOps, QA, etc).
 
 ---
 
-## 📘 Índice de Documentación
+## 📘 Indice General
 
 ### 1️⃣ Architecture Decision Records (ADR)
-Decisiones arquitectónicas documentadas con contexto, alternativas y consecuencias.
+Decisiones arquitectonicas documentadas con contexto, alternativas y consecuencias.
 
 📂 [`adr/`](./adr)
 
 ---
 
 ### 2️⃣ Diagramas de Arquitectura
-Diagramas C4 (context, container, component), flujos de seguridad, orden de filtros y arquitectura hexagonal.
+Diagramas C4, flujos JWT, orden de filtros, arquitectura hexagonal, etc.
 
 📂 [`diagrams/`](./diagrams)
 
 ---
 
 ### 3️⃣ Seguridad
-Documentación detallada sobre:
+Documentacion del sistema de seguridad:
 
-- Flujos JWT (Login, Refresh, Me)
-- Especificación de tokens (claims, expiración)
-- Matriz de Roles/Scopes
-- Orden de filtros
-- Políticas de acceso (@PreAuthorize)
+- JWT (Access + Refresh)
+- Matriz de roles y scopes
+- Politicas de acceso (@PreAuthorize)
+- Filtros
+- Handlers
+- Validacion de claves
 
 📂 [`security/`](./security)
 
 ---
 
-### 4️⃣ Guías de Configuración
-Guías prácticas para usar esta plantilla en otros proyectos:
+### 4️⃣ Guias de Integracion
+Guias practicas para usar este template en otros proyectos:
 
-- Cómo integrar el template en microservicios
-- Cómo cargar claves RSA
-- Cómo activar HMAC
-- Cómo trabajar con Refresh Token Rotation
-- Cómo usar TestSecurityConfig
+- Integracion en microservicios
+- Carga de claves RSA
+- Como activar HMAC
+- Como configurar Refresh Token Rotation
+- Uso de TestSecurityConfig
 
 📂 [`guides/`](./guides)
 
 ---
 
-### 5️⃣ Testing y QA
-Guías y buenas prácticas de testing:
+### 5️⃣ Testing & QA
+Metodologias y patrones de testing:
 
-- Unit tests
-- Testing de Nimbus
-- Testing de filtros
-- Testing de SecurityConfig
-- @WebMvcTest
-- Testcontainers
+- Unit Tests
+- SecurityConfig Tests
+- Filter Tests
+- Slice Tests (@WebMvcTest)
+- Integracion (Testcontainers)
 - Reglas de cobertura
 
 📂 [`testing/`](./testing)
@@ -64,38 +64,41 @@ Guías y buenas prácticas de testing:
 ---
 
 ### 6️⃣ DevOps / CI-CD
-Documentación operativa:
+Documentacion para despliegues, pipelines y configuraciones de entorno:
 
 - GitHub Actions
-- Dockerfile
+- Dockerfile seguro
 - Perfiles dev/test/prod
-- Pipeline de calidad
-- Preparación para Kubernetes
+- Kubernetes Ready
+- Liveness/Readiness
 
 📂 [`devops/`](./devops)
 
 ---
 
-### 7️⃣ Futuras Extensiones
-Ideas y componentes planificados:
+### 7️⃣ Extensiones Futuras
+Documentos de roadmap tecnico:
 
 - OAuth2 Authorization Server
 - JWE encryption
 - Multi-tenant avanzado
-- Impersonación
-- Token introspection endpoint
+- Impersonacion
+- Token introspection
 
 📂 [`future/`](./future)
 
 ---
 
-## ✨ Objetivo
+## 🎯 Objetivo del directorio
 
-Crear una documentación clara, útil y mantenible, que permita a cualquier desarrollador:
+Permitir a cualquier desarrollador (actual o futuro) comprender:
 
-- Comprender las decisiones arquitectónicas
-- Integrar fácilmente el módulo de seguridad
-- Extenderlo sin romper su diseño
-- Mantener un sistema de seguridad empresarial
+- El por que de las decisiones tomadas  
+- Como funciona la seguridad del proyecto  
+- Como extenderlo de forma correcta  
+- Como integrarlo en un entorno corporativo  
 
 ---
+
+Si tienes dudas sobre algun apartado, revisa los ADR correspondientes o contacta con arquitectura.
+
