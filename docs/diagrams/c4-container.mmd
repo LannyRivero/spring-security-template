@@ -1,16 +1,13 @@
-**Archivo:** `c4-container.mmd`
-```md
-```mermaid
 C4Container
     title Spring Security Template — Container View
 
-    Container(api, "API / Web Layer", "Spring MVC", "Controladores REST: login, refresh, me")
-    Container(app, "Application Layer", "Java", "Casos de uso: AuthUseCase, RefreshCommand")
-    Container(domain, "Domain Layer", "Java", "Modelo puro: User, Role, Scope, Exceptions")
-    Container(infra, "Infrastructure Layer", "Java + Libs", "Filtros, TokenProvider, Persistencia, Nimbus JOSE")
-    ContainerDb(db, "User Repository", "H2 / MySQL", "Usuarios, roles, scopes")
+    Container(api, "API Layer", "Spring MVC", "Controladores REST")
+    Container(app, "Application Layer", "Java", "Casos de uso")
+    Container(domain, "Domain Layer", "Java", "Modelo de dominio")
+    Container(infra, "Infrastructure Layer", "Java + Libs", "JWT, persistencia, seguridad")
+    ContainerDb(db, "User DB", "SQL Database", "Usuarios y roles")
 
     Rel(api, app, "Invoca casos de uso")
     Rel(app, domain, "Usa el modelo de dominio")
-    Rel(app, infra, "Consulta UserAccountGateway, TokenProvider, RoleProvider")
-    Rel(infra, db, "JPA / adaptadores")
+    Rel(app, infra, "Accede a adaptadores")
+    Rel(infra, db, "JPA / consultas SQL")
