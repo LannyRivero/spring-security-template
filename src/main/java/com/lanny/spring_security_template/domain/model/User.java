@@ -1,35 +1,44 @@
 package com.lanny.spring_security_template.domain.model;
 
-import java.util.List;
-import java.util.Objects;
-
-import org.springframework.security.crypto.password.PasswordEncoder;
-
 import com.lanny.spring_security_template.domain.exception.UserDeletedException;
 import com.lanny.spring_security_template.domain.exception.UserDisabledException;
 import com.lanny.spring_security_template.domain.model.exception.UserLockedException;
+import com.lanny.spring_security_template.domain.service.PasswordHasher;
+import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
+import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
+import com.lanny.spring_security_template.domain.valueobject.Username;
+
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Domain aggregate representing an authenticated user.
- * Extended version supporting multiple status values.
+ * Clean version using Value Objects and without infrastructure dependencies.
  */
-public class User {
+public final class User {
 
     private final String id;
-    private final String username;
-    private final String email;
-    private final String passwordHash;
-    private final UserStatus status; // 👈 reemplaza el boolean enabled
+    private final Username username;
+    private final EmailAddress email;
+    private final PasswordHash passwordHash;
+    private final UserStatus status;
     private final List<String> roles;
     private final List<String> scopes;
 
-    public User(String id, String username, String email, String passwordHash,
-                UserStatus status, List<String> roles, List<String> scopes) {
+    public User(
+            String id,
+            Username username,
+            EmailAddress email,
+            PasswordHash passwordHash,
+            UserStatus status,
+            List<String> roles,
+            List<String> scopes
+    ) {
         this.id = id;
-        this.username = username;
-        this.email = email;
-        this.passwordHash = passwordHash;
-        this.status = status;
+        this.username = Objects.requireNonNull(username);
+        this.email = Objects.requireNonNull(email);
+        this.passwordHash = Objects.requireNonNull(passwordHash);
+        this.status = Objects.requireNonNull(status);
         this.roles = List.copyOf(roles);
         this.scopes = List.copyOf(scopes);
     }
@@ -37,28 +46,32 @@ public class User {
     /** Domain rule enforcing account policy before authentication */
     public void ensureCanAuthenticate() {
         switch (status) {
-            case LOCKED -> throw new UserLockedException("User " + username + " is locked");
-            case DISABLED -> throw new UserDisabledException("User " + username + " is disabled");
-            case DELETED -> throw new UserDeletedException("User " + username + " is deleted");
+            case LOCKED -> throw new UserLockedException("User " + username.value() + " is locked");
+            case DISABLED -> throw new UserDisabledException("User " + username.value() + " is disabled");
+            case DELETED -> throw new UserDeletedException("User " + username.value() + " is deleted");
             default -> { /* ACTIVE: allowed */ }
         }
     }
 
-    public boolean passwordMatches(String rawPassword, PasswordEncoder encoder) {
+    /**
+     * Delegates password checking to a domain-safe abstraction.
+     * This avoids leaking Spring Security into the domain layer.
+     */
+    public boolean passwordMatches(String rawPassword, PasswordHasher hasher) {
         ensureCanAuthenticate();
-        return encoder.matches(rawPassword, passwordHash);
+        return hasher.matches(rawPassword, this.passwordHash.value());
     }
 
     // --- Getters ---
     public String id() { return id; }
-    public String username() { return username; }
-    public String email() { return email; }
+    public Username username() { return username; }
+    public EmailAddress email() { return email; }
+    public PasswordHash passwordHash() { return passwordHash; }
     public UserStatus status() { return status; }
     public List<String> roles() { return roles; }
     public List<String> scopes() { return scopes; }
-    public String passwordHash() { return passwordHash; }
 
-    // --- Equality ---
+    // --- Equality based on ID ---
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -71,4 +84,5 @@ public class User {
         return Objects.hash(id);
     }
 }
+
 
