@@ -1,0 +1,113 @@
+# ADR-021 — Nivel de Aislamiento del Microservicio (Security Boundary)
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado
+
+---
+
+## 🎯 Contexto
+
+Spring Security Template es el **núcleo común de seguridad** para ecosistemas de microservicios como:
+
+- RenewSim  
+- Buzón Inteligente  
+- Otros módulos externos  
+
+Por tanto, su *boundary* (frontera de seguridad) debe estar claramente definido:
+
+- Qué expone  
+- Qué controla  
+- Qué delega  
+- Qué protege  
+
+---
+
+## 🧠 Decisión
+
+El microservicio opera bajo un **Security Boundary independiente**, con:
+
+---
+
+### 1️⃣ Autenticación interna completa
+
+El microservicio **genera** los tokens:
+
+- firma RSA/HMAC  
+- expiración  
+- scopes  
+- roles  
+
+---
+
+### 2️⃣ El dominio de usuarios es local
+
+`UserAccountGateway` puede:
+
+- leer usuarios  
+- validar credenciales  
+- cargar roles/scopes  
+
+---
+
+### 3️⃣ Autorización descentralizada
+
+Cada microservicio consumidor hace:
+
+- Validación de JWT  
+- Comprobación de scopes  
+- Comprobación de roles  
+
+El sistema *no* implementa un Authorization Server tipo OAuth2.
+
+---
+
+### 4️⃣ Boundaries explícitos
+
+| Capa | Responsable |
+|------|-------------|
+| Este módulo | Autenticación, tokens, seguridad |
+| Otros módulos | Autorización fina, permisos específicos |
+
+---
+
+## ✔ Razones principales
+
+### 1. Microservicios desacoplados  
+Cada servicio evalúa permisos de manera local.
+
+### 2. Reduce latencia  
+No hay un “Auth Server centralizado” como cuello de botella.
+
+### 3. Escalabilidad horizontal real  
+Cada instancia valida tokens sin llamar a otros.
+
+### 4. Preparación para OAuth2  
+Boundary claro permite intercambiar TokenProvider por IdP externo.
+
+---
+
+## 🧩 Alternativas consideradas
+
+### 1. Centralizar autorización  
+✗ Demasiado acoplamiento  
+✗ Alto costo  
+✗ Un solo punto de fallo  
+
+### 2. Hacerlo monolítico  
+✗ Rompe arquitectura limpia  
+
+---
+
+## 📌 Consecuencias
+
+### Positivas
+- Límites claros  
+- Más simple de mantener  
+- Cada módulo es autónomo  
+- Listo para escalar  
+
+### Negativas
+- Cada microservicio debe tener su propio `SecurityConfig`  
+
+---
+
+## 📤 Resultado
