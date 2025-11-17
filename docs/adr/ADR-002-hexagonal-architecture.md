@@ -1,61 +1,85 @@
-# ADR-002 – Arquitectura Hexagonal como base
+# ADR-002 — Arquitectura Hexagonal
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado  
 
-**Estado:** Aceptado  
-**Fecha:** 2025-03-01
+---
 
-## Contexto
+## 🎯 Contexto
 
-La plantilla de seguridad debe ser:
+El proyecto debe funcionar como **plantilla enterprise**, extensible y reutilizable.  
+La seguridad debe ser independiente del framework, de la capa web y de la persistencia.
 
-- Reutilizable en proyectos de distintos dominios (energía, logística, banca, etc.).
-- Fácil de testear sin depender del framework web o de persistencia.
-- Independiente de detalles de infraestructura (JWT provider, base de datos, etc.).
-- Suficientemente limpia como para servir de referencia de buenas prácticas.
+Además, el template debe integrarse como módulo en:
 
-Se evaluaron varias aproximaciones: arquitectura en capas tradicional, arquitectura modular de Spring y arquitectura hexagonal.
+- RenewSim  
+- Buzón Inteligente  
+- Microservicios futuros  
 
-## Decisión
+Esto exige baja dependencia y alta modularidad.
 
-Adoptar **Arquitectura Hexagonal (Ports & Adapters)** como base, con inspiración **DDD** para el modelo de dominio.
+---
 
-Se organizarán las capas principales en:
+## 🧠 Decisión
 
-- `domain` → modelo y reglas de negocio (User, Role, Scope, UserStatus, excepciones).
-- `application` → casos de uso (login, refresh, me, register).
-- `infrastructure` → adaptadores (JWT, persistencia, filtros, métricas).
-- `web` → controladores REST y DTOs.
+Se adopta **Arquitectura Hexagonal (Ports & Adapters)** combinada con Clean Architecture.
 
-## Alternativas consideradas
+---
 
-1. **Arquitectura en capas clásica (Controller → Service → Repository)**
-   - ✔ Sencilla y conocida.
-   - ✖ Mezcla lógica de negocio con detalles de infraestructura.
-   - ✖ Dificulta el reemplazo de persistencia o proveedores de JWT.
+## ✔ Razones principales
 
-2. **Arquitectura basada en módulos de Spring (submódulos por feature)**
-   - ✔ Buena separación por funcionalidades.
-   - ✖ Fuertemente acoplada a Spring.
-   - ✖ El dominio sigue con dependencia de framework.
+### 1. Separación total entre dominio y detalles
+- TokenProvider no depende de Nimbus  
+- UserAccountGateway no depende de JPA  
+- Filtros no contienen lógica de negocio  
 
-3. **Monolito simple sin separación clara**
-   - ✔ Rápida para MVPs.
-   - ✖ No alineada con el objetivo de servir como plantilla enterprise.
+### 2. Permite sustituir tecnologías fácilmente
+- Cambiar Nimbus → JJWT  
+- Cambiar persistencia → Mongo, JPA, memoria  
+- Cambiar filtros  
+- Integrar OAuth2 Authorization Server
 
-## Justificación técnica
+### 3. Facilita testing avanzado
+- Tests unitarios sin Spring  
+- Tests de integración por adaptadores  
+- Tests de casos de uso sin web
 
-- La Arquitectura Hexagonal permite que el **dominio y los casos de uso no dependan de Spring**, ni de JPA, ni de Nimbus.
-- Facilita tests unitarios puros sobre `application` y `domain` sin levantar el contexto.
-- Hace que los detalles de infraestructura (JWT, DB, métricas) sean plug-and-play, a través de interfaces (ports).
+### 4. Patrón estándar en arquitectura empresarial
 
-## Consecuencias
+---
 
-**Positivas:**
+## 🧩 Alternativas consideradas
 
-- Código más limpio, mantenible y escalable.
-- Facilidad para reemplazar adaptadores (por ejemplo, cambiar de JPA a otro tipo de persistencia).
-- El proyecto sirve como referencia clara de buenas prácticas de arquitectura.
+### 1. Arquitectura en capas clásica (controllers → services → repositories)  
+✗ Acoplada  
+✗ No reutilizable  
+✗ Difícil de testear
 
-**Negativas:**
+### 2. Microkernel / plugin architecture  
+✗ Overkill  
+✗ No aporta ventajas aquí
 
-- Mayor complejidad conceptual para desarrolladores sin experiencia en DDD/Hexagonal.
-- Requiere disciplina para no “saltarse” las capas y acoplar web o infra al dominio.
+---
+
+## 📌 Consecuencias
+
+### Positivas
+- Plantilla profesional
+- Muy fácil de extender
+- Permite mocking/ports clean
+- Mejor mantenimiento a largo plazo
+- Testing más rápido y modular
+
+### Negativas
+- Más archivos / verbosidad
+- Más disciplina arquitectónica
+
+---
+
+## 📤 Resultado
+
+Estructura aprobada:
+
+application/
+domain/
+infrastructure/
+web/

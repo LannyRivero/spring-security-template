@@ -1,64 +1,99 @@
-# ADR-001 – Algoritmo de firma JWT: RSA vs HMAC
+# ADR-001 — Algoritimo de firma JWT: RSA vs HMAC
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado  
+🔄 Reemplaza a: Ninguno
 
-**Estado:** Aceptado  
-**Fecha:** 2025-03-01
+---
 
-## Contexto
+## 🎯 Contexto
 
-La plantilla de seguridad requiere firmar y validar JWTs de forma segura.  
-Los algoritmos más utilizados en la industria son:
+El sistema requiere firmar y validar JWT para autenticación y autorización.  
+Existen dos opciones principales:
 
-- HMAC (HS256/HS384/HS512) → clave simétrica
-- RSA (RS256/RS384/RS512) → clave asimétrica
+- **HMAC (HS256/384/512)**: clave simétrica compartida.
+- **RSA (RS256/384/512)**: clave privada para firmar, clave pública para validar.
 
-La solución debe funcionar en:
+El proyecto debe ser compatible con entornos:
 
-- Entornos de desarrollo y test (configuración sencilla)
-- Entornos productivos corporativos (seguridad fuerte, rotación de claves)
-- Escenarios distribuidos (API Gateway, múltiples microservicios)
+- Desarrollo local  
+- Testing automatizado  
+- Producción corporativa (KMS, keystores, Vault)  
 
-## Decisión
+Además, la plantilla debe ser reutilizable por otros microservicios.
 
-Se adopta la siguiente estrategia:
+---
 
-- **Producción:** algoritmo de firma recomendado → **RSA** (asimétrico).
-- **Desarrollo / Test:** se permite **HMAC** o RSA demo por simplicidad.
-- El algoritmo será configurable vía propiedad: `security.jwt.algorithm`.
+## 🧠 Decisión
 
-## Alternativas consideradas
+Se adopta **RSA como algoritmo por defecto**.  
+Se mantiene **HMAC disponible como fallback opcional**.
 
-1. **Solo HMAC**
-   - ✔ Fácil de configurar (una sola clave base64).
-   - ✖ Menos seguro en arquitecturas distribuidas (todos comparten la misma clave).
-   - ✖ Complica escenarios donde distintos servicios solo deberían tener la clave pública.
+---
 
-2. **Solo RSA**
-   - ✔ Muy seguro y estándar en entornos enterprise.
-   - ✖ Aumenta la complejidad inicial en entornos locales y de CI.
+## ✔ Razones principales
 
-3. **Otros algoritmos (EC, EdDSA)**
-   - ✔ Modernos y eficientes.
-   - ✖ No aportan un beneficio inmediato para el alcance actual.
-   - ✖ Añaden complejidad innecesaria en esta primera versión.
+### Por qué **RSA** es el estándar:
+- Separación clara entre **firma** (servidor) y **validación** (otros servicios)
+- No expone la clave privada en microservicios
+- Compatible con:
+  - OAuth2
+  - OIDC
+  - Kubernetes Secrets
+  - AWS KMS / Azure KeyVault
+- Facilita la rotación de claves
+- Escalable para arquitecturas distribuidas
 
-## Justificación técnica
+### Por qué **HMAC** no es adecuado para producción:
+- Una única clave compartida
+- Riesgo: si un servicio filtra la clave, todos quedan comprometidos
+- Rotación más compleja
+- No compatible con validación cruzada multi-servicio
 
-- RSA permite separar:
-  - **Clave privada** → solo en el servicio emisor.
-  - **Clave pública** → compartida con gateways u otros microservicios.
-- Cumple mejor las recomendaciones de OWASP ASVS y prácticas de JWT en ecosistemas distribuidos.
-- HMAC se mantiene como opción opcional para facilitar el desarrollo local y los entornos de test.
+---
 
-## Consecuencias
+## 🧩 Alternativas consideradas
 
-**Positivas:**
+### 1. Solo HMAC  
+**Descartada.**  
+✓ Simple  
+✗ Riesgo de seguridad elevado  
+✗ Limitado para arquitecturas distribuidas  
+✗ No corporativo  
 
-- Mayor seguridad en producción gracias a claves asimétricas.
-- Modelo compatible con API Gateways y validación de tokens en múltiples servicios.
-- Soporte sencillo para rotación de claves RSA en el futuro.
-- Flexibilidad para usar HMAC cuando se priorice sencillez (dev/test).
+### 2. Solo RSA  
+**Posible pero no flexible.**  
+Se requiere HMAC en dev para trabajar sin claves.
 
-**Negativas:**
+### 3. EC (Elliptic Curve)  
+**Descartada por ahora:**  
+Aunque ES256 es más moderno, RSA sigue siendo estándar en empresas.
 
-- Configuración de RSA requiere más pasos (keystore, claves, secretos).
-- Se necesita una abstracción (`TokenProvider`) para que el resto del código sea agnóstico al algoritmo.
+---
+
+## 📌 Consecuencias
+
+### Positivas
+- Seguridad corporate-grade
+- Validación JWT distribuida entre microservicios
+- Integración con Vault/KMS
+- Escalabilidad sin exponer claves privadas
+
+### Negativas
+- Configuración más compleja en dev
+- Requiere gestión de claves (keystore, vault, etc.)
+
+---
+
+## 📤 Resultado
+
+El template soporta:
+
+- ✔ **RSA como default (prod/test/dev)**
+- ✔ **HMAC como fallback**
+- ✔ Carga de claves desde:  
+  - classpath  
+  - filesystem  
+  - keystore/JKS  
+  - AWS KMS / GCP Secrets / Azure  
+
+

@@ -1,58 +1,87 @@
-# ADR-003 – Refresh Token Rotation
+# ADR-003 — Refresh Token Rotation
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado  
 
-**Estado:** Aceptado  
-**Fecha:** 2025-03-01
+---
 
-## Contexto
+## 🎯 Contexto
 
-El sistema ofrece autenticación mediante:
+Los Refresh Tokens son especialmente sensibles porque:
 
-- Access Tokens de corta duración.
-- Refresh Tokens de mayor duración.
+- Tienen mayor duración
+- Permiten generar nuevos Access Tokens
+- Su compromiso equivale a secuestrar la sesión completa
 
-Los Refresh Tokens, si se comprometen, pueden permitir que un atacante mantenga una sesión activa sin conocer la contraseña del usuario. Es necesario reducir este riesgo manteniendo una buena experiencia de usuario.
+El sistema debe:
 
-## Decisión
+1. Evitar reutilización del Refresh Token  
+2. Detectar robo de tokens  
+3. Mantener sesiones seguras en producción  
 
-Implementar una estrategia de **Refresh Token Rotation**, preparada en la plantilla, donde:
+---
 
-- Cada vez que se use un Refresh Token válido:
-  - Se emite un **nuevo Refresh Token**.
-  - El Refresh Token anterior se marca como inválido (revocado).
-- La revocación se hace mediante el `jti` (ID de token) y el `TokenBlacklistGateway`.
+## 🧠 Decisión
 
-## Alternativas consideradas
+El template adopta **Refresh Token Rotation**:
 
-1. **No usar refresh tokens**
-   - ✔ Diseño más simple.
-   - ✖ Obliga al usuario a autenticarse con credenciales con mucha frecuencia.
-   - ✖ No encaja con flujos modernos de UX.
+- Cada vez que se usa un refresh token → se emite uno nuevo  
+- El token viejo se invalida inmediatamente  
+- Se registra el `jti` o fingerprint  
 
-2. **Refresh tokens sin rotación**
-   - ✔ Implementación sencilla.
-   - ✖ Un refresh robado tiene una ventana de uso muy larga.
-   - ✖ Difícil revocar de forma granular.
+---
 
-3. **Sesiones solo con Access Tokens muy cortos**
-   - ✔ Simplifica el modelo.
-   - ✖ Experiencia de usuario pobre (relogin continuo).
-   - ✖ Requiere demasiada tolerancia al fallo en el cliente.
+## ✔ Razones principales
 
-## Justificación técnica
+### 1. Mejora crítica en seguridad
+Evita ataques donde:
 
-- La rotación de Refresh Tokens **es la práctica recomendada en OAuth2/OIDC**.
-- Permite invalidar un refresh en cuanto se use (one-time token) y aplicar políticas de seguridad más estrictas.
-- La plantilla incluye infraestructura de revocación a través de `TokenBlacklistGateway`.
+- Alguien roba un refresh  
+- Lo usa después de que el usuario ya pidió otro  
 
-## Consecuencias
+Esto queda automáticamente bloqueado.
 
-**Positivas:**
+### 2. Estándar en OIDC y bancos
+Google, Auth0, Okta, AWS Cognito…  
+todos implementan rotating refresh.
 
-- Reduce significativamente el impacto del robo de un Refresh Token.
-- Permite implementar políticas de seguridad avanzadas sin rehacer el modelo.
-- Alinea la plantilla con estándares modernos de seguridad.
+### 3. Permite detección de replay attacks
+Si llega un refresh token **ya rotado**, es señal de intrusión.
 
-**Negativas:**
+---
 
-- Complejidad adicional en la gestión de tokens (generación + revocación).
-- Necesidad de almacenamiento para token IDs revocados (idealmente Redis u otra store rápida).
+## 🧩 Alternativas consideradas
+
+### 1. Refresh Tokens fijos  
+✗ Poco seguro  
+✗ No detecta robo  
+✗ No recomendado en 2025
+
+### 2. Sessions (stateful)  
+✗ Requiere base de datos  
+✗ No compatible con JWT stateless
+
+---
+
+## 📌 Consecuencias
+
+### Positivas
+- Sesiones más seguras  
+- Detección de ataques  
+- Compatible con JWKS / OAuth2  
+
+### Negativas
+- Requiere blacklisting de refresh tokens antiguos  
+- Añade complejidad en dev  
+
+---
+
+## 📤 Resultado
+
+- Refresh tokens llevan `jti` único  
+- Se invalidan en cada uso  
+- El sistema está preparado para:  
+  - Persistencia de jti por usuario  
+  - Blacklist  
+  - Auditoría  
+
+
