@@ -1,0 +1,8 @@
+flowchart LR
+
+    A[Clave anterior -> previous] --> B[Nueva clave -> active]
+    B --> C[Firma de nuevos tokens]
+    A --> D[Validar tokens antiguos]
+    C --> E[Tokens expiran]
+    D --> E
+    E --> F[Eliminar clave previous]
