@@ -1,7 +1,9 @@
 package com.lanny.spring_security_template.application.auth.port.out;
 
-import java.util.List;
+import java.util.Set;
+
+import com.lanny.spring_security_template.domain.valueobject.Role;
 
 public interface RoleProvider {
-  List<String> resolveRoles(String username);
+  Set<Role> resolveRoles(String username);
 }

@@ -3,6 +3,7 @@ package com.lanny.spring_security_template.application.auth.service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -20,8 +21,11 @@ import com.lanny.spring_security_template.application.auth.port.out.UserAccountG
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
 import com.lanny.spring_security_template.domain.model.User;
+import com.lanny.spring_security_template.domain.model.UserStatus;
 import com.lanny.spring_security_template.domain.model.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
+import com.lanny.spring_security_template.domain.valueobject.Role;
+import com.lanny.spring_security_template.domain.valueobject.Scope;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
 import com.lanny.spring_security_template.shared.ClockProvider;
@@ -42,9 +46,9 @@ public class AuthUseCaseImpl implements AuthUseCase {
     private final TokenBlacklistGateway tokenBlacklistGateway;
     private final AuthMetricsService metrics;
 
-    // ===========================
-    // LOGIN FLOW
-    // ===========================
+    // =====================================================
+    // LOGIN
+    // =====================================================
     @Override
     public JwtResult login(LoginCommand command) {
 
@@ -58,20 +62,33 @@ public class AuthUseCaseImpl implements AuthUseCase {
             throw new InvalidCredentialsException("Invalid username or password");
         }
 
-        // Roles y scopes calculados por los proveedores correspondientes
-        List<String> roles = roleProvider.resolveRoles(user.username().value());
-        List<String> scopes = scopePolicy.resolveScopes(roles);
+        // 1️⃣ Roles como Value Objects
+        Set<Role> roles = roleProvider.resolveRoles(user.username().value());
 
+        // 2️⃣ Scopes como Value Objects
+        Set<Scope> scopes = scopePolicy.resolveScopes(roles);
+
+        // 3️⃣ Convertir dominio → strings para el JWT
+        List<String> roleNames = roles.stream()
+                .map(Role::name)
+                .toList();
+
+        List<String> scopeNames = scopes.stream()
+                .map(Scope::name)
+                .toList();
+
+        // 4️⃣ Tiempos
         Duration accessTtl = securityJwtProperties.accessTtl();
         Duration refreshTtl = securityJwtProperties.refreshTtl();
 
         Instant issuedAt = clockProvider.now();
         Instant accessExp = issuedAt.plus(accessTtl);
 
+        // 5️⃣ Emitir tokens
         String accessToken = tokenProvider.generateAccessToken(
                 user.username().value(),
-                roles,
-                scopes,
+                roleNames,
+                scopeNames,
                 accessTtl);
 
         String refreshToken = tokenProvider.generateRefreshToken(
@@ -83,22 +100,28 @@ public class AuthUseCaseImpl implements AuthUseCase {
         return new JwtResult(accessToken, refreshToken, accessExp);
     }
 
-    // ===========================
-    // REFRESH FLOW
-    // ===========================
+    // =====================================================
+    // REFRESH
+    // =====================================================
     @Override
     public JwtResult refresh(RefreshCommand command) {
+
         return tokenProvider.parseClaims(command.refreshToken())
                 .map(claims -> {
 
-                    // 1. Verificar revocación
                     if (tokenBlacklistGateway.isRevoked(claims.jti())) {
                         throw new IllegalArgumentException("Refresh token revoked");
                     }
 
                     String username = claims.sub();
-                    List<String> roles = roleProvider.resolveRoles(username);
-                    List<String> scopes = scopePolicy.resolveScopes(roles);
+
+                    // Roles + scopes como objetos de dominio
+                    Set<Role> roles = roleProvider.resolveRoles(username);
+                    Set<Scope> scopes = scopePolicy.resolveScopes(roles);
+
+                    // Convertir para el JWT
+                    List<String> roleNames = roles.stream().map(Role::name).toList();
+                    List<String> scopeNames = scopes.stream().map(Scope::name).toList();
 
                     Duration accessTtl = securityJwtProperties.accessTtl();
                     Duration refreshTtl = securityJwtProperties.refreshTtl();
@@ -106,50 +129,81 @@ public class AuthUseCaseImpl implements AuthUseCase {
                     Instant issuedAt = clockProvider.now();
                     Instant accessExp = issuedAt.plus(accessTtl);
 
+                    // Rotación de refresh tokens
                     if (securityJwtProperties.rotateRefreshTokens()) {
-                        // 2. Revocar refresh actual
+
                         tokenBlacklistGateway.revoke(
                                 claims.jti(),
                                 Instant.ofEpochSecond(claims.exp()));
 
-                        // 3. Emitir refresh nuevo + access nuevo
                         String newRefresh = tokenProvider.generateRefreshToken(username, refreshTtl);
-                        String newAccess = tokenProvider.generateAccessToken(username, roles, scopes, accessTtl);
+                        String newAccess = tokenProvider.generateAccessToken(
+                                username,
+                                roleNames,
+                                scopeNames,
+                                accessTtl);
 
                         metrics.recordTokenRefresh();
 
                         return new JwtResult(newAccess, newRefresh, accessExp);
                     }
 
-                    // Sin rotación: solo crear access nuevo
-                    String newAccess = tokenProvider.generateAccessToken(username, roles, scopes, accessTtl);
+                    // Sin rotación: emitir solo access nuevo
+                    String newAccess = tokenProvider.generateAccessToken(
+                            username,
+                            roleNames,
+                            scopeNames,
+                            accessTtl);
+
                     return new JwtResult(newAccess, command.refreshToken(), accessExp);
 
                 })
                 .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
     }
 
-    // ===========================
-    // ME
-    // ===========================
+    // =====================================================
+    // ME / WHOAMI
+    // =====================================================
     @Override
     public MeResult me(String username) {
 
         User user = userAccountGateway.findByUsernameOrEmail(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        List<String> roles = roleProvider.resolveRoles(username);
-        List<String> scopes = scopePolicy.resolveScopes(roles);
+        Set<Role> roles = roleProvider.resolveRoles(username);
+        Set<Scope> scopes = scopePolicy.resolveScopes(roles);
 
-        return new MeResult(user.id(), username, roles, scopes);
+        return new MeResult(
+                user.id(),
+                username,
+                roles.stream().map(Role::name).toList(),
+                scopes.stream().map(Scope::name).toList());
     }
 
-    // ===========================
+    // =====================================================
     // DEV REGISTER
-    // ===========================
+    // =====================================================
     @Override
-    @Profile("dev")
-    public void registerDev(RegisterCommand command) {
-        // 🚧 Future work — create basic seed users for development
-    }
+@Profile("dev")
+public void registerDev(RegisterCommand command) {
+
+    // 1. Construir usuario del dominio
+    User newUser = new User(
+            command.id(),
+            command.username(),
+            command.email(),
+            passwordHasher.hash(command.rawPassword()),
+            UserStatus.ACTIVE,
+            command.roles(),    // List<String> de nombres de rol
+            command.scopes()    // List<String> de nombres de scope
+    );
+
+    // 2. Guardar usando el gateway
+    userAccountGateway.save(newUser);
+
+    metrics.recordUserRegistration();
+
+    System.out.printf("[DEV] Seed user created: %s%n", newUser.username().value());
+}
+
 }
