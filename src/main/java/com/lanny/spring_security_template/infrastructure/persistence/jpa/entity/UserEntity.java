@@ -15,17 +15,19 @@ public class UserEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(length = 36)  // UUID length
     private String id;
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false, length = 100)
     private String username;
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false, length = 150)
     private String email;
 
     @Column(nullable = false)
     private String passwordHash;
 
+    @Column(nullable = false)
     private boolean enabled = true;
 
     @ManyToMany(fetch = FetchType.EAGER)
@@ -44,4 +46,5 @@ public class UserEntity {
     )
     private Set<ScopeEntity> scopes = new HashSet<>();
 }
+
 

@@ -11,6 +11,9 @@ import org.springframework.stereotype.Component;
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.model.UserStatus;
+import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
+import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
+import com.lanny.spring_security_template.domain.valueobject.Username;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.UserEntity;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.repository.UserJpaRepository;
 
@@ -39,8 +42,11 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
         userRepository.save(toEntity(user));
     }
 
-    /**  Convierte entidad JPA → modelo de dominio */
+    // =====================================================
+    // ENTITY → DOMAIN
+    // =====================================================
     private User toDomain(UserEntity entity) {
+
         UserStatus status = entity.isEnabled() ? UserStatus.ACTIVE : UserStatus.DISABLED;
 
         List<String> roles = entity.getRoles().stream()
@@ -52,24 +58,41 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
                 .toList();
 
         return new User(
-                entity.getId(),
-                entity.getUsername(),
-                entity.getEmail(),
-                entity.getPasswordHash(),
+                String.valueOf(entity.getId()),
+                Username.of(entity.getUsername()),
+                EmailAddress.of(entity.getEmail()),
+                PasswordHash.of(entity.getPasswordHash()),
                 status,
                 roles,
                 scopes);
     }
-    /**  Convierte modelo de dominio → entidad JPA */
+
+    // =====================================================
+    // DOMAIN → ENTITY
+    // =====================================================
     @NonNull
     private UserEntity toEntity(User domain) {
         UserEntity entity = new UserEntity();
-        entity.setId(domain.id());
-        entity.setUsername(domain.username());
-        entity.setEmail(domain.email());
-        entity.setPasswordHash(domain.passwordHash());
-        //  Traducimos el enum a boolean
+        
+        if (domain.id() != null) {
+            try {
+                entity.setId(domain.id());
+
+            } catch (NumberFormatException ex) {
+                throw new IllegalStateException("Domain user ID must be convertible to Long");
+            }
+        }
+
+        entity.setUsername(domain.username().value());
+        entity.setEmail(domain.email().value());
+        entity.setPasswordHash(domain.passwordHash().value());
         entity.setEnabled(domain.status() == UserStatus.ACTIVE);
+
+        // ⚠️ Importante
+        // NO seteamos roles/scopes aquí porque esas relaciones se gestionan
+        // con entidades RoleEntity / ScopeEntity.
+        // Esto evita problemas de cascada en JPA.
+
         return entity;
     }
 }
