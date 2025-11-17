@@ -1,50 +1,95 @@
-# ADR-009 – InMemoryProviders por perfil dev
+# ADR-009 — InMemoryProviders en Perfil Dev
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado
 
-**Estado:** Aceptado  
-**Fecha:** 2025-03-01
+---
 
-## Contexto
+## 🎯 Contexto
 
-En entornos de desarrollo es deseable:
+Durante el desarrollo local se necesita:
 
-- Tener arranques muy rápidos.
-- Evitar dependencias externas (DB, Redis, etc.).
-- Permitir probar la plantilla sin configuración compleja.
+- Rapidez  
+- Simplicidad  
+- Claves cargadas automáticamente  
+- Blacklist en memoria  
+- Sin dependencias externas  
+- Pruebas interactivas fáciles  
 
-## Decisión
+Pero este comportamiento NO debe activarse en producción.
 
-Para el perfil **`dev`** se implementan proveedores en memoria:
+---
 
-- `InMemoryRoleProvider`
-- `InMemoryScopePolicy`
-- `InMemoryTokenBlacklistGateway`
+## 🧠 Decisión
 
-Estos permiten usar la plantilla de seguridad sin necesidad de configurar una base de datos ni una cache externa.
+En el perfil `dev` se usan implementaciones **in-memory** para acelerar el desarrollo:
 
-## Alternativas consideradas
+- InMemoryTokenBlacklistGateway  
+- InMemoryRoleProvider  
+- InMemoryScopePolicy  
+- Claves RSA desde classpath  
+- H2/MySQL local  
 
-1. **Siempre usar DB real**
-   - ✔ Entorno más “real”.
-   - ✖ Ralentiza el arranque.
-   - ✖ Añade fricción innecesaria a quien solo quiere probar la plantilla.
+---
 
-2. **Mockear todo en tests pero sin soporte real dev**
-   - ✖ No ayuda en pruebas manuales de la API.
+## ✔ Razones principales
 
-## Justificación técnica
+### 1. Elimina fricción en desarrollo
+El proyecto inicia inmediatamente con:
 
-- En desarrollo se favorece la productividad sobre el realismo absoluto del entorno.
-- Al tener adaptadores InMemory, el desarrollador puede probar login, refresh, scopes, etc. sin montar infraestructura adicional.
+- claves precargadas  
+- roles por defecto  
+- scopes predefinidos  
+- usuarios iniciales (si se desea)
 
-## Consecuencias
+### 2. Minimiza dependencias externas
+Sin Redis  
+Sin Vault  
+Sin PostgreSQL  
+Sin keystores
 
-**Positivas:**
+### 3. Evita sobre-configuración
+Ideal para laptops, clases o talleres.
 
-- Onboarding muy rápido para nuevos usuarios de la plantilla.
-- Menos puntos de fallo en dev.
-- Permite centrar la atención en la seguridad, no en la base de datos.
+---
 
-**Negativas:**
+## 🧩 Alternativas consideradas
 
-- El comportamiento en prod (con DB/cache real) puede diferir ligeramente.
-- Es necesario avisar claramente en la documentación de que estos proveedores son solo para dev.
+### 1. Usar Redis en local  
+✗ Aumenta complejidad  
+✗ No aporta valor en dev  
+
+### 2. Usar BD real para roles/scopes  
+✗ Más lento  
+✗ No necesario  
+
+### 3. Cargar claves desde filesystem  
+✗ Innecesario en dev  
+✗ Añade fricción  
+
+---
+
+## 📌 Consecuencias
+
+### Positivas
+- Experiencia dev muy fluida  
+- Fácil onboarding  
+- Rápido inicio de proyectos  
+- Tests reproducibles  
+
+### Negativas
+- No apto para producción  
+- Debe estar claramente separado por perfiles  
+
+---
+
+## 📤 Resultado
+
+En `application-dev.yml`:
+
+- Blacklist in-memory  
+- Keys desde classpath  
+- Roles base  
+- ScopePolicy básica  
+
+El perfil dev queda optimizado para productividad.
+

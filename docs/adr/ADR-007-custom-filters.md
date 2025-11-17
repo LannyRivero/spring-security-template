@@ -1,57 +1,108 @@
-# ADR-007 – Elección de filtros personalizados
+# ADR-007 — Elección de Filtros Personalizados
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado
 
-**Estado:** Aceptado  
-**Fecha:** 2025-03-01
+---
 
-## Contexto
+## 🎯 Contexto
 
-Además de la cadena de filtros de Spring Security, el sistema necesita:
+Además del filtro estándar de autenticación JWT, un sistema enterprise moderno requiere mecanismos adicionales de seguridad y observabilidad:
 
-- Añadir cabeceras de seguridad (HSTS, XSS-Protection, CSP, etc.).
-- Limitar intentos de login (rate limiting).
-- Propagar un `X-Correlation-ID` para trazabilidad.
-- Evitar cache de respuestas sensibles.
+- Mitigar ataques de fuerza bruta  
+- Añadir cabeceras de seguridad recomendadas por OWASP  
+- Trazabilidad entre microservicios (Correlation-ID)  
+- Prevenir cache de tokens  
+- Controlar comportamiento en entornos dev/test/prod  
 
-## Decisión
+Spring Security provee un sistema flexible basado en filtros; por tanto, los filtros deben:
 
-Implementar los siguientes filtros propios:
+1. Ser independientes del dominio  
+2. Ser ordenados correctamente  
+3. Reducir acoplamiento  
+4. Ser fáciles de activar/desactivar  
 
-- `LoginRateLimitingFilter`
-- `SecurityHeadersFilter`
-- `CorrelationIdFilter`
-- `AuthNoCacheFilter`
+---
 
-Y definir su posición relativa mediante una enumeración de orden (`FilterOrder`).
+## 🧠 Decisión
 
-## Alternativas consideradas
+Se definen e implementan 5 filtros personalizados:
 
-1. **Confiar solo en los filtros por defecto de Spring Security**
-   - ✔ Menos código propio.
-   - ✖ No cubre todas las cabeceras de seguridad recomendadas.
-   - ✖ No da control fino sobre rate limiting ni correlation IDs.
+### 1. **LoginRateLimitingFilter**  
+Previene intentos repetidos de login → evita brute-force.
 
-2. **Delegar completamente en API Gateway**
-   - ✔ El gateway puede manejar cabeceras y rate limiting.
-   - ✖ No todas las instalaciones tienen gateway.
-   - ✖ Menos control en entornos locales o monolíticos.
+### 2. **SecurityHeadersFilter**  
+Añade cabeceras OWASP:  
+- HSTS  
+- X-Frame-Options  
+- X-Content-Type-Options  
+- Referrer-Policy  
+- Strict-Transport-Security  
 
-## Justificación técnica
+### 3. **CorrelationIdFilter**  
+Añade `X-Correlation-ID` a todas las peticiones → trazabilidad.
 
-- Los filtros personalizados permiten que la plantilla sea útil incluso sin gateway.
-- Permiten tener un punto único para:
-  - Medir métricas de seguridad.
-  - Asegurar cabeceras.
-  - Aplicar rate limiting de login.
+### 4. **AuthNoCacheFilter**  
+Bloquea el cacheo de respuestas sensibles de auth.
 
-## Consecuencias
+### 5. **JwtAuthorizationFilter**  
+Valida JWT, claims, expiración, firma y scopes.
 
-**Positivas:**
+Todos los filtros se ordenan en `FilterOrder.java` para evitar inconsistencias.
 
-- Mayor seguridad desde la propia aplicación.
-- Mejor trazabilidad de peticiones.
-- Plantilla utilizable en distintos escenarios de despliegue.
+---
 
-**Negativas:**
+## ✔ Razones principales
 
-- Incrementa el número de componentes a mantener.
-- Necesidad de tener tests específicos para los filtros.
+### 1. Seguridad avanzada (OWASP ASVS)
+Cabeceras, cache-control, mitigación brute-force → nivel enterprise.
+
+### 2. Observabilidad real
+Sin Correlation-ID no se puede trazar errores entre microservicios.
+
+### 3. Full compliance
+Cumple mejores prácticas de banca, fintech y empresas.
+
+### 4. Separación de responsabilidades
+Cada filtro hace **una cosa y solo una cosa** (SRP).
+
+---
+
+## 🧩 Alternativas consideradas
+
+### 1. No usar filtros propios  
+✗ Menos seguridad  
+✗ No hay tracing  
+✗ No cumple estándares enterprise  
+
+### 2. Un solo filtro gigante  
+✗ Mala práctica  
+✗ Difícil de mantener  
+✗ No cumple SRP  
+
+---
+
+## 📌 Consecuencias
+
+### Positivas
+- Seguridad reforzada  
+- Observabilidad mejorada  
+- Código desacoplado  
+- Fácil testing  
+
+### Negativas
+- Mayor cantidad de clases  
+- Más configuración en SecurityConfig  
+
+---
+
+## 📤 Resultado
+
+El template implementa filtros:
+
+- Separados  
+- Testeables  
+- Ordenados  
+- Activables vía perfiles  
+
+Listos para producción.
+

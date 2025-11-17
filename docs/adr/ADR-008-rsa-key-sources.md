@@ -1,53 +1,102 @@
-# ADR-008 – Fuentes de claves RSA (classpath, filesystem, keystore)
+# ADR-008 — Fuentes de Claves RSA (classpath, filesystem, keystore)
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado
 
-**Estado:** Aceptado  
-**Fecha:** 2025-03-01
+---
 
-## Contexto
+## 🎯 Contexto
 
-Las claves RSA privadas y públicas utilizadas para firmar y validar tokens deben:
+El sistema soporta JWT firmados con RSA.  
+Para firmar y validar se requieren claves:
 
-- Ser fáciles de gestionar en dev/test.
-- Ser seguras en producción.
-- Integrarse con distintos mecanismos (keystore, archivos, KMS, etc.).
+- `privateKey` → firma  
+- `publicKey` → validación  
 
-## Decisión
+Diferentes entornos requieren diferentes estrategias:
 
-Soportar múltiples fuentes de claves RSA mediante distintos `RsaKeyProvider`:
+| Entorno | Necesidad |
+|---------|-----------|
+| dev     | simplicidad, claves incluidas |
+| test    | claves efímeras in-memory |
+| prod    | claves seguras en keystores o KMS |
 
-- **Classpath (resources/keys)** → principalmente dev.
-- **Filesystem** → contenedores y despliegues clásicos.
-- **Keystore (JKS/PKCS12)** → producción recomendada.
-- Preparar la integración futura con KMS / Secret Managers.
+El proyecto debe soportar TODAS estas opciones sin acoplarse a ninguna.
 
-## Alternativas consideradas
+---
 
-1. **Solo classpath**
-   - ✔ Muy fácil en dev.
-   - ✖ Inaceptable para producción (claves empaquetadas en el artefacto).
+## 🧠 Decisión
 
-2. **Solo filesystem**
-   - ✔ Común en servidores tradicionales.
-   - ✖ Menos conveniente en entornos cloud/Kubernetes.
+Se definen **3 KeyProviders**, seleccionables vía configuración:
 
-3. **Solo keystore**
-   - ✔ Seguro en producción.
-   - ✖ Complejo e innecesario para entornos locales y de prueba.
+### 1. **ClasspathRsaKeyProvider**
+- Carga claves desde `src/main/resources/keys`
+- Ideal para `dev`
 
-## Justificación técnica
+### 2. **FileSystemRsaKeyProvider**
+- Carga claves desde rutas absolutas en filesystem
+- Ideal para contenedores Docker no seguros
 
-- Distintas organizaciones y entornos usan mecanismos diferentes para gestionar claves.
-- Separar esto vía `RsaKeyProvider` permite adaptar la fuente de claves a cada contexto sin tocar el dominio ni los casos de uso.
+### 3. **KeystoreRsaKeyProvider**
+- Carga claves desde JKS/PKCS12
+- Compatible con:
+  - AWS KMS
+  - Azure KeyVault
+  - GCP Secret Manager
+- Recomendado para `prod`
 
-## Consecuencias
+---
 
-**Positivas:**
+## ✔ Razones principales
 
-- Alta flexibilidad de despliegue (local, Docker, Kubernetes, on-prem).
-- Buenas prácticas de seguridad en producción (no empaquetar claves).
-- Claridad de responsabilidades (infraestructura maneja las claves).
+### 1. Flexibilidad total  
+Cualquier microservicio puede escoger su proveedor.
 
-**Negativas:**
+### 2. Seguridad real en producción  
+Los keystores evitan almacenar claves en recursos.
 
-- Aumento del número de clases de infraestructura.
-- Necesidad de documentación clara para cada modo de carga de claves.
+### 3. Testing sencillo  
+Los tests cargan claves en memoria sin depender del SO.
+
+---
+
+## 🧩 Alternativas consideradas
+
+### 1. Solo claves en classpath  
+✗ Inseguro en prod  
+✗ No cumple estándares corporativos  
+
+### 2. Solo filesystem  
+✗ Inconveniente en CI/CD  
+✗ No funciona en AWS Lambda, CloudRun  
+
+### 3. Solo keystore  
+✗ Overkill en dev/test  
+✗ Más complejo  
+
+---
+
+## 📌 Consecuencias
+
+### Positivas
+- Seguridad adaptable por entorno  
+- Claves externas en producción  
+- Tests controlados  
+- Deployment flexible  
+
+### Negativas
+- Más código  
+- Configuración más avanzada  
+
+---
+
+## 📤 Resultado
+
+El template queda preparado para cualquier tipo de despliegue:
+
+- Local  
+- Docker  
+- Kubernetes  
+- Cloud (AWS/Azure/GCP)
+
+Y soporta migración futura a JWKS.
+
