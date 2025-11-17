@@ -1,37 +1,80 @@
-# ADR-011 — Soporte opcional para JWE (JSON Web Encryption)
+# ADR-011 — Futuro Soporte para JWE (Encrypted JWT)
+📅 Fecha: 2025-11-17  
+📁 Estado: Evaluación
 
-**Estado:** Propuesto  
-**Fecha:** 2025-03-01
+---
 
-## 📌 Contexto
-El proyecto utiliza actualmente JWS (JSON Web Signature) para firmar JWT.  
-Sin embargo, algunos entornos corporativos manejan información sensible en los tokens (claims internos, PII, datos de privilegios) y requieren **encriptación** además de firma.
+## 🎯 Contexto
 
-JWE, soportado de forma nativa por Nimbus JOSE + JWT, permite cifrar el contenido del token.
+Actualmente se utiliza **JWS (firmado)** con JWT autocontenidos.  
+Es el estándar para microservicios.
 
-## 🏆 Decisión
-Incorporar un módulo opcional JWE basado en:
+Sin embargo, en industrias como:
 
-- Algoritmo de clave: `RSA-OAEP`  
-- Algoritmo de contenido: `A256GCM`
+- banca  
+- salud  
+- gobiernos  
+- defensa  
 
-Los tokens podrán ser emitidos como:
+Puede requerirse **JWE (JSON Web Encryption)** para ocultar:
 
-- **JWS** (solo firma, modo por defecto)
-- **JWE** (firma + cifrado, configurable)
+- datos sensibles  
+- metadatos  
+- claims ocultos  
 
-## 🎯 Motivaciones
-- Protección total de claims sensibles  
-- Cumplimiento GDPR / ISO / PCI  
-- Integración nativa con Nimbus  
-- Es compatible con OAuth2 y OIDC
+Nimbus JOSE + JWT soporta JWE de forma nativa.
 
-## 🔄 Alternativas consideradas
-- ❌ Mantener solo JWS → expone claims sensibles en entornos críticos  
-- ❌ Cifrado manual por aplicación → complejo y no estándar  
-- ❌ Encriptar parcialmente claims → no asegura integridad
+---
+
+## 🧠 Decisión (actual)
+
+**No implementar JWE todavía**, pero dejar:
+
+- arquitectura lista  
+- TokenProvider extensible  
+- KeyProvider compatible  
+- ADR documentado  
+
+para una futura fase.
+
+---
+
+## ✔ Razones principales
+
+### 1. JWE incrementa complejidad
+- Doble operación: firmar + encriptar  
+- Más claves  
+- Más CPU  
+
+### 2. No aporta valor al caso actual
+Los tokens no contienen PII, solo metadatos seguros.
+
+### 3. JWE complica interoperabilidad
+Muchos gateways no soportan JWE.
+
+---
+
+## 🧩 Alternativas consideradas
+
+### Implementar JWE desde el inicio  
+✗ Overkill  
+✗ Peor rendimiento  
+✗ No requerido por el proyecto  
+
+---
 
 ## 📌 Consecuencias
-- Introduce configuración adicional  
-- Ligera sobrecarga de CPU al cifrar/descifrar  
-- Aumenta significativamente la seguridad en entornos regulados
+
+### Positivas
+- Arquitectura lista para migrar  
+- Decisión documentada  
+
+### Negativas
+- El equipo debe estar alerta si un partner requiere JWE  
+
+---
+
+## 📤 Resultado
+
+El sistema continúa usando **JWS firmado**, pero está listo para activar JWE sin romper la arquitectura.
+

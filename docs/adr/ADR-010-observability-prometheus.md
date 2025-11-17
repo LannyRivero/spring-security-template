@@ -1,54 +1,97 @@
-# ADR-010 – Observabilidad con Prometheus
+# ADR-010 — Observabilidad con Prometheus
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado
 
-**Estado:** Aceptado  
-**Fecha:** 2025-03-01
+---
 
-## Contexto
+## 🎯 Contexto
 
-La seguridad no solo debe implementarse, sino **monitorizarse**.  
-Es necesario medir:
+En sistemas distribuidos (microservicios) es imprescindible contar con:
 
-- Número de logins exitosos y fallidos.
-- Tokens rechazados por firma / expiración / blacklist.
-- Número de peticiones protegidas.
-- Posibles patrones anómalos (brute force, abusos, etc.).
+- Métricas en tiempo real  
+- Detección temprana de fallos  
+- Trazabilidad  
+- Dashboards en Grafana  
+- Alertas automáticas  
 
-La mayoría de entornos modernos utilizan **Prometheus + Grafana** como stack de observabilidad.
+Spring Boot Actuator expone métricas básicas, pero no incluye:
 
-## Decisión
+- Métricas específicas de autenticación  
+- Contadores por intentos de login  
+- Métricas por error 401/403  
+- Latencia del SecurityFilterChain  
 
-Integrar la plantilla con **Prometheus** mediante:
+El proyecto necesita observabilidad avanzada desde el día 0.
 
-- Un servicio de métricas (`AuthMetricsService`).
-- Configuración de registro de métricas (`PrometheusConfigBean`).
-- Exponer contadores y métricas clave vía Actuator / Micrometer.
+---
 
-## Alternativas consideradas
+## 🧠 Decisión
 
-1. **Solo logs**
-   - ✔ Fácil de implementar.
-   - ✖ No ofrece métricas agregadas en tiempo real.
-   - ✖ Más difícil de visualizar tendencias.
+Se implementa un **AuthMetricsService** que expone métricas personalizadas en Prometheus:
 
-2. **Métricas internas sin Prometheus**
-   - ✔ Menos dependencias.
-   - ✖ Menor compatibilidad con entornos Kubernetes y cloud.
+### Métricas incluidas
 
-## Justificación técnica
+| Nombre | Tipo | Descripción |
+|--------|------|-------------|
+| `auth_login_attempts_total` | Counter | Intentos de login |
+| `auth_login_failures_total` | Counter | Fallos de login |
+| `auth_tokens_created_total` | Counter | Tokens emitidos |
+| `auth_tokens_invalid_total` | Counter | Tokens inválidos |
+| `auth_tokens_expired_total` | Counter | Tokens expirados |
 
-- Prometheus es estándar de facto en infraestructuras cloud-native.
-- La plantilla debe ser “listo para producción” no solo en seguridad, sino también en observabilidad.
-- Las métricas permiten al equipo de operaciones detectar patrones de ataque y problemas antes de que escalen.
+Además:
 
-## Consecuencias
+- Integración con Micrometer  
+- Endpoint `/actuator/prometheus` habilitado  
+- MDC enriquecido con Correlation-ID  
 
-**Positivas:**
+---
 
-- Integración directa con Grafana / Kubernetes / Alertmanager.
-- Mayor capacidad de auditoría y respuesta ante incidentes.
-- Refuerza el carácter enterprise de la plantilla.
+## ✔ Razones principales
 
-**Negativas:**
+### 1. Facilidad de integración en monitorización corporativa  
+Prometheus + Grafana es estándar.
 
-- Ligero aumento de complejidad en configuración.
-- Necesidad de definir y mantener un conjunto coherente de métricas.
+### 2. Seguridad observable  
+Sin métricas, ataques de login pasan desapercibidos.
+
+### 3. Preparación para autoscaling  
+Permite detectar:
+
+- picos de CPU  
+- latencia del servicio  
+- uso intensivo del login
+
+---
+
+## 🧩 Alternativas consideradas
+
+### 1. Logs únicamente  
+✗ No escalable  
+✗ No apto para dashboards  
+
+### 2. Métricas solo de Actuator  
+✗ Insuficiente para auth  
+
+### 3. NewRelic/AppDynamics  
+✗ De pago  
+✗ No siempre disponibles  
+
+---
+
+## 📌 Consecuencias
+
+### Positivas
+- Dashboards listos  
+- Alertas configurables  
+- Métricas de seguridad reales  
+
+### Negativas
+- Ligero overhead de recolección  
+
+---
+
+## 📤 Resultado
+
+El microservicio expone métricas listas para Prometheus/Grafana y prepara al ecosistema para autoscaling y operaciones enterprise.
+

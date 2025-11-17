@@ -1,40 +1,89 @@
-# ADR-012 — Integración opcional con OAuth2 Authorization Server
+# ADR-012 — Interoperabilidad futura con OAuth2 / OpenID Connect
+📅 Fecha: 2025-11-17  
+📁 Estado: Planificado
 
-**Estado:** Planeado  
-**Fecha:** 2025-03-01
+---
 
-## 📌 Contexto
-La plantilla funciona como Authentication Provider local.  
-Pero entornos corporativos usan herramientas externas como:
+## 🎯 Contexto
 
-- Keycloak  
-- Auth0  
-- Okta  
-- Azure AD  
-- Spring Authorization Server  
+Aunque el proyecto usa autenticación "propietaria" basada en:
 
-Para habilitar SSO, MFA, social login y federación.
+- JWT autocontenidos  
+- Roles  
+- Scopes  
+- Refresh tokens  
 
-## 🏆 Decisión
-Preparar adaptadores opcionales para delegar:
+muchos ecosistemas corporativos usan:
 
-- Autenticación  
-- Introspección  
-- Rotación de tokens  
-- Validación remota  
+- Identity Providers (IdP)
+- Keycloak
+- Auth0
+- Azure AD
+- Okta
 
-Manteniendo la lógica actual como fallback.
+Por lo tanto, la plantilla debe ser compatible en un futuro con OAuth2/OIDC.
 
-## 🎯 Motivaciones
-- Integración transparente con ecosistemas enterprise  
-- Roadmap natural hacia OAuth2/OIDC  
-- Posibilidad de Single Sign-On  
-- Mejor soporte para MFA y políticas corporativas
+---
 
-## 🔄 Alternativas consideradas
-- ❌ Forzar OAuth2 desde el inicio → demasiado rígido  
-- ❌ Autenticación local siempre → limita escalabilidad
+## 🧠 Decisión
+
+No implementar OAuth2/OIDC actualmente, pero preparar:
+
+- `TokenProvider` como interfaz desacoplada  
+- Scopes compatibles con OIDC (`resource:action`)  
+- Claims estándar (sub, iss, exp)  
+- Nimbus (compatible con JWKS)  
+- Arquitectura hexagonal lista para un `ExternalIdpAdapter`
+
+---
+
+## ✔ Razones principales
+
+### 1. Evitar sobrecarga inicial  
+OAuth2 añade:
+
+- Authorization Server  
+- Discovery  
+- Introspection  
+- Refresh endpoint complejo  
+
+### 2. Mantener simplicidad  
+Esta plantilla debe ser usable *sin* un IdP externo.
+
+### 3. Preparación para escenarios enterprise  
+Poder sustituir el login local por Keycloak implica 0 cambios en:
+
+- domain  
+- application  
+- controllers  
+
+Solo sustituir el adaptador.
+
+---
+
+## 🧩 Alternativas consideradas
+
+### Implementar OAuth2/OIDC desde el principio  
+✗ Rompe simplicidad  
+✗ Exige demasiada configuración  
+✗ No aplicable en todos los casos  
+
+---
 
 ## 📌 Consecuencias
-- El template será usable tanto como IdP local como integración OAuth2  
-- Añade complejidad opcional, no obligatoria
+
+### Positivas
+- Evolución futura 100% posible  
+- Arquitectura preparada  
+- Integración con Keycloak trivial  
+
+### Negativas
+- Capacidad limitada en escenarios federados  
+- No hay SSO aún  
+
+---
+
+## 📤 Resultado
+
+La plantilla queda preparada para un futuro módulo OAuth2/OIDC sin necesidad de reescribir el sistema.
+
