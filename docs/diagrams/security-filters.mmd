@@ -1,0 +1,7 @@
+flowchart TB
+    Start[Request] --> F1[CorrelationIdFilter]
+    F1 --> F2[SecurityHeadersFilter]
+    F2 --> F3[LoginRateLimitingFilter]
+    F3 --> F4[AuthNoCacheFilter]
+    F4 --> F5[JwtAuthorizationFilter]
+    F5 --> App[SecurityContext + Controller]
