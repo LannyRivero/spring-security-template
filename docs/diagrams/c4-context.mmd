@@ -1,14 +1,14 @@
-```mermaid
 C4Context
     title Spring Security Template — Context Diagram
 
     Person(user, "Usuario / Cliente", "Frontend o cliente externo")
-    System(auth, "Spring Security Template", "Servicio de autenticación y seguridad basado en JWT")
-    System_Ext(db, "Base de Datos / User Store", "H2 / MySQL / PostgreSQL")
+    System(auth, "Spring Security Template", "Servicio de autenticación basado en JWT")
+    System_Ext(db, "Base de Datos", "H2 / MySQL / PostgreSQL")
     System_Ext(prom, "Prometheus", "Recolecta métricas")
-    System_Ext(grafana, "Grafana", "Visualiza dashboards")
+    System_Ext(grafana, "Grafana", "Dashboards")
 
-    Rel(user, auth, "Envía credenciales / tokens JWT")
-    Rel(auth, db, "Lee usuarios, roles y scopes")
-    Rel(auth, prom, "Exporta métricas")
-    Rel(prom, grafana, "Dashboards y análisis")
+    Rel(user, auth, "Envía credenciales y tokens JWT")
+    Rel(auth, db, "Consulta usuarios y roles")
+    Rel(auth, prom, "Expone métricas")
+    Rel(prom, grafana, "Visualiza métricas")
+
