@@ -1,65 +1,93 @@
-# ADR-004 – Estrategia de Blacklisting
+# ADR-004 — Estrategia de Blacklisting
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado
 
-**Estado:** Aceptado  
-**Fecha:** 2025-03-01
+---
 
-## Contexto
+## 🎯 Contexto
 
-Aunque los JWT son stateless por diseño, existen situaciones en las que es necesario revocar tokens antes de su expiración natural:
+El sistema debe permitir:
 
-- Logout explícito del usuario.
-- Bloqueo o eliminación de la cuenta.
-- Rotación de Refresh Tokens.
-- Posible compromiso de credenciales.
+- Invalidar tokens comprometidos
+- Revocar sesiones al instante
+- Soportar Refresh Token Rotation
+- Cumplir requisitos de banca/empresa:
+  - Logout real
+  - Revocación administrativa
+  - Detección de replay attacks
 
-## Decisión
+Dado que los JWT son *stateless*, su invalidación requiere un mecanismo explícito.
 
-Introducir un componente `TokenBlacklistGateway` que permita:
+---
 
-- Registrar tokens (por `jti`) como revocados.
-- Consultar si un token está en blacklist durante la validación.
+## 🧠 Decisión
 
-La implementación concreta del gateway podrá variar según el entorno:
+Se implementa un **Blacklisting por jti** (ID del token) como mecanismo oficial.
 
-- **dev/test:** InMemory.
-- **prod:** Redis, base de datos u otra store persistente.
+- Cada JWT incluye un `jti` único.
+- Al invalidar un token → se almacena temporalmente su `jti`.
+- Los filtros verifican si el `jti` está invalidado.
 
-## Alternativas consideradas
+En dev/test se usa **InMemoryTokenBlacklistGateway**.  
+En producción puede usarse Redis/Vault.
 
-1. **No implementar blacklisting**
-   - ✔ Menor complejidad.
-   - ✖ No se puede hacer logout real.
-   - ✖ No se pueden invalidar tokens comprometidos.
+---
 
-2. **Reducir al mínimo la expiración de Access Tokens**
-   - ✔ Reduce el impacto temporal de un robo.
-   - ✖ No resuelve casos de Refresh Token robado.
-   - ✖ Peor UX si la expiración es muy corta.
+## ✔ Razones principales
 
-3. **Modificar secret/clave para invalidar todos los tokens**
-   - ✔ Método extremo de revocación global.
-   - ✖ Invalida todas las sesiones (afecta a todos los usuarios).
-   - ✖ Difícil de usar en producción sin impacto masivo.
+### 1. Es compatible con JWT y sin estado
+No requiere sesiones completas en BD.
 
-## Justificación técnica
+### 2. Permite logout real
+El token queda inutilizado antes del expiry.
 
-- El blacklisting ofrece un punto de control intermedio entre:
-  - No tener revocación.
-  - Tener que invalidar absolutamente todos los tokens.
-- Se integra de forma limpia con la validación estándar de JWT:
-  - Firma válida
-  - No expirado
-  - No revocado (`TokenBlacklistGateway`)
+### 3. Es requerido por:
+- OWASP ASVS  
+- Lineamientos PCI-DSS  
+- OIDC Session Security
 
-## Consecuencias
+### 4. Escalable con Redis
+TTL automático = exp del token.
 
-**Positivas:**
+---
 
-- Permite logout real y revocación temprana de tokens.
-- Reduce impacto en caso de compromiso.
-- Es compatible con la estrategia de Refresh Token Rotation.
+## 🧩 Alternativas consideradas
 
-**Negativas:**
+### 1. No usar blacklist  
+✗ No hay logout  
+✗ No se puede bloquear un token robado  
+✗ No detecta refresh replay  
 
-- Necesita almacenamiento adicional para IDs de tokens revocados.
-- Añade una consulta extra en el flujo de validación de tokens (con impacto mínimo si se usa una store rápida).
+### 2. Sessions tradicionales  
+✗ Rompe la idea de JWT stateless  
+✗ Mucho overhead  
+
+### 3. Revocar claves RSA  
+✗ Rompería todas las sesiones  
+✗ No es viable en microservicios  
+
+---
+
+## 📌 Consecuencias
+
+### Positivas
+- Logout real  
+- Protección ante robo de tokens  
+- Apoyo al refresh rotation  
+- Fácil de extender a Redis  
+
+### Negativas
+- Añade complejidad en prod  
+- Requiere almacenamiento temporal  
+
+---
+
+## 📤 Resultado
+
+- Implementación en dev: in-memory  
+- Diseño preparado para:
+  - Redis
+  - Hazelcast
+  - DynamoDB TTL  
+- Validación en JwtAuthorizationFilter
+

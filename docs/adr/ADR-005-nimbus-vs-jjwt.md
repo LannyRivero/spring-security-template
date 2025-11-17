@@ -1,56 +1,103 @@
-# ADR-005 – Uso de Nimbus JOSE + JWT
+# ADR-005 — Uso de Nimbus JOSE + JWT
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado
 
-**Estado:** Aceptado  
-**Fecha:** 2025-03-01
+---
 
-## Contexto
+## 🎯 Contexto
 
-La plantilla necesita una biblioteca para:
+El sistema necesita generar y validar JWT con:
 
-- Firmar y validar JWT.
-- Gestionar claves (JWK).
-- Posibilitar JWE (encriptación) en el futuro.
-- Integrarse con ecosistemas OAuth2/OIDC.
+- Claims avanzados
+- RSA/HMAC intercambiable
+- Control criptográfico granular
+- Soporte corporativo (JOSE, JWK, JWE)
+- Testing completo sin acoplar la lógica
 
-Las opciones principales fueron **JJWT** y **Nimbus JOSE + JWT**.
+JJWT, aunque popular, es limitado:
 
-## Decisión
+- No soporta JOSE completo  
+- Integración pobre con OAuth2  
+- No soporta JWE  
+- Extensibilidad reducida  
 
-Elegir **Nimbus JOSE + JWT** como biblioteca estándar para el manejo de JWT y JOSE.
+---
 
-## Alternativas consideradas
+## 🧠 Decisión
 
-1. **JJWT**
-   - ✔ API muy sencilla.
-   - ✔ Fácil para ejemplos simples.
-   - ✖ Limitado en soporte JOSE.
-   - ✖ No orientado a JWE ni escenarios avanzados enterprise.
+Se adopta **Nimbus JOSE + JWT** como biblioteca principal.
 
-2. **Otras librerías más ligeras**
-   - ✔ Menor huella.
-   - ✖ No ofrecen el mismo nivel de soporte JOSE/JWK/JWE.
+---
 
-## Justificación técnica
+## ✔ Razones principales
 
-- Nimbus ofrece soporte completo para:
-  - JWS, JWK, JWE, JWT, JOSE.
-- Es ampliamente usada en:
-  - Servidores OAuth2 / OIDC.
-  - Soluciones de SSO.
-  - Entornos bancarios y de alta seguridad.
-- Permite evolucionar la plantilla hacia:
-  - JWE (tokens encriptados).
-  - JWK sets expuestos, si se añadiera un Authorization Server.
+### 1. Estándar corporativo
+Usado por:
 
-## Consecuencias
+- Google
+- Auth0
+- Okta
+- AWS Cognito
+- Azure AD
 
-**Positivas:**
+### 2. JOSE completo
+Permite:
 
-- La plantilla se alinea con estándares enterprise.
-- La lógica de token es extensible y flexible.
-- Se simplifica la integración futura con OAuth2 / OIDC.
+- JWS: firma
+- JWE: cifrado
+- JWK: claves
+- Rotación de claves
+- Thumbprints
 
-**Negativas:**
+### 3. Control total del JWT
+- Claims personalizados
+- Custom header parameters
+- Verify/Sign flexible
 
-- Curva de aprendizaje algo mayor comparado con JJWT.
-- Más opciones y configuraciones, lo que requiere guías claras (README y ADRs).
+### 4. Facilita integraciones futuras
+- Authorization Server
+- Resource Server
+- JWKS endpoint
+
+### 5. Tests más fiables
+- Validación criptográfica completa
+- Soporte para claves en memoria
+
+---
+
+## 🧩 Alternativas consideradas
+
+### 1. JJWT  
+✗ Sin soporte JOSE  
+✗ Sin JWE  
+✗ Poco usado en proyectos enterprise  
+
+### 2. Keycloak Adapter  
+✗ Overkill  
+✗ Requiere Keycloak como dependencia  
+
+---
+
+## 📌 Consecuencias
+
+### Positivas
+- Seguridad enterprise real  
+- Flexible y extensible  
+- Preparado para OAuth2/OIDC  
+- Estándar moderno para microservicios  
+
+### Negativas
+- Más complejo para principiantes  
+- Requiere más configuraciones  
+
+---
+
+## 📤 Resultado
+
+Se adopta Nimbus JOSE + JWT para:
+
+- TokenProvider
+- Validación criptográfica
+- Carga de claves RSA/HMAC
+- Tests completos
+
