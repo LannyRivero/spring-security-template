@@ -52,3 +52,19 @@ Documenta el uso de:
 
 ```java
 @PreAuthorize("hasAuthority('SCOPE_profile:read')")
+```
+---
+
+### 5️⃣ Manejo de claves (RSA/HMAC)
+
+📄 `keys-management.md`
+
+Incluye:
+
+- Cómo cargar RSA desde classpath
+
+- Cómo usar filesystem
+
+- Cómo usar keystore JKS
+
+- Configuración HMAC
