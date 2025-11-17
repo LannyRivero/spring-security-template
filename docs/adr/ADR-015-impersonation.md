@@ -1,34 +1,116 @@
-# ADR-015 — Manejo de sesiones impersonadas para administradores
+# ADR-015 — Hardening de Seguridad (Headers, TLS, JWT)
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado
 
-**Estado:** Planeado  
-**Fecha:** 2025-03-01
+---
 
-## 📌 Contexto
-Administradores y equipos de soporte necesitan ver el sistema como un usuario real para depuración o asistencia.
+## 🎯 Contexto
 
-## 🏆 Decisión
-Implementar impersonación mediante claim:
+La seguridad moderna exige no solo autenticación, sino un **hardening** transversal:
 
-### "act_as": "<id real del usuario>"
+- Cabeceras anti-XSS  
+- HSTS  
+- TLS estricto  
+- Deshabilitar cache de tokens  
+- Validación de claims JWT  
+- Logs sin PII  
 
+La aplicación debe cumplir estándares como:
 
-Con restricciones:
+- OWASP ASVS  
+- NIST 800-63  
+- PCI-DSS (nivel básico)  
 
-- Tiempo limitado  
-- Registro en auditoría  
-- Permisos elevados requeridos  
-- Prohibido impersonar a otros administradores
+---
 
-## 🎯 Motivaciones
-- Mejora soporte técnico  
-- Facilita depuración de permisos  
-- Estándar en plataformas SaaS
+## 🧠 Decisión
 
-## 🔄 Alternativas consideradas
-- ❌ Acceder como el usuario real → inseguro  
-- ❌ Acceso root siempre → demasiado riesgoso
+Se definen reglas estrictas:
+
+---
+
+### 1️⃣ Cabeceras de Seguridad (SecurityHeadersFilter)
+
+Incluye:
+
+- `Strict-Transport-Security`  
+- `X-Content-Type-Options: nosniff`  
+- `X-Frame-Options: DENY`  
+- `X-XSS-Protection: 1; mode=block`  
+- `Referrer-Policy: no-referrer`  
+- `Permissions-Policy` adecuada  
+
+---
+
+### 2️⃣ TLS obligatorio en producción
+
+- HTTPS solo  
+- No permitir downgrade a HTTP  
+- TLS 1.3 preferido  
+
+---
+
+### 3️⃣ Validación estricta de JWT
+
+- `iss` comprobado  
+- `exp` obligatorio  
+- `iat` obligatorio  
+- `jti` generado  
+- Scopes validados en aplicación  
+
+---
+
+### 4️⃣ Logs sin información sensible
+
+Prohibido loguear:
+
+- tokens  
+- contraseñas  
+- headers Authorization  
+- keys  
+
+Además, usar `Correlation-ID` para trazabilidad.
+
+---
+
+## ✔ Razones principales
+
+### 1. Seguridad moderna real  
+Hardening = varios niveles de defensa.
+
+### 2. Compliant con regulaciones  
+Cumple ASVS, PCI, NIST.
+
+### 3. Listo para auditorías  
+El sistema es auditable.
+
+---
+
+## 🧩 Alternativas consideradas
+
+### 1. Seguridad básica  
+✗ Expuesta a ataques clásicos  
+
+### 2. Delegar hardening a nginx/gateway  
+✗ Parcial  
+✗ La app también debe protegerse internamente  
+
+---
 
 ## 📌 Consecuencias
-- El sistema debe diferenciar “actor” vs “usuario final”  
-- Las auditorías deben registrar ambas identidades
+
+### Positivas
+- Seguridad de nivel bancario  
+- Compatible con auditorías  
+- Reducido ataque de superficie  
+
+### Negativas
+- Más filtros y más coste computacional  
+
+---
+
+## 📤 Resultado
+
+El microservicio implementa un hardening moderno, estricto y auditable, manteniendo flexibilidad según entorno (dev/test/prod).
+
 

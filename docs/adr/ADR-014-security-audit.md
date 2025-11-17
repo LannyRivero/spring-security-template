@@ -1,46 +1,93 @@
-# ADR-014 — Auditoría de Seguridad basada en eventos
+# ADR-014 — Canary Releases en despliegues futuros
+📅 Fecha: 2025-11-17  
+📁 Estado: Planificado
 
-**Estado:** Aceptado  
-**Fecha:** 2025-03-01
+---
 
-## 📌 Contexto
-Las auditorías son obligatorias en sistemas corporativos:
+## 🎯 Contexto
 
-- Login / Logout  
-- Intentos fallidos  
-- Tokens generados  
-- Tokens revocados  
-- Usuarios bloqueados  
+La plantilla está diseñada para producción real:
 
-## 🏆 Decisión
-Crear un servicio centralizado:
+- Kubernetes  
+- CI/CD  
+- Escalado horizontal  
 
-### SecurityAuditService
+Muchos equipos requieren **Canary Releases**, es decir:  
+Desplegar una versión nueva a un % pequeño de usuarios y observar métricas antes de un rollout total.
 
-Que genere eventos estándares:
+En el futuro, el módulo de seguridad podría requerir:
 
-- LOGIN_SUCCESS  
-- LOGIN_FAILURE  
-- TOKEN_REVOKED  
-- USER_LOCKED  
-- USER_DISABLED  
+- Nuevos filtros  
+- Cambios en tokens  
+- Cambios en KeyProviders  
+- Cambios en scopes  
 
-Y que pueda integrarse con:
+y un error podría impactar a toda la organización.
 
-- ELK  
-- OpenSearch  
-- Loki  
-- Grafana
+---
 
-## 🎯 Motivaciones
-- Cumplimiento normativo  
-- Detección rápida de ataques  
-- Trazabilidad total  
+## 🧠 Decisión
 
-## 🔄 Alternativas consideradas
-- ❌ Logging disperso → difícil de rastrear  
-- ❌ Auditoría en DB siempre → poco flexible
+Se documenta la compatibilidad futura con **Canary Releases**, aunque no se implementa en código todavía.
+
+### Estrategia futura recomendada:
+
+1. Usar labels de versión en pods:  
+   `version=v1`, `version=v2`
+
+2. Configurar Ingress/Gateway con:  
+   - tráfico dividido por %  
+   - reglas por header `X-Canary`  
+   - decisiones del LoadBalancer  
+
+3. Observar métricas del ADR-010:  
+   - login success/failure  
+   - tokens invalid  
+   - latencia  
+
+---
+
+## ✔ Razones principales
+
+### 1. Zero-downtime upgrades  
+Seguridad crítica → no puede fallar.
+
+### 2. Despliegues seguros  
+Un bug grave se detecta antes de afectar a todos los usuarios.
+
+### 3. Integración cloud-native  
+Compatible con:
+
+- Istio  
+- Nginx Ingress  
+- AWS ALB  
+- Traefik  
+
+---
+
+## 🧩 Alternativas consideradas
+
+### Blue-Green Deployment  
+✗ Duplica costos  
+✗ No prueba la feature con tráfico real parcial  
+
+### Rolling Update clásico  
+✗ Si hay bug, afecta a todos  
+
+---
 
 ## 📌 Consecuencias
-- Aumenta observabilidad  
-- Permite análisis de seguridad en tiempo real
+
+### Positivas
+- Preparación para producción real  
+- Plantilla alineada con microservicios modernos  
+
+### Negativas
+- Necesaria infraestructura cloud para implementarlo  
+
+---
+
+## 📤 Resultado
+
+La arquitectura queda oficialmente preparada para estrategias Canary en despliegues avanzados.
+

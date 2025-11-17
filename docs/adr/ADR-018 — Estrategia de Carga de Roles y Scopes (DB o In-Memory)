@@ -1,0 +1,67 @@
+# ADR-018 — Estrategia de Carga de Roles y Scopes (DB o In-Memory)
+📅 Fecha: 2025-11-17  
+📁 Estado: Aprobado
+
+---
+
+## 🎯 Contexto
+
+Roles y scopes determinan:
+
+- Qué puede hacer un usuario  
+- Qué recursos puede leer/escribir  
+- Qué acciones están permitidas  
+
+El sistema debe ser:
+
+- Simple en `dev`
+- Validable en `test`
+- Robusto en `prod`
+
+---
+
+## 🧠 Decisión
+
+Se define una estrategia dual:
+
+---
+
+### 1️⃣ **Perfil dev → InMemoryRoleProvider**
+- Sin base de datos necesaria  
+- Roles predefinidos (`ADMIN`, `USER`, `DEV`)  
+- Scopes: `profile:read`, `*`  
+
+Ventajas:
+- Rápido  
+- Fácil de probar  
+- Ideal para demos, cursos, laptops  
+
+---
+
+### 2️⃣ **Perfil prod → DB o External Provider**
+Roles y scopes se cargarán desde:
+
+- Tabla `roles`  
+- Tabla `scopes`  
+- Tabla `role_scopes`  
+
+o fuentes externas:
+
+- LDAP  
+- Keycloak  
+- Permission microservice  
+
+Ventajas:
+- Persistencia real  
+- Administración centralizada  
+- Auditoría y control granular  
+
+---
+
+### 3️⃣ Scope Policy  
+Se mantiene desacoplada en una interfaz:
+
+```java
+interface ScopePolicy {
+    boolean isAllowed(String scope, User user);
+}
