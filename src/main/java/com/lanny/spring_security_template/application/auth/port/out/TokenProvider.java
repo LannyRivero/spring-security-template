@@ -4,6 +4,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
+import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
+
 public interface TokenProvider {
 
     String generateAccessToken(String subject, List<String> roles, List<String> scopes, Duration ttl);
@@ -15,6 +17,9 @@ public interface TokenProvider {
     String extractSubject(String token);
 
     Optional<TokenClaims> parseClaims(String token);
+
+    Optional<JwtClaimsDTO> validateAndGetClaims(String token);
+
 
     record TokenClaims(
             String sub,

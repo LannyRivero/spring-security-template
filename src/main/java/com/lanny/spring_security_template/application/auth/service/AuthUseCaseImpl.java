@@ -109,7 +109,8 @@ public class AuthUseCaseImpl implements AuthUseCase {
         @Override
         public JwtResult refresh(RefreshCommand command) {
 
-                return tokenProvider.parseClaims(command.refreshToken())
+                return tokenProvider.validateAndGetClaims(command.refreshToken())
+
                                 .map(claims -> {
 
                                         // 1) Validar que es un REFRESH TOKEN (audiencia)
