@@ -112,17 +112,24 @@ public class AuthUseCaseImpl implements AuthUseCase {
                 return tokenProvider.parseClaims(command.refreshToken())
                                 .map(claims -> {
 
+                                        // 1) Validar que es un REFRESH TOKEN (audiencia)
+                                        String expectedRefreshAudience = securityJwtProperties.refreshAudience();
+                                        if (claims.aud() == null || !claims.aud().contains(expectedRefreshAudience)) {
+                                                throw new IllegalArgumentException("Invalid refresh token audience");
+                                        }
+
+                                        // 2) Protección anti-replay (reuso del refresh = FRAUDE)
                                         if (tokenBlacklistGateway.isRevoked(claims.jti())) {
-                                                throw new IllegalArgumentException("Refresh token revoked");
+                                                throw new IllegalArgumentException(
+                                                                "Refresh token revoked or already used");
                                         }
 
                                         String username = claims.sub();
 
-                                        // Roles + scopes como objetos de dominio
+                                        // 3) Reconstruir roles + scopes desde providers de dominio
                                         Set<Role> roles = roleProvider.resolveRoles(username);
                                         Set<Scope> scopes = scopePolicy.resolveScopes(roles);
 
-                                        // Convertir para el JWT
                                         List<String> roleNames = roles.stream().map(Role::name).toList();
                                         List<String> scopeNames = scopes.stream().map(Scope::name).toList();
 
@@ -132,13 +139,15 @@ public class AuthUseCaseImpl implements AuthUseCase {
                                         Instant issuedAt = clockProvider.now();
                                         Instant accessExp = issuedAt.plus(accessTtl);
 
-                                        // Rotación de refresh tokens
+                                        // 4) ROTACIÓN DE REFRESH TOKENS (OAuth2-style)
                                         if (securityJwtProperties.rotateRefreshTokens()) {
 
+                                                // Revocar SIEMPRE el refresh usado (anti-replay fuerte)
                                                 tokenBlacklistGateway.revoke(
                                                                 claims.jti(),
                                                                 Instant.ofEpochSecond(claims.exp()));
 
+                                                // Emitimos refresh nuevo + access nuevo
                                                 String newRefresh = tokenProvider.generateRefreshToken(username,
                                                                 refreshTtl);
                                                 String newAccess = tokenProvider.generateAccessToken(
@@ -152,7 +161,7 @@ public class AuthUseCaseImpl implements AuthUseCase {
                                                 return new JwtResult(newAccess, newRefresh, accessExp);
                                         }
 
-                                        // Sin rotación: emitir solo access nuevo
+                                        // 5) Sin rotación: emitir SOLO nuevo access token
                                         String newAccess = tokenProvider.generateAccessToken(
                                                         username,
                                                         roleNames,
@@ -198,9 +207,8 @@ public class AuthUseCaseImpl implements AuthUseCase {
                                 EmailAddress.of(command.email()),
                                 PasswordHash.of(passwordHasher.hash(command.rawPassword())),
                                 UserStatus.ACTIVE,
-                                command.roles(), 
-                                command.scopes() 
-                );
+                                command.roles(),
+                                command.scopes());
 
                 // 2. Guardar usando el gateway
                 userAccountGateway.save(newUser);
