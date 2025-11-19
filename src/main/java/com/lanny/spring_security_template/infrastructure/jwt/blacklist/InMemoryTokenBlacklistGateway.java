@@ -13,16 +13,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InMemoryTokenBlacklistGateway implements TokenBlacklistGateway {
     private final Map<String, Instant> revoked = new ConcurrentHashMap<>();
 
-    @Override
+     @Override
     public boolean isRevoked(String jti) {
-        var exp = revoked.get(jti);
-        if (exp == null)
-            return false;
-        if (exp.isBefore(Instant.now())) {
-            revoked.remove(jti);
-            return false;
-        }
-        return true;
+        Instant exp = revoked.get(jti);
+        return exp != null && Instant.now().isBefore(exp);
     }
 
     @Override

@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/security_template_demo?createDatabaseIfNotExist=true
+    username: demo
+    password: demo
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      enabled: true
+
+security:
+  jwt:
+    issuer: security-template
+    audience: security-template-app
+    algorithm: RSA
+    rotate-refresh-tokens: true
+
+cors:
+  allowed-origins:
+    - https://demo.security-template.app

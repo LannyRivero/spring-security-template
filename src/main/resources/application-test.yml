@@ -37,6 +37,7 @@ security:
     expiration-seconds: 1800
     hmac:
       secret-base64: test-secret-12345
+    rotate-refresh-tokens: false
 
 # =============================
 # LOGGING (Minimal)
@@ -56,4 +57,10 @@ management:
     web:
       exposure:
         include: health
+
+rate-limiting:
+  enabled: false
+
+cors:
+  enabled: false
 
