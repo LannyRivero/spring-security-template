@@ -1,23 +1,34 @@
 package com.lanny.spring_security_template.infrastructure.security.provider;
 
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
+import com.lanny.spring_security_template.domain.valueobject.Role;
+import com.lanny.spring_security_template.domain.valueobject.Scope;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.util.Set;
 
 @Component
-@Profile({ "dev", "demo", "prod" }) 
+@Profile({ "dev", "demo", "prod" })
 public class InMemoryRoleProvider implements RoleProvider {
 
     @Override
-    public List<String> resolveRoles(String username) {
-        //  Aquí puedes usar lógica real (consultar DB o API)
-        // De momento, un mock básico:
+    public Set<Role> resolveRoles(String username) {
+
         if ("admin".equalsIgnoreCase(username)) {
-            return List.of("ROLE_ADMIN");
+            return Set.of(
+                    new Role(
+                            "ADMIN",
+                            Set.of(
+                                    Scope.of("profile:read"),
+                                    Scope.of("profile:write"),
+                                    Scope.of("user:read"))));
         }
-        return List.of("ROLE_USER");
+
+        return Set.of(
+                new Role(
+                        "USER",
+                        Set.of(
+                                Scope.of("profile:read"))));
     }
 }
-

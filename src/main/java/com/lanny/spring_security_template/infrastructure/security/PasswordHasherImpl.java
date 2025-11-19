@@ -4,6 +4,10 @@ import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+/**
+ * Infra-level implementation of PasswordHasher using Spring Security's
+ * PasswordEncoder.
+ */
 @Component
 public class PasswordHasherImpl implements PasswordHasher {
 
@@ -14,12 +18,12 @@ public class PasswordHasherImpl implements PasswordHasher {
     }
 
     @Override
-    public boolean matches(CharSequence rawPassword, String encodedPassword) {
-        return encoder.matches(rawPassword, encodedPassword);
+    public String hash(String rawPassword) {
+        return encoder.encode(rawPassword);
     }
 
     @Override
-    public String encode(CharSequence rawPassword) {
-        return encoder.encode(rawPassword);
+    public boolean matches(String rawPassword, String hashedPassword) {
+        return encoder.matches(rawPassword, hashedPassword);
     }
 }
