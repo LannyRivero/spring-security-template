@@ -18,13 +18,20 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: none        
     show-sql: true
+
+  flyway:
+    enabled: false
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    locations:
+      - classpath:db/migration
+      - classpath:db/migration/dev
 
   sql:
     init:
-      mode: always
-      platform: mysql
+      mode: never           
 
 # =============================
 # SERVER CONFIG
@@ -43,8 +50,8 @@ security:
     access-audience: security-template-app
     refresh-audience: security-template-app
     algorithm: RSA
-    access-ttl: PT1H     # Access token: 1 hour (ISO 8601 format)
-    refresh-ttl: P7D     # Refresh token: 7 days
+    access-ttl: PT1H
+    refresh-ttl: P7D
     rotate-refresh-tokens: true
     default-roles:
       - ROLE_USER
@@ -57,7 +64,6 @@ security:
 
     hmac:
       secret-base64: ${JWT_SECRET_BASE64:dev-secret-12345}
-
 
 # =============================
 # 🛡️ RATE LIMITING
@@ -102,6 +108,7 @@ logging:
     com.lanny.spring_security_template: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
 # =============================
 # ⚙️ ACTUATOR + METRICS
 # =============================
@@ -119,6 +126,8 @@ management:
         enabled: true
     tags:
       application: spring-security-template
+
+
 
 
 

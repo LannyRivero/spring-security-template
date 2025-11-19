@@ -10,6 +10,7 @@ public class AuthMetricsService {
     private final Counter loginSuccessCounter;
     private final Counter loginFailureCounter;
     private final Counter refreshCounter;
+    private final Counter userRegistrationCounter;
 
     public AuthMetricsService(MeterRegistry registry) {
         this.loginSuccessCounter = Counter.builder("auth_login_success_total")
@@ -22,6 +23,10 @@ public class AuthMetricsService {
 
         this.refreshCounter = Counter.builder("auth_token_refresh_total")
                 .description("Number of token refresh operations")
+                .register(registry);
+
+        this.userRegistrationCounter = Counter.builder("auth_user_registration_total")
+                .description("Number of user registration (dev only)")
                 .register(registry);
     }
 
@@ -36,5 +41,8 @@ public class AuthMetricsService {
     public void recordTokenRefresh() {
         refreshCounter.increment();
     }
-}
 
+    public void recordUserRegistration() {
+        userRegistrationCounter.increment();
+    }
+}

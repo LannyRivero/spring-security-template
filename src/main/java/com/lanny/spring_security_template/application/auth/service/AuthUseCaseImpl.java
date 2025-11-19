@@ -3,6 +3,7 @@ package com.lanny.spring_security_template.application.auth.service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -20,8 +21,14 @@ import com.lanny.spring_security_template.application.auth.port.out.UserAccountG
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
 import com.lanny.spring_security_template.domain.model.User;
+import com.lanny.spring_security_template.domain.model.UserStatus;
 import com.lanny.spring_security_template.domain.model.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
+import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
+import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
+import com.lanny.spring_security_template.domain.valueobject.Role;
+import com.lanny.spring_security_template.domain.valueobject.Scope;
+import com.lanny.spring_security_template.domain.valueobject.Username;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
 import com.lanny.spring_security_template.shared.ClockProvider;
@@ -32,124 +39,175 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthUseCaseImpl implements AuthUseCase {
 
-    private final UserAccountGateway userAccountGateway;
-    private final RoleProvider roleProvider;
-    private final ScopePolicy scopePolicy;
-    private final TokenProvider tokenProvider;
-    private final PasswordHasher passwordHasher;
-    private final ClockProvider clockProvider;
-    private final SecurityJwtProperties securityJwtProperties;
-    private final TokenBlacklistGateway tokenBlacklistGateway;
-    private final AuthMetricsService metrics;
+        private final UserAccountGateway userAccountGateway;
+        private final RoleProvider roleProvider;
+        private final ScopePolicy scopePolicy;
+        private final TokenProvider tokenProvider;
+        private final PasswordHasher passwordHasher;
+        private final ClockProvider clockProvider;
+        private final SecurityJwtProperties securityJwtProperties;
+        private final TokenBlacklistGateway tokenBlacklistGateway;
+        private final AuthMetricsService metrics;
 
-    // ===========================
-    // LOGIN FLOW
-    // ===========================
-    @Override
-    public JwtResult login(LoginCommand command) {
+        // =====================================================
+        // LOGIN
+        // =====================================================
+        @Override
+        public JwtResult login(LoginCommand command) {
 
-        User user = userAccountGateway.findByUsernameOrEmail(command.username())
-                .orElseThrow(() -> new UsernameNotFoundException(command.username()));
+                User user = userAccountGateway.findByUsernameOrEmail(command.username())
+                                .orElseThrow(() -> new UsernameNotFoundException(command.username()));
 
-        user.ensureCanAuthenticate();
+                user.ensureCanAuthenticate();
 
-        if (!user.passwordMatches(command.password(), passwordHasher)) {
-            metrics.recordLoginFailure();
-            throw new InvalidCredentialsException("Invalid username or password");
+                if (!user.passwordMatches(command.password(), passwordHasher)) {
+                        metrics.recordLoginFailure();
+                        throw new InvalidCredentialsException("Invalid username or password");
+                }
+
+                // 1️⃣ Roles como Value Objects
+                Set<Role> roles = roleProvider.resolveRoles(user.username().value());
+
+                // 2️⃣ Scopes como Value Objects
+                Set<Scope> scopes = scopePolicy.resolveScopes(roles);
+
+                // 3️⃣ Convertir dominio → strings para el JWT
+                List<String> roleNames = roles.stream()
+                                .map(Role::name)
+                                .toList();
+
+                List<String> scopeNames = scopes.stream()
+                                .map(Scope::name)
+                                .toList();
+
+                // 4️⃣ Tiempos
+                Duration accessTtl = securityJwtProperties.accessTtl();
+                Duration refreshTtl = securityJwtProperties.refreshTtl();
+
+                Instant issuedAt = clockProvider.now();
+                Instant accessExp = issuedAt.plus(accessTtl);
+
+                // 5️⃣ Emitir tokens
+                String accessToken = tokenProvider.generateAccessToken(
+                                user.username().value(),
+                                roleNames,
+                                scopeNames,
+                                accessTtl);
+
+                String refreshToken = tokenProvider.generateRefreshToken(
+                                user.username().value(),
+                                refreshTtl);
+
+                metrics.recordLoginSuccess();
+
+                return new JwtResult(accessToken, refreshToken, accessExp);
         }
 
-        // Roles y scopes calculados por los proveedores correspondientes
-        List<String> roles = roleProvider.resolveRoles(user.username().value());
-        List<String> scopes = scopePolicy.resolveScopes(roles);
+        // =====================================================
+        // REFRESH
+        // =====================================================
+        @Override
+        public JwtResult refresh(RefreshCommand command) {
 
-        Duration accessTtl = securityJwtProperties.accessTtl();
-        Duration refreshTtl = securityJwtProperties.refreshTtl();
+                return tokenProvider.parseClaims(command.refreshToken())
+                                .map(claims -> {
 
-        Instant issuedAt = clockProvider.now();
-        Instant accessExp = issuedAt.plus(accessTtl);
+                                        if (tokenBlacklistGateway.isRevoked(claims.jti())) {
+                                                throw new IllegalArgumentException("Refresh token revoked");
+                                        }
 
-        String accessToken = tokenProvider.generateAccessToken(
-                user.username().value(),
-                roles,
-                scopes,
-                accessTtl);
+                                        String username = claims.sub();
 
-        String refreshToken = tokenProvider.generateRefreshToken(
-                user.username().value(),
-                refreshTtl);
+                                        // Roles + scopes como objetos de dominio
+                                        Set<Role> roles = roleProvider.resolveRoles(username);
+                                        Set<Scope> scopes = scopePolicy.resolveScopes(roles);
 
-        metrics.recordLoginSuccess();
+                                        // Convertir para el JWT
+                                        List<String> roleNames = roles.stream().map(Role::name).toList();
+                                        List<String> scopeNames = scopes.stream().map(Scope::name).toList();
 
-        return new JwtResult(accessToken, refreshToken, accessExp);
-    }
+                                        Duration accessTtl = securityJwtProperties.accessTtl();
+                                        Duration refreshTtl = securityJwtProperties.refreshTtl();
 
-    // ===========================
-    // REFRESH FLOW
-    // ===========================
-    @Override
-    public JwtResult refresh(RefreshCommand command) {
-        return tokenProvider.parseClaims(command.refreshToken())
-                .map(claims -> {
+                                        Instant issuedAt = clockProvider.now();
+                                        Instant accessExp = issuedAt.plus(accessTtl);
 
-                    // 1. Verificar revocación
-                    if (tokenBlacklistGateway.isRevoked(claims.jti())) {
-                        throw new IllegalArgumentException("Refresh token revoked");
-                    }
+                                        // Rotación de refresh tokens
+                                        if (securityJwtProperties.rotateRefreshTokens()) {
 
-                    String username = claims.sub();
-                    List<String> roles = roleProvider.resolveRoles(username);
-                    List<String> scopes = scopePolicy.resolveScopes(roles);
+                                                tokenBlacklistGateway.revoke(
+                                                                claims.jti(),
+                                                                Instant.ofEpochSecond(claims.exp()));
 
-                    Duration accessTtl = securityJwtProperties.accessTtl();
-                    Duration refreshTtl = securityJwtProperties.refreshTtl();
+                                                String newRefresh = tokenProvider.generateRefreshToken(username,
+                                                                refreshTtl);
+                                                String newAccess = tokenProvider.generateAccessToken(
+                                                                username,
+                                                                roleNames,
+                                                                scopeNames,
+                                                                accessTtl);
 
-                    Instant issuedAt = clockProvider.now();
-                    Instant accessExp = issuedAt.plus(accessTtl);
+                                                metrics.recordTokenRefresh();
 
-                    if (securityJwtProperties.rotateRefreshTokens()) {
-                        // 2. Revocar refresh actual
-                        tokenBlacklistGateway.revoke(
-                                claims.jti(),
-                                Instant.ofEpochSecond(claims.exp()));
+                                                return new JwtResult(newAccess, newRefresh, accessExp);
+                                        }
 
-                        // 3. Emitir refresh nuevo + access nuevo
-                        String newRefresh = tokenProvider.generateRefreshToken(username, refreshTtl);
-                        String newAccess = tokenProvider.generateAccessToken(username, roles, scopes, accessTtl);
+                                        // Sin rotación: emitir solo access nuevo
+                                        String newAccess = tokenProvider.generateAccessToken(
+                                                        username,
+                                                        roleNames,
+                                                        scopeNames,
+                                                        accessTtl);
 
-                        metrics.recordTokenRefresh();
+                                        return new JwtResult(newAccess, command.refreshToken(), accessExp);
 
-                        return new JwtResult(newAccess, newRefresh, accessExp);
-                    }
+                                })
+                                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+        }
 
-                    // Sin rotación: solo crear access nuevo
-                    String newAccess = tokenProvider.generateAccessToken(username, roles, scopes, accessTtl);
-                    return new JwtResult(newAccess, command.refreshToken(), accessExp);
+        // =====================================================
+        // ME / WHOAMI
+        // =====================================================
+        @Override
+        public MeResult me(String username) {
 
-                })
-                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
-    }
+                User user = userAccountGateway.findByUsernameOrEmail(username)
+                                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-    // ===========================
-    // ME
-    // ===========================
-    @Override
-    public MeResult me(String username) {
+                Set<Role> roles = roleProvider.resolveRoles(username);
+                Set<Scope> scopes = scopePolicy.resolveScopes(roles);
 
-        User user = userAccountGateway.findByUsernameOrEmail(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                return new MeResult(
+                                user.id(),
+                                username,
+                                roles.stream().map(Role::name).toList(),
+                                scopes.stream().map(Scope::name).toList());
+        }
 
-        List<String> roles = roleProvider.resolveRoles(username);
-        List<String> scopes = scopePolicy.resolveScopes(roles);
+        // =====================================================
+        // DEV REGISTER
+        // =====================================================
+        @Override
+        @Profile("dev")
+        public void registerDev(RegisterCommand command) {
 
-        return new MeResult(user.id(), username, roles, scopes);
-    }
+                // 1. Construir usuario del dominio usando Value Objects
+                User newUser = new User(
+                                null,
+                                Username.of(command.username()),
+                                EmailAddress.of(command.email()),
+                                PasswordHash.of(passwordHasher.hash(command.rawPassword())),
+                                UserStatus.ACTIVE,
+                                command.roles(), 
+                                command.scopes() 
+                );
 
-    // ===========================
-    // DEV REGISTER
-    // ===========================
-    @Override
-    @Profile("dev")
-    public void registerDev(RegisterCommand command) {
-        // 🚧 Future work — create basic seed users for development
-    }
+                // 2. Guardar usando el gateway
+                userAccountGateway.save(newUser);
+
+                metrics.recordUserRegistration();
+
+                System.out.printf("[DEV] Seed user created: %s%n", newUser.username().value());
+        }
+
 }
