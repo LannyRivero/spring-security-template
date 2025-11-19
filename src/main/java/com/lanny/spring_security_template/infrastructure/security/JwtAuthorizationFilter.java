@@ -7,9 +7,11 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.lang.NonNull;
 
+import org.slf4j.MDC;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,10 +20,10 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
+@Order(80) // después de CorrelationId y SecurityHeaders
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
   private final JwtValidator jwtValidator;
@@ -40,42 +42,41 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
       @NonNull HttpServletResponse response,
       @NonNull FilterChain chain) throws ServletException, IOException {
 
-    String path = request.getRequestURI();
-
-    // 1️⃣ Excluir Swagger + Actuator
-    if (path.startsWith("/actuator")
-        || path.startsWith("/v3/api-docs")
-        || path.startsWith("/swagger-ui")) {
-
-      chain.doFilter(request, response);
-      return;
-    }
-
-    // 2️⃣ Extraer Bearer
-    String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-
-    if (!StringUtils.hasText(header) || !header.startsWith("Bearer ")) {
-      chain.doFilter(request, response);
-      return;
-    }
-
-    String token = header.substring(7);
-
     try {
-      // 3️⃣ Validación estricta del JWT
+
+      // Excluir Swagger y Actuator
+      String path = request.getRequestURI();
+      if (path.startsWith("/actuator") ||
+          path.startsWith("/v3/api-docs") ||
+          path.startsWith("/swagger-ui")) {
+        chain.doFilter(request, response);
+        return;
+      }
+
+      String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+
+      if (!StringUtils.hasText(header) || !header.startsWith("Bearer ")) {
+        chain.doFilter(request, response);
+        return;
+      }
+
+      String token = header.substring(7);
+
+      // 1️⃣ VALIDACIÓN ESTRICTA
       JwtClaimsDTO claims = jwtValidator.validate(token);
 
-      // 4️⃣ Anti-replay
+      // 2️⃣ Blacklist (anti-replay)
       if (tokenBlacklistGateway.isRevoked(claims.jti())) {
         throw new IllegalArgumentException("Token revoked");
       }
 
-      // 5️⃣ Construir Authentication solo con roles válidos
-      Set<SimpleGrantedAuthority> authorities = claims.roles()
+      // 3️⃣ Construcción de authorities
+      var authorities = claims.roles()
           .stream()
           .map(SimpleGrantedAuthority::new)
           .collect(Collectors.toSet());
 
+      // 4️⃣ Crear Authentication
       var auth = new UsernamePasswordAuthenticationToken(
           claims.sub(),
           null,
@@ -83,11 +84,18 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
       SecurityContextHolder.getContext().setAuthentication(auth);
 
-    } catch (Exception e) {
-      // No autenticado
+      // PASO 2: Añadir el usuario al MDC
+      MDC.put("user", claims.sub());
+
+    } catch (Exception ex) {
       SecurityContextHolder.clearContext();
     }
 
-    chain.doFilter(request, response);
+    try {
+      chain.doFilter(request, response);
+    } finally {
+      // Limpiar MDC
+      MDC.remove("user");
+    }
   }
 }
