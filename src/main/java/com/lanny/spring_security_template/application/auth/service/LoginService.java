@@ -6,8 +6,8 @@ import com.lanny.spring_security_template.application.auth.port.out.RoleProvider
 import com.lanny.spring_security_template.application.auth.port.out.ScopePolicy;
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
+import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.model.User;
-import com.lanny.spring_security_template.domain.model.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
 import lombok.RequiredArgsConstructor;

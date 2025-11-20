@@ -2,7 +2,7 @@ package com.lanny.spring_security_template.domain.model;
 
 import com.lanny.spring_security_template.domain.exception.UserDeletedException;
 import com.lanny.spring_security_template.domain.exception.UserDisabledException;
-import com.lanny.spring_security_template.domain.model.exception.UserLockedException;
+import com.lanny.spring_security_template.domain.exception.UserLockedException;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
 import com.lanny.spring_security_template.domain.valueobject.PasswordHash;

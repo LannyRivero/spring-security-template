@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.domain.model.exception;
+package com.lanny.spring_security_template.domain.exception;
 
 /**
  * Thrown when a user provides invalid login credentials.

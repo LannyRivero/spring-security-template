@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.domain.model.exception;
+package com.lanny.spring_security_template.domain.exception;
 
 /**
  * 📕 Domain exception representing a user account that is locked or disabled.
