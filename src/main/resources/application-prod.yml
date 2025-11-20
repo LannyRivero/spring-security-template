@@ -41,6 +41,7 @@ security:
     kid: prod-rsa-1
     issuer: security-template
     audience: security-template-app
+    max-active-sessions: 1
     algorithm: RSA
     expiration-seconds: 3600
     service-expiration-seconds: 300

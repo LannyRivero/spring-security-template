@@ -20,6 +20,8 @@ public interface TokenProvider {
 
     Optional<JwtClaimsDTO> validateAndGetClaims(String token);
 
+    String extractJti(String token);
+
 
     record TokenClaims(
             String sub,

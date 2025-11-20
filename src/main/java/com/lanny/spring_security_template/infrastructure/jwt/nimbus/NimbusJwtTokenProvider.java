@@ -77,4 +77,14 @@ public class NimbusJwtTokenProvider implements TokenProvider {
         }
     }
 
+    @Override
+    public String extractJti(String token) {
+        try {
+            var claims = jwtUtils.validateAndParse(token);
+            return claims.getJWTID();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Cannot extract jti from token", e);
+        }
+    }
+
 }
