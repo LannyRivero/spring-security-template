@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.application.auth.port.out;
+package com.lanny.spring_security_template.domain.policy;
 
 import java.util.Set;
 

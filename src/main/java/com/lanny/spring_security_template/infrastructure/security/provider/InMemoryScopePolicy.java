@@ -1,6 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.security.provider;
 
-import com.lanny.spring_security_template.application.auth.port.out.ScopePolicy;
+import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.valueobject.Role;
 import com.lanny.spring_security_template.domain.valueobject.Scope;
 import org.springframework.context.annotation.Profile;
