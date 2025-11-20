@@ -69,15 +69,15 @@ public class SecurityConfig {
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(deniedHandler))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/v3/api-docs/**","/actuator/**", "/swagger-ui/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/actuator/**", "/swagger-ui/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
                         .anyRequest().authenticated());
 
         http.addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(securityHeadersFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(loginRateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(jwtAuthz, UsernamePasswordAuthenticationFilter.class);
-        http.addFilterAfter(securityHeadersFilter, JwtAuthorizationFilter.class);
-        http.addFilterAfter(authNoCacheFilter, SecurityHeadersFilter.class);
+        http.addFilterAfter(authNoCacheFilter, JwtAuthorizationFilter.class);
 
         return http.build();
     }
