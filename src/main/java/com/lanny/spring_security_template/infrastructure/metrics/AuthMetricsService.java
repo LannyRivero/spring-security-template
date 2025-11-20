@@ -11,6 +11,7 @@ public class AuthMetricsService {
     private final Counter loginFailureCounter;
     private final Counter refreshCounter;
     private final Counter userRegistrationCounter;
+    private final Counter bruteForceCounter;
 
     public AuthMetricsService(MeterRegistry registry) {
         this.loginSuccessCounter = Counter.builder("auth_login_success_total")
@@ -27,6 +28,10 @@ public class AuthMetricsService {
 
         this.userRegistrationCounter = Counter.builder("auth_user_registration_total")
                 .description("Number of user registration (dev only)")
+                .register(registry);
+
+        this.bruteForceCounter = Counter.builder("auth_bruteforce_detected_total")
+                .description("Number of brute-force login patterns detected(per user+IP)")
                 .register(registry);
     }
 
@@ -45,4 +50,9 @@ public class AuthMetricsService {
     public void recordUserRegistration() {
         userRegistrationCounter.increment();
     }
+    
+    public void recordBruteForceDetected() {
+        bruteForceCounter.increment();
+    }
 }
+

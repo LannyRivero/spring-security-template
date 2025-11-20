@@ -3,11 +3,13 @@ package com.lanny.spring_security_template.infrastructure.security.filter;
 import com.lanny.spring_security_template.infrastructure.security.handler.ApiError;
 import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitKeyResolver;
 import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
+import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -27,6 +29,7 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
     private final RateLimitingProperties props;
     private final RateLimitKeyResolver keyResolver;
     private final ObjectMapper objectMapper;
+    private final AuthMetricsService metrics;
 
     private static final class Bucket {
         int attempts;
@@ -39,11 +42,13 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
     public LoginRateLimitingFilter(
             RateLimitingProperties props,
             RateLimitKeyResolver keyResolver,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            AuthMetricsService metrics
     ) {
         this.props = props;
         this.keyResolver = keyResolver;
         this.objectMapper = objectMapper;
+        this.metrics = metrics;
     }
 
     @Override
@@ -81,7 +86,7 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
         // Blocked?
         if (bucket.blockedUntil != null && bucket.blockedUntil.isAfter(now)) {
             long retryAfter = bucket.blockedUntil.getEpochSecond() - now.getEpochSecond();
-            reject(response, request, retryAfter);
+            reject(response, request, retryAfter, key);
             return;
         }
 
@@ -91,14 +96,16 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
         if (bucket.attempts > props.maxAttempts()) {
             bucket.blockedUntil = now.plusSeconds(props.blockSeconds());
             long retryAfter = props.retryAfter();
-            reject(response, request, retryAfter);
+            metrics.recordBruteForceDetected();
+            logBruteForceEvent(key, request);
+            reject(response, request, retryAfter, key);
             return;
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private void reject(HttpServletResponse response, HttpServletRequest request, long retryAfter) throws IOException {
+    private void reject(HttpServletResponse response, HttpServletRequest request, long retryAfter, String key) throws IOException {
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setHeader("Retry-After", String.valueOf(retryAfter));
         response.setContentType("application/json");
@@ -110,6 +117,26 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
         );
 
         response.getWriter().write(objectMapper.writeValueAsString(error));
+    }
+
+    // logging del patrón por usuario + IP
+    private void logBruteForceEvent(String key, HttpServletRequest request) {
+        // Tu IpUserRateLimitKeyResolver construye: ip + "|" + username
+        String ip = request.getRemoteAddr();
+        String username = "unknown";
+
+        if (key !=null && key.contains("|")) {
+            String [] parts = key.split("\\|", 2);
+            ip = parts[0];
+            username = parts[1];            
+        }
+        // Aquí podrías usar SLF4J (si tienes @Slf4j) o logger normal
+       System.out.printf(
+                "[BRUTE-FORCE] Detected brute-force pattern for user='%s' from ip='%s'%n",
+                username,
+                ip
+        );
+
     }
 }
 
