@@ -9,27 +9,16 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import com.lanny.spring_security_template.application.auth.command.LoginCommand;
-import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
-import com.lanny.spring_security_template.application.auth.command.RegisterCommand;
+import com.lanny.spring_security_template.application.auth.command.*;
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
-import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
-import com.lanny.spring_security_template.application.auth.port.out.ScopePolicy;
-import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;   // 🟢 NUEVO
-import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
-import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
+import com.lanny.spring_security_template.application.auth.port.out.*;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
-import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.model.UserStatus;
 import com.lanny.spring_security_template.domain.model.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
-import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
-import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
-import com.lanny.spring_security_template.domain.valueobject.Role;
-import com.lanny.spring_security_template.domain.valueobject.Scope;
-import com.lanny.spring_security_template.domain.valueobject.Username;
+import com.lanny.spring_security_template.domain.valueobject.*;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
 import com.lanny.spring_security_template.shared.ClockProvider;
@@ -46,91 +35,82 @@ public class AuthUseCaseImpl implements AuthUseCase {
     private final TokenProvider tokenProvider;
     private final PasswordHasher passwordHasher;
     private final ClockProvider clockProvider;
-    private final SecurityJwtProperties securityJwtProperties;
-    private final TokenBlacklistGateway tokenBlacklistGateway;
+    private final SecurityJwtProperties props;
+    private final TokenBlacklistGateway blacklist;
     private final AuthMetricsService metrics;
-    private final SessionRegistryGateway sessionRegistry;   // 🟢 NUEVO
+    private final SessionRegistryGateway sessionRegistry;
+    private final RefreshTokenStore refreshTokenStore;
 
     // =====================================================
     // LOGIN
     // =====================================================
     @Override
-    public JwtResult login(LoginCommand command) {
+    public JwtResult login(LoginCommand cmd) {
 
-        User user = userAccountGateway.findByUsernameOrEmail(command.username())
-                .orElseThrow(() -> new UsernameNotFoundException(command.username()));
+        User user = userAccountGateway.findByUsernameOrEmail(cmd.username())
+                .orElseThrow(() -> new UsernameNotFoundException(cmd.username()));
 
         user.ensureCanAuthenticate();
 
-        if (!user.passwordMatches(command.password(), passwordHasher)) {
+        if (!user.passwordMatches(cmd.password(), passwordHasher)) {
             metrics.recordLoginFailure();
             throw new InvalidCredentialsException("Invalid username or password");
         }
 
-        // 1️⃣ Roles como Value Objects
-        Set<Role> roles = roleProvider.resolveRoles(user.username().value());
-
-        // 2️⃣ Scopes como Value Objects
-        Set<Scope> scopes = scopePolicy.resolveScopes(roles);
-
-        // 3️⃣ Convertir dominio → strings para el JWT
-        List<String> roleNames = roles.stream()
-                .map(Role::name)
-                .toList();
-
-        List<String> scopeNames = scopes.stream()
-                .map(Scope::name)
-                .toList();
-
-        // 4️⃣ Tiempos
-        Duration accessTtl = securityJwtProperties.accessTtl();
-        Duration refreshTtl = securityJwtProperties.refreshTtl();
-
-        Instant issuedAt = clockProvider.now();
-        Instant accessExp = issuedAt.plus(accessTtl);
-        Instant refreshExp = issuedAt.plus(refreshTtl);                 // 🟢 usamos esto para las sesiones
-
         String username = user.username().value();
 
-        // 5️⃣ Emitir tokens
-        String accessToken = tokenProvider.generateAccessToken(
-                username,
-                roleNames,
-                scopeNames,
-                accessTtl);
+        // Roles/Scopes como Value Objects
+        Set<Role> roles = roleProvider.resolveRoles(username);
+        Set<Scope> scopes = scopePolicy.resolveScopes(roles);
 
-        String refreshToken = tokenProvider.generateRefreshToken(
-                username,
-                refreshTtl);
+        List<String> roleNames = roles.stream().map(Role::name).toList();
+        List<String> scopeNames = scopes.stream().map(Scope::name).toList();
 
-        // 🟢 6️⃣ Registrar sesión (JTI del refresh) en el SessionRegistry
-        String refreshJti = tokenProvider.extractJti(refreshToken);     // 🟢 NUEVO método en TokenProvider
+        // Tiempos
+        Instant now = clockProvider.now();
+        Duration accessTtl = props.accessTtl();
+        Duration refreshTtl = props.refreshTtl();
+
+        Instant accessExp = now.plus(accessTtl);
+        Instant refreshExp = now.plus(refreshTtl);
+
+        // Emitimos tokens
+        String accessToken = tokenProvider.generateAccessToken(username, roleNames, scopeNames, accessTtl);
+        String refreshToken = tokenProvider.generateRefreshToken(username, refreshTtl);
+
+        // Extraer JTI del refresh token
+        String refreshJti = tokenProvider.extractJti(refreshToken);
+
+        // Guardar refresh en DB (persistencia real)
+        refreshTokenStore.save(username, refreshJti, now, refreshExp);
+
+        // Registrar sesión
         sessionRegistry.registerSession(username, refreshJti, refreshExp);
 
-        // 🟢 7️⃣ Aplicar política de máximo de sesiones activas
-        int maxSessions = securityJwtProperties.maxActiveSessions();    // 🟢 NUEVA property
+        // Limitar sesiones activas
+        int maxSessions = props.maxActiveSessions();
+        if (maxSessions > 0) {
+            var sessions = sessionRegistry.getActiveSessions(username);
+            if (sessions.size() > maxSessions) {
 
-        if (maxSessions > 0) { // 0 = sin límite
-            List<String> activeSessions = sessionRegistry.getActiveSessions(username);
+                int excess = sessions.size() - maxSessions;
 
-            if (activeSessions.size() > maxSessions) {
-                int toRemove = activeSessions.size() - maxSessions;
+                for (int i = 0; i < excess; i++) {
+                    String jtiToRemove = sessions.get(i);
 
-                // Aquí simplemente eliminamos las primeras; si tus impls las ordenan por fecha, serán las más antiguas
-                for (int i = 0; i < toRemove; i++) {
-                    String jtiToRevoke = activeSessions.get(i);
+                    // Revocamos el refresh antiguo
+                    blacklist.revoke(jtiToRemove, refreshExp);
 
-                    // Revocamos el token asociado a ese JTI (anti-replay)
-                    tokenBlacklistGateway.revoke(jtiToRevoke, refreshExp);
+                    // Eliminamos del registry
+                    sessionRegistry.removeSession(username, jtiToRemove);
 
-                    // Lo quitamos del registry
-                    sessionRegistry.removeSession(username, jtiToRevoke);
+                    // Eliminamos de BD
+                    refreshTokenStore.delete(jtiToRemove);
                 }
             }
         }
 
         metrics.recordLoginSuccess();
-
         return new JwtResult(accessToken, refreshToken, accessExp);
     }
 
@@ -138,83 +118,75 @@ public class AuthUseCaseImpl implements AuthUseCase {
     // REFRESH
     // =====================================================
     @Override
-    public JwtResult refresh(RefreshCommand command) {
+    public JwtResult refresh(RefreshCommand cmd) {
 
-        return tokenProvider.validateAndGetClaims(command.refreshToken())
-
+        return tokenProvider.validateAndGetClaims(cmd.refreshToken())
                 .map(claims -> {
-
-                    // 1) Validar que es un REFRESH TOKEN (audiencia)
-                    String expectedRefreshAudience = securityJwtProperties.refreshAudience();
-                    if (claims.aud() == null || !claims.aud().contains(expectedRefreshAudience)) {
-                        throw new IllegalArgumentException("Invalid refresh token audience");
-                    }
-
-                    // 2) Protección anti-replay (reuso del refresh = FRAUDE)
-                    if (tokenBlacklistGateway.isRevoked(claims.jti())) {
-                        throw new IllegalArgumentException(
-                                "Refresh token revoked or already used");
-                    }
 
                     String username = claims.sub();
 
-                    // 3) Reconstruir roles + scopes desde providers de dominio
+                    // Validar audiencia
+                    if (claims.aud() == null || !claims.aud().contains(props.refreshAudience())) {
+                        throw new IllegalArgumentException("Invalid refresh token audience");
+                    }
+
+                    // Anti-replay real: El refresh debe existir en BD
+                    if (!refreshTokenStore.exists(claims.jti())) {
+                        throw new IllegalArgumentException("Refresh token not found (revoked or expired)");
+                    }
+
+                    // Anti-replay: ¿revocado?
+                    if (blacklist.isRevoked(claims.jti())) {
+                        throw new IllegalArgumentException("Refresh token revoked or re-used");
+                    }
+
+                    // Reconstruir roles/scopes
                     Set<Role> roles = roleProvider.resolveRoles(username);
                     Set<Scope> scopes = scopePolicy.resolveScopes(roles);
 
                     List<String> roleNames = roles.stream().map(Role::name).toList();
                     List<String> scopeNames = scopes.stream().map(Scope::name).toList();
 
-                    Duration accessTtl = securityJwtProperties.accessTtl();
-                    Duration refreshTtl = securityJwtProperties.refreshTtl();
+                    Instant now = clockProvider.now();
+                    Duration accessTtl = props.accessTtl();
+                    Duration refreshTtl = props.refreshTtl();
+                    Instant accessExp = now.plus(accessTtl);
+                    Instant refreshExp = now.plus(refreshTtl);
 
-                    Instant issuedAt = clockProvider.now();
-                    Instant accessExp = issuedAt.plus(accessTtl);
-                    Instant refreshExp = issuedAt.plus(refreshTtl);
+                    // ROTACIÓN
+                    if (props.rotateRefreshTokens()) {
 
-                    // 4) ROTACIÓN DE REFRESH TOKENS (OAuth2-style)
-                    if (securityJwtProperties.rotateRefreshTokens()) {
+                        // 1) Revocamos refresh anterior
+                        blacklist.revoke(claims.jti(), Instant.ofEpochSecond(claims.exp()));
 
-                        // Revocar SIEMPRE el refresh usado (anti-replay fuerte)
-                        tokenBlacklistGateway.revoke(
-                                claims.jti(),
-                                Instant.ofEpochSecond(claims.exp()));
+                        // 2) Lo eliminamos de BD y del registry
+                        refreshTokenStore.delete(claims.jti());
+                        sessionRegistry.removeSession(username, claims.jti());
 
-                        // Limpiar la sesión antigua del registry (si existe)
-                        sessionRegistry.removeSession(username, claims.jti());  // 🟢 NUEVO
-
-                        // Emitimos refresh nuevo + access nuevo
+                        // 3) Emitimos nuevos tokens
                         String newRefresh = tokenProvider.generateRefreshToken(username, refreshTtl);
-                        String newAccess = tokenProvider.generateAccessToken(
-                                username,
-                                roleNames,
-                                scopeNames,
-                                accessTtl);
+                        String newAccess = tokenProvider.generateAccessToken(username, roleNames, scopeNames, accessTtl);
 
-                        // Registrar nueva sesión (nuevo JTI de refresh)
-                        String newJti = tokenProvider.extractJti(newRefresh);   // 🟢
+                        String newJti = tokenProvider.extractJti(newRefresh);
+
+                        // 4) Guardamos en BD y session registry
+                        refreshTokenStore.save(username, newJti, now, refreshExp);
                         sessionRegistry.registerSession(username, newJti, refreshExp);
 
                         metrics.recordTokenRefresh();
-
                         return new JwtResult(newAccess, newRefresh, accessExp);
                     }
 
-                    // 5) Sin rotación: emitir SOLO nuevo access token
-                    String newAccess = tokenProvider.generateAccessToken(
-                            username,
-                            roleNames,
-                            scopeNames,
-                            accessTtl);
-
-                    return new JwtResult(newAccess, command.refreshToken(), accessExp);
+                    // SIN rotación → nuevo access, refresh igual
+                    String newAccess = tokenProvider.generateAccessToken(username, roleNames, scopeNames, accessTtl);
+                    return new JwtResult(newAccess, cmd.refreshToken(), accessExp);
 
                 })
                 .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
     }
 
     // =====================================================
-    // ME / WHOAMI
+    // ME
     // =====================================================
     @Override
     public MeResult me(String username) {
@@ -229,7 +201,8 @@ public class AuthUseCaseImpl implements AuthUseCase {
                 user.id(),
                 username,
                 roles.stream().map(Role::name).toList(),
-                scopes.stream().map(Scope::name).toList());
+                scopes.stream().map(Scope::name).toList()
+        );
     }
 
     // =====================================================
@@ -237,24 +210,22 @@ public class AuthUseCaseImpl implements AuthUseCase {
     // =====================================================
     @Override
     @Profile("dev")
-    public void registerDev(RegisterCommand command) {
+    public void registerDev(RegisterCommand cmd) {
 
-        // 1. Construir usuario del dominio usando Value Objects
         User newUser = new User(
                 null,
-                Username.of(command.username()),
-                EmailAddress.of(command.email()),
-                PasswordHash.of(passwordHasher.hash(command.rawPassword())),
+                Username.of(cmd.username()),
+                EmailAddress.of(cmd.email()),
+                PasswordHash.of(passwordHasher.hash(cmd.rawPassword())),
                 UserStatus.ACTIVE,
-                command.roles(),
-                command.scopes());
+                cmd.roles(),
+                cmd.scopes()
+        );
 
-        // 2. Guardar usando el gateway
         userAccountGateway.save(newUser);
-
         metrics.recordUserRegistration();
 
         System.out.printf("[DEV] Seed user created: %s%n", newUser.username().value());
     }
-
 }
+
