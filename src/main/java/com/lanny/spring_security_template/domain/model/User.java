@@ -6,6 +6,7 @@ import com.lanny.spring_security_template.domain.exception.UserLockedException;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
 import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
+import com.lanny.spring_security_template.domain.valueobject.UserId;
 import com.lanny.spring_security_template.domain.valueobject.Username;
 
 import java.util.List;
@@ -17,7 +18,7 @@ import java.util.Objects;
  */
 public final class User {
 
-    private final String id;
+    private final UserId id;
     private final Username username;
     private final EmailAddress email;
     private final PasswordHash passwordHash;
@@ -34,7 +35,7 @@ public final class User {
             List<String> roles,
             List<String> scopes
     ) {
-        this.id = id;
+        this.id = UserId.from(id);
         this.username = Objects.requireNonNull(username);
         this.email = Objects.requireNonNull(email);
         this.passwordHash = Objects.requireNonNull(passwordHash);
@@ -43,7 +44,7 @@ public final class User {
         this.scopes = List.copyOf(scopes);
     }
 
-    /** Domain rule enforcing account policy before authentication */
+    // /** BUSINESS RULE- Block authentication based on user status */
     public void ensureCanAuthenticate() {
         switch (status) {
             case LOCKED -> throw new UserLockedException("User " + username.value() + " is locked");
@@ -54,8 +55,8 @@ public final class User {
     }
 
     /**
-     * Delegates password checking to a domain-safe abstraction.
-     * This avoids leaking Spring Security into the domain layer.
+     * Validate password using domain hashing
+    * IMPORTANT: This method ALWAYS call ensureCanAuthenticate() before hashing
      */
     public boolean passwordMatches(String rawPassword, PasswordHasher hasher) {
         ensureCanAuthenticate();
@@ -63,7 +64,7 @@ public final class User {
     }
 
     // --- Getters ---
-    public String id() { return id; }
+    public UserId id() { return id; }
     public Username username() { return username; }
     public EmailAddress email() { return email; }
     public PasswordHash passwordHash() { return passwordHash; }

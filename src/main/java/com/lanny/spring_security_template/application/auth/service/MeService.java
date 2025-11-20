@@ -29,7 +29,7 @@ public class MeService {
         Set<Scope> scopes = scopePolicy.resolveScopes(roles);
 
         return new MeResult(
-                user.id(),
+                user.id().value().toString(),
                 username,
                 roles.stream().map(Role::name).toList(),
                 scopes.stream().map(Scope::name).toList()
