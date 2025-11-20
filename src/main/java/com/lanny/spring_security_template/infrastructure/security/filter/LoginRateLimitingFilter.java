@@ -10,6 +10,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -18,10 +20,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+// import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 30)
 public class LoginRateLimitingFilter extends OncePerRequestFilter {
@@ -43,8 +47,7 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
             RateLimitingProperties props,
             RateLimitKeyResolver keyResolver,
             ObjectMapper objectMapper,
-            AuthMetricsService metrics
-    ) {
+            AuthMetricsService metrics) {
         this.props = props;
         this.keyResolver = keyResolver;
         this.objectMapper = objectMapper;
@@ -53,9 +56,9 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
-        if (!props.enabled()) return true;
+        if (!props.enabled())
+            return true;
 
-        // Solo aplica al endpoint y método configurado
         return !request.getRequestURI().equals(props.loginPath()) ||
                 !"POST".equalsIgnoreCase(request.getMethod());
     }
@@ -64,10 +67,10 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
-    ) throws ServletException, IOException {
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         String key = keyResolver.resolveKey(request);
+
         Bucket bucket = buckets.computeIfAbsent(key, k -> {
             Bucket b = new Bucket();
             b.windowStart = Instant.now();
@@ -85,7 +88,11 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
 
         // Blocked?
         if (bucket.blockedUntil != null && bucket.blockedUntil.isAfter(now)) {
+
             long retryAfter = bucket.blockedUntil.getEpochSecond() - now.getEpochSecond();
+
+            logRateLimitBlocked(key, request, retryAfter);
+
             reject(response, request, retryAfter, key);
             return;
         }
@@ -95,9 +102,12 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
 
         if (bucket.attempts > props.maxAttempts()) {
             bucket.blockedUntil = now.plusSeconds(props.blockSeconds());
+
             long retryAfter = props.retryAfter();
+
             metrics.recordBruteForceDetected();
             logBruteForceEvent(key, request);
+
             reject(response, request, retryAfter, key);
             return;
         }
@@ -105,7 +115,17 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private void reject(HttpServletResponse response, HttpServletRequest request, long retryAfter, String key) throws IOException {
+    // ===================================
+    // REJECT HANDLERS
+    // ===================================
+
+    // Versión completa
+    private void reject(
+            HttpServletResponse response,
+            HttpServletRequest request,
+            long retryAfter,
+            String key) throws IOException {
+
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setHeader("Retry-After", String.valueOf(retryAfter));
         response.setContentType("application/json");
@@ -113,30 +133,43 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
         ApiError error = ApiError.of(
                 HttpStatus.TOO_MANY_REQUESTS.value(),
                 "Too many login attempts. Please try again later.",
-                request
-        );
+                request);
 
         response.getWriter().write(objectMapper.writeValueAsString(error));
     }
 
-    // logging del patrón por usuario + IP
+    // ===================================
+    // LOGGING
+    // ===================================
+
     private void logBruteForceEvent(String key, HttpServletRequest request) {
-        // Tu IpUserRateLimitKeyResolver construye: ip + "|" + username
+
         String ip = request.getRemoteAddr();
-        String username = "unknown";
+        String username = extractUsernameFromKey(key);
 
-        if (key !=null && key.contains("|")) {
-            String [] parts = key.split("\\|", 2);
-            ip = parts[0];
-            username = parts[1];            
-        }
-        // Aquí podrías usar SLF4J (si tienes @Slf4j) o logger normal
-       System.out.printf(
-                "[BRUTE-FORCE] Detected brute-force pattern for user='%s' from ip='%s'%n",
+        log.warn(
+                "[BRUTE-FORCE] Suspicious pattern detected user='{}' ip='{}' path='{}'",
                 username,
-                ip
-        );
-
+                ip,
+                request.getRequestURI());
     }
-}
 
+    private void logRateLimitBlocked(String key, HttpServletRequest request, long retryAfter) {
+        String ip = request.getRemoteAddr();
+        String username = extractUsernameFromKey(key);
+
+        log.warn(
+                "[RATE-LIMIT] Blocked login user='{}' ip='{}' retryAfter={}s",
+                username,
+                ip,
+                retryAfter);
+    }
+
+    private String extractUsernameFromKey(String key) {
+        if (key != null && key.contains("|")) {
+            return key.split("\\|", 2)[1];
+        }
+        return "unknown";
+    }
+
+}
