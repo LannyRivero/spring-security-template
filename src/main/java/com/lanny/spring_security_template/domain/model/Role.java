@@ -1,7 +1,9 @@
-package com.lanny.spring_security_template.domain.valueobject;
+package com.lanny.spring_security_template.domain.model;
 
 import java.util.Objects;
 import java.util.Set;
+
+import com.lanny.spring_security_template.domain.valueobject.Scope;
 
 /**
  * Rich domain Value Object representing a Role with its associated scopes.

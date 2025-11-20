@@ -2,7 +2,7 @@ package com.lanny.spring_security_template.domain.policy;
 
 import java.util.Set;
 
-import com.lanny.spring_security_template.domain.valueobject.Role;
+import com.lanny.spring_security_template.domain.model.Role;
 import com.lanny.spring_security_template.domain.valueobject.Scope;
 
 public interface ScopePolicy {
