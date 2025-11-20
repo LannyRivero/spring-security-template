@@ -13,32 +13,44 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties(prefix = "security.jwt")
 public record SecurityJwtProperties(
+
         /** Token issuer (iss claim) */
-        @DefaultValue("spring-security-template") String issuer,
+        @DefaultValue("spring-security-template")
+        String issuer,
 
         /** Expected audience for access tokens */
-        @DefaultValue("access") String accessAudience,
+        @DefaultValue("access")
+        String accessAudience,
 
         /** Expected audience for refresh tokens */
-        @DefaultValue("refresh") String refreshAudience,
+        @DefaultValue("refresh")
+        String refreshAudience,
 
         /** Access token lifetime (ISO-8601 duration) */
-        @DefaultValue("PT15M") Duration accessTtl,
+        @DefaultValue("PT15M")
+        Duration accessTtl,
 
         /** Refresh token lifetime (ISO-8601 duration) */
-        @DefaultValue("P7D") Duration refreshTtl,
+        @DefaultValue("P7D")
+        Duration refreshTtl,
 
         /** Algorithm used for JWT signing (RSA or HMAC) */
-        @DefaultValue("RSA") String algorithm,
+        @DefaultValue("RSA")
+        String algorithm,
 
         /** Whether refresh tokens should be rotated and the previous one revoked */
-        @DefaultValue("false") boolean rotateRefreshTokens,
+        @DefaultValue("false")
+        boolean rotateRefreshTokens,
 
         /** Default roles assigned to new users (optional) */
-        @DefaultValue({}) List<String> defaultRoles,
+        @DefaultValue({})
+        List<String> defaultRoles,
 
         /** Default scopes granted to new users (optional) */
-        @DefaultValue({}) List<String> defaultScopes
+        @DefaultValue({})
+        List<String> defaultScopes,
+
+        /** 🟢 NEW: max active sessions per user */
+        @DefaultValue("1")
+        int maxActiveSessions
 ) { }
-
-

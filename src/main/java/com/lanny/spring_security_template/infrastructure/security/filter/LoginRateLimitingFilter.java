@@ -1,82 +1,175 @@
 package com.lanny.spring_security_template.infrastructure.security.filter;
 
+import com.lanny.spring_security_template.infrastructure.security.handler.ApiError;
+import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitKeyResolver;
+import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
+import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.springframework.beans.factory.annotation.Value;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+// import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- *  Simple rate limiting filter for /api/v1/auth/login endpoint.
- * Blocks brute-force attempts using a per-IP sliding window counter.
- */
-@Order(FilterOrder.RATE_LIMITING)
+@Slf4j
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 30)
 public class LoginRateLimitingFilter extends OncePerRequestFilter {
 
-    private static final String LOGIN_PATH = "/api/v1/auth/login";
+    private final RateLimitingProperties props;
+    private final RateLimitKeyResolver keyResolver;
+    private final ObjectMapper objectMapper;
+    private final AuthMetricsService metrics;
 
-    @Value("${security.rate-limit.max-requests:5}")
-    private int maxRequests;
+    private static final class Bucket {
+        int attempts;
+        Instant windowStart;
+        Instant blockedUntil;
+    }
 
-    @Value("${security.rate-limit.window-seconds:60}")
-    private long windowSeconds;
-    private final Map<String, SlidingWindow> buckets = new ConcurrentHashMap<>();
+    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+
+    public LoginRateLimitingFilter(
+            RateLimitingProperties props,
+            RateLimitKeyResolver keyResolver,
+            ObjectMapper objectMapper,
+            AuthMetricsService metrics) {
+        this.props = props;
+        this.keyResolver = keyResolver;
+        this.objectMapper = objectMapper;
+        this.metrics = metrics;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
+        if (!props.enabled())
+            return true;
+
+        return !request.getRequestURI().equals(props.loginPath()) ||
+                !"POST".equalsIgnoreCase(request.getMethod());
+    }
 
     @Override
     protected void doFilterInternal(
-            @NonNull HttpServletRequest req,
-            @NonNull HttpServletResponse res,
-            @NonNull FilterChain chain) throws ServletException, IOException {
-        if (req.getRequestURI().startsWith(LOGIN_PATH)) {
-            String key = clientKey(req);
-            SlidingWindow window = buckets.computeIfAbsent(key, k -> new SlidingWindow());
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-            if (!window.tryAcquire(maxRequests, windowSeconds)) {
-                res.setStatus(429);
-                res.setHeader("Retry-After", String.valueOf(windowSeconds));
-                res.getWriter().write("Too Many Requests");
-                return;
-            }
+        String key = keyResolver.resolveKey(request);
+
+        Bucket bucket = buckets.computeIfAbsent(key, k -> {
+            Bucket b = new Bucket();
+            b.windowStart = Instant.now();
+            return b;
+        });
+
+        Instant now = Instant.now();
+
+        // Reset window
+        if (bucket.windowStart.plusSeconds(props.window()).isBefore(now)) {
+            bucket.windowStart = now;
+            bucket.attempts = 0;
+            bucket.blockedUntil = null;
         }
 
-        chain.doFilter(req, res);
-    }
+        // Blocked?
+        if (bucket.blockedUntil != null && bucket.blockedUntil.isAfter(now)) {
 
-    private String clientKey(HttpServletRequest req) {
-        // Use remote address directly to prevent spoofing
-        // If behind a trusted proxy, configure your proxy to set a different header
-        return req.getRemoteAddr();
-    }
+            long retryAfter = bucket.blockedUntil.getEpochSecond() - now.getEpochSecond();
 
-    /** Sliding window algorithm (per IP). */
-    static class SlidingWindow {
-        private final Deque<Long> events = new ArrayDeque<>();
+            logRateLimitBlocked(key, request, retryAfter);
 
-        synchronized boolean tryAcquire(int max, long windowSec) {
-            long now = Instant.now().getEpochSecond();
-
-            // remove old timestamps
-            while (!events.isEmpty() && now - events.peekFirst() >= windowSec) {
-                events.pollFirst();
-            }
-
-            if (events.size() >= max)
-                return false;
-            events.addLast(now);
-            return true;
+            reject(response, request, retryAfter, key);
+            return;
         }
+
+        // Attempt
+        bucket.attempts++;
+
+        if (bucket.attempts > props.maxAttempts()) {
+            bucket.blockedUntil = now.plusSeconds(props.blockSeconds());
+
+            long retryAfter = props.retryAfter();
+
+            metrics.recordBruteForceDetected();
+            logBruteForceEvent(key, request);
+
+            reject(response, request, retryAfter, key);
+            return;
+        }
+
+        filterChain.doFilter(request, response);
     }
+
+    // ===================================
+    // REJECT HANDLERS
+    // ===================================
+
+    // Versión completa
+    private void reject(
+            HttpServletResponse response,
+            HttpServletRequest request,
+            long retryAfter,
+            String key) throws IOException {
+
+        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        response.setHeader("Retry-After", String.valueOf(retryAfter));
+        response.setContentType("application/json");
+
+        ApiError error = ApiError.of(
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                "Too many login attempts. Please try again later.",
+                request);
+
+        response.getWriter().write(objectMapper.writeValueAsString(error));
+    }
+
+    // ===================================
+    // LOGGING
+    // ===================================
+
+    private void logBruteForceEvent(String key, HttpServletRequest request) {
+
+        String ip = request.getRemoteAddr();
+        String username = extractUsernameFromKey(key);
+
+        log.warn(
+                "[BRUTE-FORCE] Suspicious pattern detected user='{}' ip='{}' path='{}'",
+                username,
+                ip,
+                request.getRequestURI());
+    }
+
+    private void logRateLimitBlocked(String key, HttpServletRequest request, long retryAfter) {
+        String ip = request.getRemoteAddr();
+        String username = extractUsernameFromKey(key);
+
+        log.warn(
+                "[RATE-LIMIT] Blocked login user='{}' ip='{}' retryAfter={}s",
+                username,
+                ip,
+                retryAfter);
+    }
+
+    private String extractUsernameFromKey(String key) {
+        if (key != null && key.contains("|")) {
+            return key.split("\\|", 2)[1];
+        }
+        return "unknown";
+    }
+
 }

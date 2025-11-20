@@ -5,7 +5,13 @@ spring:
   application:
     name: spring-security-template
   profiles:
-    active: dev
+    active: dev  
+
+logging:
+  level:
+    root: INFO
+    org.springframework.security: INFO
+
 
 
 

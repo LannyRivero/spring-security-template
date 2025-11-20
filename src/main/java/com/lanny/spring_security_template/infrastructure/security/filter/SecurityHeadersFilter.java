@@ -4,64 +4,62 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.annotation.Order;
-import org.springframework.core.env.Environment;
+
+import org.springframework.core.Ordered;
 import org.springframework.lang.NonNull;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Arrays;
 
-/**
- * Adds standard security HTTP headers to prevent XSS, clickjacking, and data
- * leakage.
- * Automatically relaxes CSP for Swagger UI and API docs in dev/test
- * environments only.
- */
-@Order(FilterOrder.SECURITY_HEADERS)
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 20) 
 public class SecurityHeadersFilter extends OncePerRequestFilter {
 
-    private final Environment env;
-
-    @Value("${security.headers.content-security-policy:default-src 'none'; frame-ancestors 'none';}")
-    private String defaultCsp;
-
-    @Value("${security.headers.referrer-policy:no-referrer}")
-    private String referrer;
-
-    public SecurityHeadersFilter(Environment env) {
-        this.env = env;
-    }
+    private static final String CSP =
+            "default-src 'self'; " +
+            "script-src 'self'; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "img-src 'self' data:; " +
+            "font-src 'self'; " +
+            "object-src 'none'; " +
+            "base-uri 'self'; " +
+            "frame-ancestors 'none'; " +
+            "form-action 'self'";
 
     @Override
     protected void doFilterInternal(
-            @NonNull HttpServletRequest req,
-            @NonNull HttpServletResponse res,
-            @NonNull FilterChain chain) throws ServletException, IOException {
+           @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
+    ) throws ServletException, IOException {
 
-        String uri = req.getRequestURI();
-        String[] activeProfiles = env.getActiveProfiles();
-        boolean isDevOrTest = Arrays.stream(activeProfiles)
-                .anyMatch(p -> p.equalsIgnoreCase("dev") || p.equalsIgnoreCase("test"));
+        //  Sólo tiene sentido HSTS si estás detrás de HTTPS en prod
+        response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
 
-        if (isDevOrTest && (uri.startsWith("/swagger-ui") || uri.startsWith("/v3/api-docs"))) {
-            res.setHeader("Content-Security-Policy",
-                    "default-src 'self'; " +
-                            "img-src 'self' data:; " +
-                            "style-src 'self' 'unsafe-inline'; " +
-                            "script-src 'self' 'unsafe-inline' 'unsafe-eval';");
-        } else {
-            res.setHeader("Content-Security-Policy", defaultCsp);
-        }
+        // Anti XSS / MIME sniffing
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader("X-XSS-Protection", "0"); 
 
-        res.setHeader("X-Content-Type-Options", "nosniff");
-        res.setHeader("X-Frame-Options", "DENY");
-        res.setHeader("X-XSS-Protection", "0");
-        res.setHeader("Referrer-Policy", referrer);
+        // Clickjacking
+        response.setHeader("X-Frame-Options", "DENY");
 
-        chain.doFilter(req, res);
+        // Referrer minimizado
+        response.setHeader("Referrer-Policy", "no-referrer");
+
+        // Permissions-Policy (antes Feature-Policy)
+        response.setHeader("Permissions-Policy",
+                "geolocation=(), microphone=(), camera=(), payment=(), usb=()");
+
+        // COOP / CORP → asilamiento de contexto (bueno para SPAs, dashboards, etc.)
+        response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+        response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+
+        // CSP fuerte pero compatible con API REST + Swagger
+        response.setHeader("Content-Security-Policy", CSP);
+
+        filterChain.doFilter(request, response);
     }
 }
+

@@ -6,12 +6,14 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
+import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 
 @SpringBootApplication
-@EnableConfigurationProperties(SecurityJwtProperties.class)
+@EnableConfigurationProperties({SecurityJwtProperties.class, RateLimitingProperties.class})
+
 public class SpringSecurityTemplateApplication {
 
   public static void main(String[] args) {
