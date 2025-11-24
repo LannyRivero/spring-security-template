@@ -4,6 +4,8 @@ package com.lanny.spring_security_template.infrastructure.security.policy;
 import com.lanny.spring_security_template.domain.model.Role;
 import com.lanny.spring_security_template.domain.model.Scope;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
+
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +26,8 @@ import java.util.stream.Collectors;
  * without impacting the application layer.
  */
 @Component
-@Profile({ "prod", "dev" }) // ajusta perfiles según tu estrategia
+@Primary
+@Profile({ "dev", "prod" })
 public class DefaultScopePolicy implements ScopePolicy {
 
     /**

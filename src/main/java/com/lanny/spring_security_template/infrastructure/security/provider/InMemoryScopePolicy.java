@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * - dynamic IAM rules, etc.
  */
 @Component
-@Profile({ "dev", "demo", "prod" })
+@Profile({"demo"})
 public class InMemoryScopePolicy implements ScopePolicy {
 
         /**
