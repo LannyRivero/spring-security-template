@@ -1,7 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.persistence.jpa;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Profile;
@@ -13,10 +12,25 @@ import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.model.UserStatus;
 import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
 import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
+import com.lanny.spring_security_template.domain.valueobject.UserId;
 import com.lanny.spring_security_template.domain.valueobject.Username;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.UserEntity;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.repository.UserJpaRepository;
 
+/**
+ * JPA adapter implementing the {@link UserAccountGateway} outbound port.
+ *
+ * <p>
+ * Acts as a bridge between domain aggregates and JPA entities.
+ * Converts {@link UserEntity} ↔ {@link User} using factory methods
+ * such as {@code User.rehydrate}.
+ * </p>
+ *
+ * <p>
+ * This class contains ONLY mapping and simple persistence logic.
+ * All domain rules live inside the aggregate or services.
+ * </p>
+ */
 @Component
 @Profile({ "dev", "prod" })
 public class UserAccountJpaAdapter implements UserAccountGateway {
@@ -27,27 +41,63 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
         this.userRepository = userRepository;
     }
 
+    // ======================================================================
+    // QUERIES
+    // ======================================================================
+
     @Override
     public Optional<User> findByUsernameOrEmail(String usernameOrEmail) {
         return userRepository.findByUsernameOrEmail(usernameOrEmail)
-                .filter(Objects::nonNull)
                 .map(this::toDomain);
     }
 
     @Override
+    public Optional<User> findById(String userId) {
+        if (userId == null)
+            return Optional.empty();
+        return userRepository.fetchWithRelations(userId)
+                .map(this::toDomain);
+    }
+
+    @Override
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmailIgnoreCase(email)
+                .map(this::toDomain);
+    }
+
+    // ======================================================================
+    // COMMANDS
+    // ======================================================================
+
+    @Override
     public void save(User user) {
-        if (user == null) {
-            throw new IllegalArgumentException("User must not be null");
-        }
         userRepository.save(toEntity(user));
     }
 
-    // =====================================================
+    @Override
+    public void update(User user) {
+        userRepository.save(toEntity(user));
+    }
+
+    @Override
+    public void updateStatus(String userId, UserStatus status) {
+        if (userId == null)
+            return;
+        userRepository.findById(userId).ifPresent(entity -> {
+            entity.setEnabled(status == UserStatus.ACTIVE);
+            userRepository.save(entity);
+        });
+    }
+
+    // ======================================================================
     // ENTITY → DOMAIN
-    // =====================================================
+    // ======================================================================
+
     private User toDomain(UserEntity entity) {
 
-        UserStatus status = entity.isEnabled() ? UserStatus.ACTIVE : UserStatus.DISABLED;
+        UserStatus status = entity.isEnabled()
+                ? UserStatus.ACTIVE
+                : UserStatus.DISABLED;
 
         List<String> roles = entity.getRoles().stream()
                 .map(r -> r.getName())
@@ -57,8 +107,8 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
                 .map(s -> s.getName())
                 .toList();
 
-        return new User(
-                String.valueOf(entity.getId()),
+        return User.rehydrate(
+                UserId.from(entity.getId()),
                 Username.of(entity.getUsername()),
                 EmailAddress.of(entity.getEmail()),
                 PasswordHash.of(entity.getPasswordHash()),
@@ -67,20 +117,16 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
                 scopes);
     }
 
-    // =====================================================
+    // ======================================================================
     // DOMAIN → ENTITY
-    // =====================================================
+    // ======================================================================
+
     @NonNull
     private UserEntity toEntity(User domain) {
         UserEntity entity = new UserEntity();
-        
-        if (domain.id() != null) {
-            try {
-                entity.setId(domain.id().value().toString());
 
-            } catch (NumberFormatException ex) {
-                throw new IllegalStateException("Domain user ID must be convertible to Long");
-            }
+        if (domain.id() != null) {
+            entity.setId(domain.id().value().toString());
         }
 
         entity.setUsername(domain.username().value());
@@ -88,11 +134,7 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
         entity.setPasswordHash(domain.passwordHash().value());
         entity.setEnabled(domain.status() == UserStatus.ACTIVE);
 
-        // ⚠️ Importante
-        // NO seteamos roles/scopes aquí porque esas relaciones se gestionan
-        // con entidades RoleEntity / ScopeEntity.
-        // Esto evita problemas de cascada en JPA.
-
+        // Roles y scopes NO se setean aquí (se gestionan por repos dedicados)
         return entity;
     }
 }
