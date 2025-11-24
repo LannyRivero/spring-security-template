@@ -33,8 +33,7 @@ public final class User {
             PasswordHash passwordHash,
             UserStatus status,
             List<String> roles,
-            List<String> scopes
-    ) {
+            List<String> scopes) {
         this.id = UserId.from(id);
         this.username = Objects.requireNonNull(username);
         this.email = Objects.requireNonNull(email);
@@ -50,13 +49,14 @@ public final class User {
             case LOCKED -> throw new UserLockedException("User " + username.value() + " is locked");
             case DISABLED -> throw new UserDisabledException("User " + username.value() + " is disabled");
             case DELETED -> throw new UserDeletedException("User " + username.value() + " is deleted");
-            default -> { /* ACTIVE: allowed */ }
+            default -> {
+                /* ACTIVE: allowed */ }
         }
     }
 
     /**
      * Validate password using domain hashing
-    * IMPORTANT: This method ALWAYS call ensureCanAuthenticate() before hashing
+     * IMPORTANT: This method ALWAYS call ensureCanAuthenticate() before hashing
      */
     public boolean passwordMatches(String rawPassword, PasswordHasher hasher) {
         ensureCanAuthenticate();
@@ -64,19 +64,41 @@ public final class User {
     }
 
     // --- Getters ---
-    public UserId id() { return id; }
-    public Username username() { return username; }
-    public EmailAddress email() { return email; }
-    public PasswordHash passwordHash() { return passwordHash; }
-    public UserStatus status() { return status; }
-    public List<String> roles() { return roles; }
-    public List<String> scopes() { return scopes; }
+    public UserId id() {
+        return id;
+    }
+
+    public Username username() {
+        return username;
+    }
+
+    public EmailAddress email() {
+        return email;
+    }
+
+    public PasswordHash passwordHash() {
+        return passwordHash;
+    }
+
+    public UserStatus status() {
+        return status;
+    }
+
+    public List<String> roles() {
+        return roles;
+    }
+
+    public List<String> scopes() {
+        return scopes;
+    }
 
     // --- Equality based on ID ---
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof User user)) return false;
+        if (this == o)
+            return true;
+        if (!(o instanceof User user))
+            return false;
         return Objects.equals(id, user.id);
     }
 
@@ -85,5 +107,3 @@ public final class User {
         return Objects.hash(id);
     }
 }
-
-
