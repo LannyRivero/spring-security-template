@@ -1,7 +1,5 @@
 package com.lanny.spring_security_template.domain.model;
 
-import com.lanny.spring_security_template.domain.model.Scope;
-import com.lanny.spring_security_template.domain.model.Role;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
