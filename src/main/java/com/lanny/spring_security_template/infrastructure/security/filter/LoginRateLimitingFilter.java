@@ -2,8 +2,11 @@ package com.lanny.spring_security_template.infrastructure.security.filter;
 
 import com.lanny.spring_security_template.infrastructure.security.handler.ApiError;
 import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitKeyResolver;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
 import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
+import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceImpl;
+import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceNoOp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -20,7 +23,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-// import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +36,7 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
     private final RateLimitKeyResolver keyResolver;
     private final ObjectMapper objectMapper;
     private final AuthMetricsService metrics;
+    private final ClockProvider clockProvider;
 
     private static final class Bucket {
         int attempts;
@@ -47,11 +50,34 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
             RateLimitingProperties props,
             RateLimitKeyResolver keyResolver,
             ObjectMapper objectMapper,
-            AuthMetricsService metrics) {
+            AuthMetricsServiceImpl metrics,
+            ClockProvider clockProvider) {
         this.props = props;
         this.keyResolver = keyResolver;
         this.objectMapper = objectMapper;
         this.metrics = metrics;
+        this.clockProvider = clockProvider;
+    }
+
+    // CConstructor for tests
+
+    public LoginRateLimitingFilter(
+            ClockProvider clockProvider,
+            int maxAttempts,
+            long windowSeconds) {
+        this.props = new RateLimitingProperties(
+                true,
+                "ip",
+                maxAttempts,
+                windowSeconds,
+                60L,
+                60L,
+                "/api/v1/auth/login");
+
+        this.keyResolver = req -> req.getRemoteAddr() + "|unknown";
+        this.objectMapper = new ObjectMapper();
+        this.metrics = AuthMetricsServiceNoOp.INSTANCE;
+        this.clockProvider = clockProvider;
     }
 
     @Override
@@ -73,11 +99,11 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
 
         Bucket bucket = buckets.computeIfAbsent(key, k -> {
             Bucket b = new Bucket();
-            b.windowStart = Instant.now();
+            b.windowStart = clockProvider.now();
             return b;
         });
 
-        Instant now = Instant.now();
+        Instant now = clockProvider.now();
 
         // Reset window
         if (bucket.windowStart.plusSeconds(props.window()).isBefore(now)) {

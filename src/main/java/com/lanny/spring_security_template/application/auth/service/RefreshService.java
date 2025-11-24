@@ -6,8 +6,7 @@ import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
-import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
-
+import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +26,7 @@ public class RefreshService {
     private final SecurityJwtProperties props;
     private final ClockProvider clockProvider;
     private final TokenIssuer tokenIssuer;
-    private final AuthMetricsService metrics;
+    private final AuthMetricsServiceImpl metrics;
 
     public JwtResult refresh(RefreshCommand cmd) {
 

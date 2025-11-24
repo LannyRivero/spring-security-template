@@ -1,69 +1,78 @@
 package com.lanny.spring_security_template.infrastructure.jwt;
 
+import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.jwt.key.classpath.ClasspathRsaKeyProvider;
 import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
+import com.lanny.spring_security_template.infrastructure.time.SystemClockProvider;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
+
 import com.nimbusds.jwt.JWTClaimsSet;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
+import java.time.Duration;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * ✅ Integration test for JwtUtils using real RSA keys (classpath)
- * Ensures tokens are generated, signed and validated correctly.
- */
-@SpringBootTest
-@ActiveProfiles("dev")
 class JwtUtilsTest {
 
     private final JwtUtils jwtUtils;
 
     public JwtUtilsTest() {
+
         ClasspathRsaKeyProvider keyProvider = new ClasspathRsaKeyProvider();
-        String issuer = "test-issuer";
-        String audience = "test-audience";
-        long accessExpiration = 3600000L; // 1 hour in milliseconds
-        long refreshExpiration = 86400000L; // 1 day in milliseconds
-        this.jwtUtils = new JwtUtils(keyProvider, issuer, audience, accessExpiration, refreshExpiration);
-   }
+
+        SecurityJwtProperties props = new SecurityJwtProperties(
+                "test-issuer",
+                "test-access-audience",
+                "test-refresh-audience",
+                Duration.ofHours(1),
+                Duration.ofDays(1),
+                "RSA",
+                false,
+                List.of(),
+                List.of(),
+                1);
+
+        ClockProvider clockProvider = new SystemClockProvider();
+
+        this.jwtUtils = new JwtUtils(keyProvider, props, clockProvider);
+    }
 
     @Test
     @DisplayName("🔐 Should generate and validate a valid RSA JWT")
     void shouldGenerateAndValidateAccessToken() {
-        // Generate token
+
         String token = jwtUtils.generateAccessToken(
                 "user@example.com",
                 List.of("ROLE_USER"),
-                List.of("profile:read")
-        );
+                List.of("profile:read"));
 
-        assertNotNull(token, "Token must not be null");
-        assertTrue(token.split("\\.").length == 3, "JWT must have 3 parts");
+        assertNotNull(token);
+        assertEquals(3, token.split("\\.").length);
 
-        // Validate and parse
         JWTClaimsSet claims = jwtUtils.validateAndParse(token);
+
         assertEquals("user@example.com", claims.getSubject());
         assertTrue(((List<?>) claims.getClaim("roles")).contains("ROLE_USER"));
         assertTrue(((List<?>) claims.getClaim("scopes")).contains("profile:read"));
     }
 
     @Test
-    @DisplayName("⏰ Should reject tampered or expired tokens gracefully")
+    @DisplayName("⏰ Should reject tampered or expired tokens")
     void shouldRejectInvalidOrExpiredTokens() {
+
         String token = jwtUtils.generateAccessToken(
                 "expired@example.com",
                 List.of("ROLE_USER"),
-                List.of()
-        );
+                List.of());
 
-        assertDoesNotThrow(() -> jwtUtils.validateAndParse(token), "Token should be valid before expiry");
+        assertDoesNotThrow(() -> jwtUtils.validateAndParse(token));
 
-        // Alter token to break signature
         String tampered = token.replace('a', 'b');
-        assertThrows(RuntimeException.class, () -> jwtUtils.validateAndParse(tampered), "Tampered token must fail verification");
+
+        assertThrows(RuntimeException.class,
+                () -> jwtUtils.validateAndParse(tampered));
     }
 }

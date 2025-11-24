@@ -9,7 +9,7 @@ import com.lanny.spring_security_template.domain.exception.InvalidCredentialsExc
 import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
-import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
+import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,7 @@ public class LoginService {
     private final TokenIssuer tokenIssuer;
     private final SessionManager sessionManager;
     private final RefreshTokenStore refreshTokenStore;
-    private final AuthMetricsService metrics;
+    private final AuthMetricsServiceImpl metrics;
 
     public JwtResult login(LoginCommand cmd) {
 
