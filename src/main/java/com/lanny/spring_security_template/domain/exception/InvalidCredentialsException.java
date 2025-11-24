@@ -1,17 +1,21 @@
 package com.lanny.spring_security_template.domain.exception;
 
 /**
- * Thrown when authentication fails due to invalid username or password.
- * This is a pure domain exception and should be mapped to a 401 Unauthorized
- * by the infrastructure layer.
+ * Thrown when a user attempts to authenticate with invalid credentials.
+ * 
+ * <p>Mapped to <strong>HTTP 401 Unauthorized</strong> in the web layer.
+ * Should never leak details such as whether the username exists.</p>
  */
-public class InvalidCredentialsException extends RuntimeException {
+public class InvalidCredentialsException extends DomainException {
+
+    public static final String CODE = "ERR-AUTH-001";
 
     public InvalidCredentialsException() {
-        super("Invalid username or password");
+        super(CODE, "Invalid username or password");
     }
 
     public InvalidCredentialsException(String message) {
-        super(message);
+        super(CODE, message);
     }
 }
+
