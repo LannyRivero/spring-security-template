@@ -12,9 +12,9 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
+import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
-import com.lanny.spring_security_template.shared.ClockProvider;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;

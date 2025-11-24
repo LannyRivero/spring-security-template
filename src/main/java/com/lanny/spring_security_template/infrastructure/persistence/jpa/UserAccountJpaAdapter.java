@@ -76,7 +76,7 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
         
         if (domain.id() != null) {
             try {
-                entity.setId(domain.id());
+                entity.setId(domain.id().value().toString());
 
             } catch (NumberFormatException ex) {
                 throw new IllegalStateException("Domain user ID must be convertible to Long");

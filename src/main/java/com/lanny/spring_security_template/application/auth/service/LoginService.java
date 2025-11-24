@@ -3,13 +3,13 @@ package com.lanny.spring_security_template.application.auth.service;
 import com.lanny.spring_security_template.application.auth.command.LoginCommand;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
-import com.lanny.spring_security_template.application.auth.port.out.ScopePolicy;
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
+import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.model.User;
-import com.lanny.spring_security_template.domain.model.exception.InvalidCredentialsException;
+import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
-import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
+import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,7 @@ public class LoginService {
     private final TokenIssuer tokenIssuer;
     private final SessionManager sessionManager;
     private final RefreshTokenStore refreshTokenStore;
-    private final AuthMetricsService metrics;
+    private final AuthMetricsServiceImpl metrics;
 
     public JwtResult login(LoginCommand cmd) {
 

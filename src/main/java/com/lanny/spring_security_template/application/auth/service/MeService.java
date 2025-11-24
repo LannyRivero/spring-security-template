@@ -1,12 +1,13 @@
 package com.lanny.spring_security_template.application.auth.service;
 
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
-import com.lanny.spring_security_template.application.auth.port.out.ScopePolicy;
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
+import com.lanny.spring_security_template.domain.model.Role;
+import com.lanny.spring_security_template.domain.model.Scope;
 import com.lanny.spring_security_template.domain.model.User;
-import com.lanny.spring_security_template.domain.valueobject.Role;
-import com.lanny.spring_security_template.domain.valueobject.Scope;
+import com.lanny.spring_security_template.domain.policy.ScopePolicy;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,7 +30,7 @@ public class MeService {
         Set<Scope> scopes = scopePolicy.resolveScopes(roles);
 
         return new MeResult(
-                user.id(),
+                user.id().value().toString(),
                 username,
                 roles.stream().map(Role::name).toList(),
                 scopes.stream().map(Scope::name).toList()

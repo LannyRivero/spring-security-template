@@ -1,8 +1,9 @@
 package com.lanny.spring_security_template.application.auth.service;
 
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
-import com.lanny.spring_security_template.shared.ClockProvider;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

@@ -8,7 +8,7 @@ import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
 import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
 import com.lanny.spring_security_template.domain.valueobject.Username;
-import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
+import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +18,7 @@ public class DevRegisterService {
 
     private final UserAccountGateway userAccountGateway;
     private final PasswordHasher passwordHasher;
-    private final AuthMetricsService metrics;
+    private final AuthMetricsServiceImpl metrics;
 
     public void register(RegisterCommand cmd) {
 
