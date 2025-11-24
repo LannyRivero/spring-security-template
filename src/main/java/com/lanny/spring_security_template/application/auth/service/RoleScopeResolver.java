@@ -2,8 +2,8 @@ package com.lanny.spring_security_template.application.auth.service;
 
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
 import com.lanny.spring_security_template.domain.model.Role;
+import com.lanny.spring_security_template.domain.model.Scope;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
-import com.lanny.spring_security_template.domain.valueobject.Scope;
 
 import java.util.List;
 import java.util.Set;

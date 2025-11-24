@@ -2,7 +2,8 @@ package com.lanny.spring_security_template.infrastructure.security.provider;
 
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
 import com.lanny.spring_security_template.domain.model.Role;
-import com.lanny.spring_security_template.domain.valueobject.Scope;
+import com.lanny.spring_security_template.domain.model.Scope;
+
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 

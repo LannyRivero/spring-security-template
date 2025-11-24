@@ -1,7 +1,5 @@
 package com.lanny.spring_security_template.domain.model;
 
-import com.lanny.spring_security_template.domain.valueobject.Scope;
-
 import java.util.Objects;
 import java.util.Set;
 
