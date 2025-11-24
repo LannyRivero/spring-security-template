@@ -1,16 +1,16 @@
 package com.lanny.spring_security_template.domain.exception;
 
 /**
- * 📕 Domain exception representing a user account that is locked or disabled.
- * 
- * This is part of the domain model — thrown when the aggregate root (User)
- * detects that an operation cannot proceed because the account is not active.
+ * Thrown when a user account is temporarily locked due to security policies,
+ * such as too many failed login attempts.
  */
 public class UserLockedException extends RuntimeException {
 
-    private static final long serialVersionUID = 1L;
+    public UserLockedException() {
+        super("User account is locked");
+    }
 
-    public UserLockedException(String username) {
-        super("User account is locked or disabled: " + username);
+    public UserLockedException(String message) {
+        super(message);
     }
 }
