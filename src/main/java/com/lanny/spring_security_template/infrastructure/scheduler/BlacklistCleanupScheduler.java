@@ -1,7 +1,8 @@
 package com.lanny.spring_security_template.infrastructure.scheduler;
 
 import com.lanny.spring_security_template.application.auth.port.out.BlacklistCleanupGateway;
-import com.lanny.spring_security_template.shared.ClockProvider;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;

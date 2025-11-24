@@ -4,9 +4,10 @@ import com.lanny.spring_security_template.application.auth.command.RefreshComman
 import com.lanny.spring_security_template.application.auth.port.out.*;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
-import com.lanny.spring_security_template.shared.ClockProvider;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
