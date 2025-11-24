@@ -1,71 +1,107 @@
 package com.lanny.spring_security_template.infrastructure.jwt;
 
-
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.testsupport.time.MutableClockProvider;
+import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
 import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
+import com.nimbusds.jwt.JWTClaimsSet;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
 class JwtUtilsTimeTest {
 
-    @Test
-    @DisplayName("Access token should be valid before expiration time")
-    void tokenShouldBeValidBeforeExpiration() {
-        // Arrange
-        Instant start = Instant.parse("2030-01-01T00:00:00Z");
-        MutableClockProvider clock = new MutableClockProvider(start);
+    private JwtUtils newUtils(RsaKeyProvider keys, ClockProvider clock) {
+        // usar properties DEFAULT (como las tienes en @ConfigurationProperties)
+        SecurityJwtProperties props = new SecurityJwtProperties(
+                "issuer-test",
+                "access",
+                "refresh",
+                Duration.ofMinutes(15),
+                Duration.ofDays(7),
+                "RSA",
+                false,
+                List.of(),
+                List.of(),
+                1);
 
-        RsaKeyProvider keys = TestRsaKeys.generate();
-        JwtUtils utils = new JwtUtils(keys, clock);
-
-        String token = utils.generateAccessToken("user123", "my-issuer", 300); // 5 min
-
-        // Act + Assert
-        assertThat(utils.validateAndParse(token)).isPresent();
+        return new JwtUtils(keys, props, clock);
     }
 
     @Test
-    @DisplayName("Access token should expire exactly when TTL is surpassed")
-    void tokenShouldExpireWhenSurpassedTTL() {
-        // Arrange
+    @DisplayName("Access token is valid before expiration")
+    void tokenValidBeforeExpiration() {
+
         Instant start = Instant.parse("2030-01-01T00:00:00Z");
         MutableClockProvider clock = new MutableClockProvider(start);
 
         RsaKeyProvider keys = TestRsaKeys.generate();
-        JwtUtils utils = new JwtUtils(keys, clock);
+        JwtUtils utils = newUtils(keys, clock);
 
-        String token = utils.generateAccessToken("user123", "my-issuer", 60); // 1 min TTL
+        // TTL manual usando el overload generateToken()
+        String token = utils.generateToken(
+                "user123",
+                List.of("ROLE_USER"),
+                List.of("profile:read"),
+                Duration.ofMinutes(5),
+                false);
 
-        // Act — simulate time passing
+        JWTClaimsSet claims = utils.validateAndParse(token);
+        assertThat(claims.getSubject()).isEqualTo("user123");
+    }
+
+    @Test
+    @DisplayName("Access token expires when TTL is surpassed")
+    void tokenExpiresAfterTTL() {
+
+        Instant start = Instant.parse("2030-01-01T00:00:00Z");
+        MutableClockProvider clock = new MutableClockProvider(start);
+
+        RsaKeyProvider keys = TestRsaKeys.generate();
+        JwtUtils utils = newUtils(keys, clock);
+
+        String token = utils.generateToken(
+                "user123",
+                List.of(),
+                List.of(),
+                Duration.ofSeconds(60),
+                false);
+
+        // superamos la expiración
         clock.advanceSeconds(61);
 
-        // Assert
-        assertThat(utils.validateAndParse(token)).isEmpty();
+        assertThatThrownBy(() -> utils.validateAndParse(token))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("expired");
     }
 
     @Test
-    @DisplayName("Refresh token should remain valid even after access token expiration")
-    void refreshTokenShouldRemainValidAfterAccessExpiration() {
-        // Arrange
+    @DisplayName("Refresh token remains valid before expiration")
+    void refreshValidBeforeExpiration() {
+
         Instant start = Instant.parse("2040-01-01T00:00:00Z");
         MutableClockProvider clock = new MutableClockProvider(start);
 
         RsaKeyProvider keys = TestRsaKeys.generate();
-        JwtUtils utils = new JwtUtils(keys, clock);
+        JwtUtils utils = newUtils(keys, clock);
 
-        String refreshToken = utils.generateRefreshToken("userABC", "issuer", 3600); // 1hr
+        String refresh = utils.generateToken(
+                "userABC",
+                List.of(),
+                List.of(),
+                Duration.ofHours(1),
+                true);
 
-        // Move time forward (but not enough to expire)
+        // avanzar 30 min (pero aún no expira)
         clock.advanceSeconds(1800);
 
-        // Act + Assert
-        assertThat(utils.validateAndParse(refreshToken)).isPresent();
+        JWTClaimsSet claims = utils.validateAndParse(refresh);
+        assertThat(claims.getSubject()).isEqualTo("userABC");
     }
 }
-
