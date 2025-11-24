@@ -1,32 +1,46 @@
 package com.lanny.spring_security_template.application.auth.port.in;
 
 import com.lanny.spring_security_template.application.auth.command.*;
+import com.lanny.spring_security_template.application.auth.query.MeQuery;
 import com.lanny.spring_security_template.application.auth.result.*;
 
 /**
- * High-level use case boundary for authentication and token management.
- * Defines core operations exposed to controllers or other application layers.
+ * High-level boundary for authentication and identity-related use cases.
+ * <p>
+ * Acts as the application service contract exposed to controllers or
+ * other incoming adapters (REST, GraphQL, messaging, etc.).
+ * </p>
  */
 public interface AuthUseCase {
 
     /**
-     * Perform user authentication and issue JWT access + refresh tokens.
+     * Authenticate a user using username/email + password
+     * and issue access/refresh JWT tokens.
      */
     JwtResult login(LoginCommand command);
 
     /**
-     * Validate and renew access token using refresh token.
+     * Validate and renew access token using a refresh token.
      */
     JwtResult refresh(RefreshCommand command);
 
     /**
-     * Return profile and authorities of the authenticated user.
+     * Retrieve identity, roles and scopes of the authenticated user.
+     * <p>
+     * This is a read-only operation and therefore implemented
+     * through a Query object instead of raw parameters.
+     * </p>
      */
-    MeResult me(String username);
+    MeResult me(MeQuery query);
 
     /**
-     * Create a developer account in dev environments only.
+     * Create a developer-only account.
+     * <p>
+     * This method must be enabled only for the 'dev' profile and
+     * never exposed in production environments.
+     * </p>
      */
     void registerDev(RegisterCommand command);
 }
+
 
