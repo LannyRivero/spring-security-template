@@ -19,7 +19,6 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -28,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
-@Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 30)
 public class LoginRateLimitingFilter extends OncePerRequestFilter {
 
@@ -50,7 +48,7 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
             RateLimitingProperties props,
             RateLimitKeyResolver keyResolver,
             ObjectMapper objectMapper,
-            AuthMetricsServiceImpl metrics,
+            AuthMetricsService metrics,
             ClockProvider clockProvider) {
         this.props = props;
         this.keyResolver = keyResolver;
