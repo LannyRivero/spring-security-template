@@ -27,17 +27,17 @@ public class RefreshTokenValidator {
      * @throws IllegalArgumentException if any validation rule fails
      */
     public void validate(JwtClaimsDTO claims) {
-        // 1️⃣ Validate audience
+        // 1️Validate audience
         if (claims.aud() == null || !claims.aud().contains(props.refreshAudience())) {
             throw new IllegalArgumentException("Invalid refresh token audience");
         }
 
-        // 2️⃣ Validate existence in store
+        // 2️ Validate existence in store
         if (!refreshTokenStore.exists(claims.jti())) {
             throw new IllegalArgumentException("Refresh token not found (revoked or expired)");
         }
 
-        // 3️⃣ Validate not revoked
+        // 3️ Validate not revoked
         if (blacklist.isRevoked(claims.jti())) {
             throw new IllegalArgumentException("Refresh token revoked or re-used");
         }
