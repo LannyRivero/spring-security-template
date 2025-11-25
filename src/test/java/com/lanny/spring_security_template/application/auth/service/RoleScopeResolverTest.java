@@ -29,7 +29,7 @@ class RoleScopeResolverTest {
 
     @Test
     @DisplayName(" should resolve roles and scopes correctly for given user")
-    void shouldResolveRolesAndScopes() {
+    void testShouldResolveRolesAndScopes() {
         // Arrange
         String username = "lanny";
 
@@ -63,7 +63,7 @@ class RoleScopeResolverTest {
 
     @Test
     @DisplayName(" should return empty lists when no roles or scopes are resolved")
-    void shouldReturnEmptyWhenNoRolesOrScopes() {
+    void testShouldReturnEmptyWhenNoRolesOrScopes() {
         String username = "ghost";
 
         when(roleProvider.resolveRoles(username)).thenReturn(Set.of());
@@ -77,7 +77,7 @@ class RoleScopeResolverTest {
 
     @Test
     @DisplayName(" should normalize role names automatically and merge duplicates")
-    void shouldNormalizeRoleNames() {
+    void testShouldNormalizeRoleNames() {
         // Arrange
         String username = "dup";
         Scope s1 = Scope.of("data:read");
