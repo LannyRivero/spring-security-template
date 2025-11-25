@@ -5,6 +5,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
+
 @Service
 @Profile({ "dev", "prod" })
 public class AuthMetricsServiceImpl implements AuthMetricsService {

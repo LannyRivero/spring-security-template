@@ -1,8 +1,8 @@
 package com.lanny.spring_security_template.infrastructure.security;
 
+import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
-import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
 import com.lanny.spring_security_template.infrastructure.security.filter.LoginRateLimitingFilter;
 import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitKeyResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
