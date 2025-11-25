@@ -1,108 +1,94 @@
 package com.lanny.spring_security_template.application.auth;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
-import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
-import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
-import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
-import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.service.RefreshService;
-import com.lanny.spring_security_template.application.auth.service.RoleScopeResult;
-import com.lanny.spring_security_template.application.auth.service.TokenIssuer;
-import com.lanny.spring_security_template.domain.policy.ScopePolicy;
-import com.lanny.spring_security_template.domain.time.ClockProvider;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
-import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceImpl;
-import com.lanny.spring_security_template.testsupport.time.MutableClockProvider;
+import com.lanny.spring_security_template.application.auth.service.RefreshTokenValidator;
+import com.lanny.spring_security_template.application.auth.service.TokenRefreshResultFactory;
+import com.lanny.spring_security_template.application.auth.service.TokenRotationHandler;
 
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+/**
+ * Integration-style unit test for the new RefreshService orchestration.
+ * Focuses on correct coordination of validator, rotationHandler, and factory.
+ */
 class RefreshServiceTimeTest {
 
-    @Test
-    @DisplayName("Refreshing token should succeed if refresh token has NOT expired")
-    void refreshShouldSucceedBeforeExpiration() {
-        // Arrange
-        Instant start = Instant.parse("2035-01-01T00:00:00Z");
-        ClockProvider clock = new MutableClockProvider(start);
+        @Test
+        @DisplayName(" should refresh tokens successfully before expiration (no rotation)")
+        void testShouldRefreshBeforeExpiration() {
+                // Arrange
+                TokenProvider tokenProvider = mock(TokenProvider.class);
+                RefreshTokenValidator validator = mock(RefreshTokenValidator.class);
+                TokenRotationHandler rotationHandler = mock(TokenRotationHandler.class);
+                TokenRefreshResultFactory resultFactory = mock(TokenRefreshResultFactory.class);
 
-        TokenProvider tokenProvider = mock(TokenProvider.class);
-        RoleProvider roleProvider = mock(RoleProvider.class);
-        ScopePolicy scopePolicy = mock(ScopePolicy.class);
-        RefreshTokenStore refreshTokenStore = mock(RefreshTokenStore.class);
-        SessionRegistryGateway sessionRegistry = mock(SessionRegistryGateway.class);
-        TokenBlacklistGateway blacklist = mock(TokenBlacklistGateway.class);
-        SecurityJwtProperties props = mock(SecurityJwtProperties.class);
-        TokenIssuer tokenIssuer = mock(TokenIssuer.class);
-        AuthMetricsServiceImpl metrics = mock(AuthMetricsServiceImpl.class);
+                RefreshService service = new RefreshService(
+                                tokenProvider, validator, rotationHandler, resultFactory);
 
-        // Configuración mínima necesaria para el test
-        when(props.refreshAudience()).thenReturn("auth-service");
-        when(props.accessTtl()).thenReturn(Duration.ofMinutes(15));
-        when(props.rotateRefreshTokens()).thenReturn(false);
+                String refreshToken = "valid-refresh-token";
 
-        String refresh = "valid-refresh-token";
+                JwtClaimsDTO claims = new JwtClaimsDTO(
+                                "alice",
+                                "jti-123",
+                                List.of("refresh_audience"),
+                                1000L,
+                                1000L,
+                                2000L,
+                                List.of("ROLE_USER"),
+                                List.of("profile:read"));
 
-        // Simulamos claims válidos
-        JwtClaimsDTO claims = new JwtClaimsDTO(
-                "alice",
-                "jti-123",
-                List.of("auth-service"),
-                1000L,
-                1000L,
-                2000L,
-                List.of("ROLE_USER"),
-                List.of("profile:read"));
+                // Simulamos validación correcta y no rotación
+                when(tokenProvider.validateAndGetClaims(refreshToken)).thenReturn(Optional.of(claims));
+                when(rotationHandler.shouldRotate()).thenReturn(false);
 
-        when(tokenProvider.validateAndGetClaims(refresh)).thenReturn(java.util.Optional.of(claims));
-        when(refreshTokenStore.exists("jti-123")).thenReturn(true);
-        when(blacklist.isRevoked("jti-123")).thenReturn(false);
+                JwtResult expected = new JwtResult("new-access-token", refreshToken, Instant.now());
+                when(resultFactory.newAccessOnly(claims, refreshToken)).thenReturn(expected);
 
-        // Para que RoleScopeResolver no falle: roles + scopes reconstr
-        RoleScopeResult rs = new RoleScopeResult(
-                List.of("ROLE_USER"),
-                List.of("profile:read"));
-        // Como RoleScopeResolver es estático, puedes:
-        // - usar una versión real sobre tus mocks
-        // - o si eso te complica, aislarlo en otro test.
-        // Para mantenerlo simple, asumimos que funciona y que el
-        // tokenProvider.generateAccessToken se usa.
+                // Act
+                JwtResult result = service.refresh(new RefreshCommand(refreshToken));
 
-        when(tokenProvider.generateAccessToken(
-                eq("alice"),
-                eq(rs.roleNames()),
-                eq(rs.scopeNames()),
-                any())).thenReturn("new-access-token");
+                // Assert
+                assertThat(result).isEqualTo(expected);
+                verify(validator).validate(claims);
+                verify(resultFactory).newAccessOnly(claims, refreshToken);
+                verify(rotationHandler).shouldRotate();
+                verify(rotationHandler, never()).rotate(any());
 
-        RefreshService service = new RefreshService(
-                tokenProvider,
-                roleProvider,
-                scopePolicy,
-                refreshTokenStore,
-                sessionRegistry,
-                blacklist,
-                props,
-                clock,
-                tokenIssuer,
-                metrics);
+        }
 
-        // Act
-        JwtResult result = service.refresh(new RefreshCommand(refresh));
+        @Test
+        @DisplayName(" should throw when refresh token is invalid (no claims)")
+        void testRefreshShouldFailWhenTokenInvalid() {
+                // Arrange
+                TokenProvider tokenProvider = mock(TokenProvider.class);
+                RefreshTokenValidator validator = mock(RefreshTokenValidator.class);
+                TokenRotationHandler rotationHandler = mock(TokenRotationHandler.class);
+                TokenRefreshResultFactory resultFactory = mock(TokenRefreshResultFactory.class);
 
-        // Assert
-        assertThat(result).isNotNull();
-        assertThat(result.accessToken()).isEqualTo("new-access-token");
-        assertThat(result.refreshToken()).isEqualTo(refresh);
-    }
+                RefreshService service = new RefreshService(
+                                tokenProvider, validator, rotationHandler, resultFactory);
+
+                when(tokenProvider.validateAndGetClaims("invalid-token"))
+                                .thenReturn(Optional.empty());
+
+                // Act + Assert
+                assertThatThrownBy(() -> service.refresh(new RefreshCommand("invalid-token")))
+                                .isInstanceOf(IllegalArgumentException.class)
+                                .hasMessage("Invalid refresh token");
+
+                verifyNoInteractions(validator, rotationHandler, resultFactory);
+        }
 }
