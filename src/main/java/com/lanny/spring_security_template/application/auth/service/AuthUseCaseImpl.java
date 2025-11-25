@@ -4,6 +4,7 @@ import com.lanny.spring_security_template.application.auth.command.LoginCommand;
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
 import com.lanny.spring_security_template.application.auth.command.RegisterCommand;
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
+import com.lanny.spring_security_template.application.auth.query.MeQuery;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
 import lombok.RequiredArgsConstructor;
@@ -29,8 +30,8 @@ public class AuthUseCaseImpl implements AuthUseCase {
     }
 
     @Override
-    public MeResult me(String username) {
-        return meService.me(username);
+    public MeResult me(MeQuery query) {
+        return meService.me(query.username());
     }
 
     @Override

@@ -1,5 +1,8 @@
 package com.lanny.spring_security_template.domain.model;
 
+import java.util.List;
+import java.util.Objects;
+
 import com.lanny.spring_security_template.domain.exception.UserDeletedException;
 import com.lanny.spring_security_template.domain.exception.UserDisabledException;
 import com.lanny.spring_security_template.domain.exception.UserLockedException;
@@ -9,12 +12,19 @@ import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
 import com.lanny.spring_security_template.domain.valueobject.UserId;
 import com.lanny.spring_security_template.domain.valueobject.Username;
 
-import java.util.List;
-import java.util.Objects;
-
 /**
- * Domain aggregate representing an authenticated user.
- * Clean version using Value Objects and without infrastructure dependencies.
+ * Aggregate root representing a system user.
+ *
+ * <p>
+ * Applies all domain rules related to authentication, status validation,
+ * password verification and identity consistency, while keeping all fields
+ * immutable.
+ * </p>
+ *
+ * <p>
+ * This aggregate is pure domain code: it contains no references to
+ * infrastructure, frameworks or annotations.
+ * </p>
  */
 public final class User {
 
@@ -26,15 +36,18 @@ public final class User {
     private final List<String> roles;
     private final List<String> scopes;
 
-    public User(
-            String id,
+    // ======================================================
+    // CONSTRUCTOR PRIVADO
+    // ======================================================
+    private User(
+            UserId id,
             Username username,
             EmailAddress email,
             PasswordHash passwordHash,
             UserStatus status,
             List<String> roles,
             List<String> scopes) {
-        this.id = UserId.from(id);
+        this.id = Objects.requireNonNull(id);
         this.username = Objects.requireNonNull(username);
         this.email = Objects.requireNonNull(email);
         this.passwordHash = Objects.requireNonNull(passwordHash);
@@ -43,27 +56,100 @@ public final class User {
         this.scopes = List.copyOf(scopes);
     }
 
-    // /** BUSINESS RULE- Block authentication based on user status */
+    // ======================================================
+    // FACTORY METHODS
+    // ======================================================
+
+    /**
+     * Creates a new active user with default roles/scopes.
+     * Used typically in registration flows (dev/admin).
+     */
+    public static User createNew(
+            Username username,
+            EmailAddress email,
+            PasswordHash passwordHash,
+            List<String> roles,
+            List<String> scopes) {
+        return new User(
+                UserId.newId(),
+                username,
+                email,
+                passwordHash,
+                UserStatus.ACTIVE,
+                sanitize(roles),
+                sanitize(scopes));
+    }
+
+    /**
+     * Reconstructs an existing user (hydration from persistence).
+     */
+    public static User rehydrate(
+            UserId id,
+            Username username,
+            EmailAddress email,
+            PasswordHash passwordHash,
+            UserStatus status,
+            List<String> roles,
+            List<String> scopes) {
+        return new User(
+                id,
+                username,
+                email,
+                passwordHash,
+                status,
+                sanitize(roles),
+                sanitize(scopes));
+    }
+
+    // ======================================================
+    // DOMAIN RULES
+    // ======================================================
+
+    /**
+     * Ensures the user can authenticate.
+     * Throws domain exceptions depending on status:
+     * - LOCKED → UserLockedException
+     * - DISABLED → UserDisabledException
+     * - DELETED → UserDeletedException
+     */
     public void ensureCanAuthenticate() {
         switch (status) {
             case LOCKED -> throw new UserLockedException("User " + username.value() + " is locked");
             case DISABLED -> throw new UserDisabledException("User " + username.value() + " is disabled");
             case DELETED -> throw new UserDeletedException("User " + username.value() + " is deleted");
             default -> {
-                /* ACTIVE: allowed */ }
+                /* ACTIVE */ }
         }
     }
 
     /**
-     * Validate password using domain hashing
-     * IMPORTANT: This method ALWAYS call ensureCanAuthenticate() before hashing
+     * Verifies a password and throws the appropriate domain exception if invalid.
+     * Used in login flows.
      */
-    public boolean passwordMatches(String rawPassword, PasswordHasher hasher) {
+    public void verifyPassword(String rawPassword, PasswordHasher hasher) {
         ensureCanAuthenticate();
-        return hasher.matches(rawPassword, this.passwordHash.value());
+        if (!hasher.matches(rawPassword, passwordHash.value())) {
+            throw new com.lanny.spring_security_template.domain.exception.InvalidCredentialsException(
+                    "Invalid password for " + username.value());
+        }
     }
 
-    // --- Getters ---
+    // ======================================================
+    // INTERNAL SANITIZATION
+    // ======================================================
+
+    private static List<String> sanitize(List<String> list) {
+        Objects.requireNonNull(list);
+        return list.stream()
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .toList();
+    }
+
+    // ======================================================
+    // GETTERS (IMMUTABLE)
+    // ======================================================
+
     public UserId id() {
         return id;
     }
@@ -92,7 +178,10 @@ public final class User {
         return scopes;
     }
 
-    // --- Equality based on ID ---
+    // ======================================================
+    // IDENTITY
+    // ======================================================
+
     @Override
     public boolean equals(Object o) {
         if (this == o)

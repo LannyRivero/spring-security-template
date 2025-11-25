@@ -32,9 +32,13 @@ public class LoginService {
         User user = userAccountGateway.findByUsernameOrEmail(cmd.username())
                 .orElseThrow(() -> new UsernameNotFoundException(cmd.username()));
 
+        // Validación de estado (locked, disabled, deleted)
         user.ensureCanAuthenticate();
 
-        if (!user.passwordMatches(cmd.password(), passwordHasher)) {
+        // Validación de contraseña 
+        try {
+            user.verifyPassword(cmd.password(), passwordHasher);
+        } catch (InvalidCredentialsException e) {
             metrics.recordLoginFailure();
             throw new InvalidCredentialsException("Invalid username or password");
         }
@@ -54,11 +58,12 @@ public class LoginService {
                 tokens.issuedAt(),
                 tokens.refreshExp());
 
-        // 4) Registrar sesión + aplicar política de sesiones
+        // 4) Registrar sesión
         sessionManager.register(tokens);
 
         metrics.recordLoginSuccess();
 
         return tokens.toJwtResult();
     }
+
 }
