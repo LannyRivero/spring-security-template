@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.auth;
+package com.lanny.spring_security_template.application.auth;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
