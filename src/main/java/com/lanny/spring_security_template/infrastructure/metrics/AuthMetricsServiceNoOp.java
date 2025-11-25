@@ -1,5 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.metrics;
 
+import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
+
 /**
  * No-op implementation used in tests.
  */

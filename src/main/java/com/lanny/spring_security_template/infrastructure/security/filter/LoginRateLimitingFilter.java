@@ -2,9 +2,9 @@ package com.lanny.spring_security_template.infrastructure.security.filter;
 
 import com.lanny.spring_security_template.infrastructure.security.handler.ApiError;
 import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitKeyResolver;
+import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
-import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsService;
 import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceNoOp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
