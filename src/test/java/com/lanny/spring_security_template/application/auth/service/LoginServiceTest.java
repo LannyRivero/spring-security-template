@@ -17,35 +17,27 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import com.lanny.spring_security_template.application.auth.command.LoginCommand;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
+import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.exception.UserLockedException;
 import com.lanny.spring_security_template.domain.model.User;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.domain.valueobject.Username;
 
 /**
- * Unit tests for {@link LoginService}.
+ * ✅ Unit tests for {@link LoginService}.
  *
  * <p>
- * Verifies orchestration between:
+ * Verifica la orquestación de los flujos principales:
  * </p>
  * <ul>
- * <li>{@link AuthenticationValidator}</li>
- * <li>{@link TokenSessionCreator}</li>
- * <li>{@link LoginMetricsRecorder}</li>
- * <li>{@link LoginAttemptPolicy}</li>
+ * <li>Login exitoso</li>
+ * <li>Usuario bloqueado</li>
+ * <li>Credenciales inválidas</li>
+ * <li>Usuario inexistente</li>
+ * <li>Errores inesperados</li>
  * </ul>
- *
- * <p>
- * Ensures correct behavior for:
- * <ul>
- * <li>Successful authentication</li>
- * <li>Invalid credentials</li>
- * <li>User not found</li>
- * <li>Temporary user lockout (brute-force protection)</li>
- * <li>Unexpected exceptions</li>
- * </ul>
- * </p>
  */
 @ExtendWith(MockitoExtension.class)
 class LoginServiceTest {
@@ -58,6 +50,10 @@ class LoginServiceTest {
     private LoginMetricsRecorder metrics;
     @Mock
     private LoginAttemptPolicy loginAttemptPolicy;
+    @Mock
+    private ClockProvider clockProvider;
+    @Mock
+    private AuditEventPublisher auditEventPublisher;
 
     @InjectMocks
     private LoginService loginService;
@@ -68,7 +64,9 @@ class LoginServiceTest {
     @BeforeEach
     void setUp() {
         cmd = new LoginCommand("lanny", "1234");
-        jwtResult = new JwtResult("access-token", "refresh-token", Instant.now());
+        jwtResult = new JwtResult("access-token", "refresh-token", Instant.parse("2025-01-01T00:00:00Z"));
+
+        when(clockProvider.now()).thenReturn(Instant.parse("2025-01-01T00:00:00Z"));
     }
 
     @Test
@@ -86,12 +84,15 @@ class LoginServiceTest {
 
         // Assert
         assertThat(result).isEqualTo(jwtResult);
+
         verify(loginAttemptPolicy).isUserLocked("lanny");
         verify(validator).validate(cmd);
         verify(tokenCreator).create("lanny");
         verify(loginAttemptPolicy).resetAttempts("lanny");
-        verify(metrics).recordSuccess();
-        verify(metrics, never()).recordFailure();
+        verify(metrics).recordSuccess("lanny");
+        verify(metrics, never()).recordFailure(anyString(), anyString());
+        verify(auditEventPublisher, atLeastOnce())
+                .publishAuthEvent(anyString(), eq("lanny"), any(), anyString());
     }
 
     @Test
@@ -106,7 +107,9 @@ class LoginServiceTest {
                 .hasMessageContaining("lanny");
 
         verify(loginAttemptPolicy).isUserLocked("lanny");
-        verify(metrics).recordFailure();
+        verify(metrics).recordFailure(eq("lanny"), contains("locked"));
+        verify(auditEventPublisher).publishAuthEvent(
+                anyString(), eq("lanny"), any(), contains("locked"));
         verifyNoInteractions(validator, tokenCreator);
     }
 
@@ -115,7 +118,8 @@ class LoginServiceTest {
     void testShouldRecordFailureOnInvalidCredentials() {
         // Arrange
         when(loginAttemptPolicy.isUserLocked("lanny")).thenReturn(false);
-        when(validator.validate(cmd)).thenThrow(new InvalidCredentialsException("Invalid username or password"));
+        when(validator.validate(cmd))
+                .thenThrow(new InvalidCredentialsException("Invalid username or password"));
 
         // Act & Assert
         assertThatThrownBy(() -> loginService.login(cmd))
@@ -125,7 +129,8 @@ class LoginServiceTest {
         verify(loginAttemptPolicy).isUserLocked("lanny");
         verify(validator).validate(cmd);
         verify(loginAttemptPolicy).recordFailedAttempt("lanny");
-        verify(metrics).recordFailure();
+        verify(metrics).recordFailure(eq("lanny"), contains("Invalid"));
+        verify(metrics, never()).recordSuccess(anyString());
         verifyNoInteractions(tokenCreator);
     }
 
@@ -144,8 +149,8 @@ class LoginServiceTest {
         verify(loginAttemptPolicy).isUserLocked("lanny");
         verify(validator).validate(cmd);
         verify(loginAttemptPolicy).recordFailedAttempt("lanny");
-        verify(metrics).recordFailure();
-        verify(metrics, never()).recordSuccess();
+        verify(metrics).recordFailure(eq("lanny"), anyString());
+        verify(metrics, never()).recordSuccess(anyString());
         verifyNoInteractions(tokenCreator);
     }
 
@@ -163,8 +168,8 @@ class LoginServiceTest {
 
         verify(loginAttemptPolicy).isUserLocked("lanny");
         verify(validator).validate(cmd);
-        verify(metrics, never()).recordSuccess();
-        verify(metrics, never()).recordFailure();
+        verify(metrics, never()).recordSuccess(anyString());
+        verify(metrics, never()).recordFailure(anyString(), anyString());
         verify(loginAttemptPolicy, never()).recordFailedAttempt(anyString());
         verifyNoInteractions(tokenCreator);
     }

@@ -1,26 +1,28 @@
 package com.lanny.spring_security_template.application.auth.service;
 
-import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
+import static org.mockito.Mockito.*;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import static org.mockito.Mockito.*;
+import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
 
 /**
  * Unit tests for {@link LoginMetricsRecorder}.
- * Verifies that success/failure metrics are delegated correctly.
+ * Verifies that contextual metrics are delegated correctly.
  */
 class LoginMetricsRecorderTest {
 
     @Test
-    @DisplayName(" should record login success and delegate to AuthMetricsService")
+    @DisplayName("should record login success and delegate to AuthMetricsService")
     void testShouldRecordLoginSuccess() {
         // Arrange
         AuthMetricsService metrics = mock(AuthMetricsService.class);
         LoginMetricsRecorder recorder = new LoginMetricsRecorder(metrics);
+        String username = "lanny";
 
         // Act
-        recorder.recordSuccess();
+        recorder.recordSuccess(username);
 
         // Assert
         verify(metrics).recordLoginSuccess();
@@ -29,14 +31,16 @@ class LoginMetricsRecorderTest {
     }
 
     @Test
-    @DisplayName(" should record login failure and not call success")
+    @DisplayName("should record login failure and delegate correctly")
     void testShouldRecordLoginFailure() {
         // Arrange
         AuthMetricsService metrics = mock(AuthMetricsService.class);
         LoginMetricsRecorder recorder = new LoginMetricsRecorder(metrics);
+        String username = "lanny";
+        String reason = "invalid_password";
 
         // Act
-        recorder.recordFailure();
+        recorder.recordFailure(username, reason);
 
         // Assert
         verify(metrics).recordLoginFailure();
@@ -44,4 +48,3 @@ class LoginMetricsRecorderTest {
         verifyNoMoreInteractions(metrics);
     }
 }
-
