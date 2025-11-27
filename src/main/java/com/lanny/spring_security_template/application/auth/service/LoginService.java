@@ -2,10 +2,16 @@ package com.lanny.spring_security_template.application.auth.service;
 
 import com.lanny.spring_security_template.application.auth.command.LoginCommand;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
+import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.exception.UserLockedException;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
+
 import lombok.RequiredArgsConstructor;
+
+import java.time.Instant;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -53,6 +59,8 @@ public class LoginService {
     private final TokenSessionCreator tokenCreator;
     private final LoginMetricsRecorder metrics;
     private final LoginAttemptPolicy loginAttemptPolicy;
+    private final AuditEventPublisher auditEventPublisher;
+    private final ClockProvider clockProvider;
 
     /**
      * Performs the login flow:
@@ -71,10 +79,17 @@ public class LoginService {
      */
     public JwtResult login(LoginCommand cmd) {
         String username = cmd.username();
+        Instant now = clockProvider.now();
 
         if (loginAttemptPolicy.isUserLocked(username)) {
             metrics.recordFailure();
             log.warn("[AUTH_LOCK] User '{}' attempted login while locked", username);
+
+            auditEventPublisher.publishAuthEvent(
+                "USER_LOCKED",
+                 username, 
+                 now, 
+                 "User attempted login while locked due to excessive failed attempts");
             throw new UserLockedException(username);
         }
 
@@ -87,12 +102,26 @@ public class LoginService {
             loginAttemptPolicy.resetAttempts(username);
 
             log.info("[AUTH_SUCCESS] User '{}' logged in successfully", username);
+            auditEventPublisher.publishAuthEvent(
+                "USER_LOGGED_IN", 
+                username, 
+                now, 
+                "Successful authentication and token issuance");
+
             return result;
 
         } catch (InvalidCredentialsException | UsernameNotFoundException e) {
             loginAttemptPolicy.recordFailedAttempt(username);
             metrics.recordFailure();
             log.warn("[AUTH_FAIL] Invalid credentials for user '{}': {}", username, e.getMessage());
+
+            auditEventPublisher.publishAuthEvent(
+                "LOGIN_FAILED", 
+                username, 
+                now,
+                 e.getMessage()
+                 );
+            
             throw e;
         }
     }
