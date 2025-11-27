@@ -1,7 +1,9 @@
 package com.lanny.spring_security_template.application.auth.service;
 
 import java.time.Instant;
+import java.util.UUID;
 
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
@@ -36,12 +38,24 @@ public class RefreshService {
      * @return new JWT access/refresh pair or access-only result
      */
     public JwtResult refresh(RefreshCommand cmd) {
-        return tokenProvider.validateAndGetClaims(cmd.refreshToken())
-                .map(claims -> handleRefresh(claims, cmd))
-                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+        String traceId = UUID.randomUUID().toString();
+        MDC.put("traceId", traceId);
+
+        try {
+
+            return tokenProvider.validateAndGetClaims(cmd.refreshToken())
+                    .map(claims -> handleRefresh(claims, cmd))
+                    .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+        } finally {
+            MDC.clear();
+        }
     }
 
     private JwtResult handleRefresh(JwtClaimsDTO claims, RefreshCommand cmd) {
+        String username = claims.sub();
+
+        MDC.put("username", username);
+
         // Step 1️ Validate refresh token integrity
         validator.validate(claims);
 
@@ -53,14 +67,14 @@ public class RefreshService {
             result = rotationHandler.rotate(claims);
             auditEventPublisher.publishAuthEvent(
                     "TOKEN_ROTATED",
-                    claims.sub(),
+                    username,
                     now,
                     "Refresh token rotated and new session issued");
         } else {
             result = resultFactory.newAccessOnly(claims, cmd.refreshToken());
             auditEventPublisher.publishAuthEvent(
-                    "ROKEN_REFRESHED",
-                    claims.sub(),
+                    "TOKEN_REFRESHED",
+                    username,
                     now,
                     "Access token refreshed without rotation");
         }

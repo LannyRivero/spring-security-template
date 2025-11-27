@@ -14,6 +14,7 @@ import java.time.Instant;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -123,6 +124,8 @@ public class LoginService {
                  );
             
             throw e;
+        } finally {
+            MDC.clear();
         }
     }
 }
