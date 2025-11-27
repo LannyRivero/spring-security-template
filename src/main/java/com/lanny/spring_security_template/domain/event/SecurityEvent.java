@@ -4,40 +4,34 @@ package com.lanny.spring_security_template.domain.event;
  * Enumeration of standardized security-related events.
  *
  * <p>
- * This enum defines all relevant events that can be emitted by
- * {@link com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher}
- * across authentication, authorization, and session management flows.
+ * Defines all relevant events emitted by the authentication and session
+ * subsystems.
+ * Each constant represents a distinct security lifecycle event, ensuring
+ * uniform
+ * audit logging and observability integration across the platform.
  * </p>
  *
  * <p>
- * Each constant represents a unique event type used for:
- * <ul>
- * <li>Security audits</li>
- * <li>Monitoring and alerting (Prometheus, Loki, ELK)</li>
- * <li>Event streaming (Kafka, Webhooks, SIEM)</li>
- * </ul>
+ * <strong>Aligned with OWASP ASVS:</strong>
  * </p>
- *
- * <p>
- * Following <strong>OWASP ASVS</strong> recommendations:
  * <ul>
  * <li>2.10.1 – Log all authentication decisions</li>
  * <li>2.10.3 – Log all session management events</li>
  * <li>2.10.4 – Include enough context for traceability</li>
+ * <li>2.8.x – Password change and recovery flows</li>
  * </ul>
- * </p>
  *
  * <p>
- * Typical usage:
+ * <strong>Typical usage:</strong>
+ * </p>
  * 
  * <pre>{@code
  * auditEventPublisher.publishAuthEvent(
- *         SecurityEvent.LOGIN_FAILURE.name(),
+ *         SecurityEvent.LOGIN_SUCCESS.name(),
  *         username,
  *         clockProvider.now(),
- *         "Invalid credentials");
+ *         "User authenticated successfully");
  * }</pre>
- * </p>
  */
 public enum SecurityEvent {
 
@@ -47,7 +41,9 @@ public enum SecurityEvent {
     /** Failed user authentication (invalid credentials or unknown user) */
     LOGIN_FAILURE,
 
-    /** Successful token refresh */
+    LOGIN_ATTEMPT,
+
+    /** Token successfully refreshed */
     TOKEN_REFRESH,
 
     /** Token rotation occurred (old token revoked, new issued) */
@@ -55,13 +51,25 @@ public enum SecurityEvent {
 
     /** Token explicitly revoked (logout, rotation, admin action) */
     TOKEN_REVOKED,
-    
+
     /** Token(s) issued (login, refresh, rotation) */
     TOKEN_ISSUED,
 
-    /** User account temporarily locked (e.g., due to brute-force protection) */
+    /** User account temporarily locked due to brute-force protection */
     USER_LOCKED,
 
-    /** User successfully logged in */
-    USER_LOGGED_IN
+    /** Password successfully changed by user */
+    PASSWORD_CHANGED,
+
+    /** Password change failed (invalid current password or weak new password) */
+    PASSWORD_CHANGE_FAILED;
+
+    /**
+     * Returns a standardized code for external logging or metrics.
+     * 
+     * @return code in format SEC_EVENTNAME (e.g. SEC_LOGIN_SUCCESS)
+     */
+    public String code() {
+        return "SEC_" + name();
+    }
 }

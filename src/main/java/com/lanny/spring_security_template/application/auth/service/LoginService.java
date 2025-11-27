@@ -105,7 +105,7 @@ public class LoginService {
 
             log.info("[AUTH_SUCCESS] User '{}' logged in successfully", username);
             auditEventPublisher.publishAuthEvent(
-                SecurityEvent.USER_LOGGED_IN.name(), 
+                SecurityEvent.LOGIN_SUCCESS.name(), 
                 username, 
                 now, 
                 "Successful authentication and token issuance");
