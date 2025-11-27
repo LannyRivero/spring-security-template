@@ -2,10 +2,10 @@ package com.lanny.spring_security_template.application.auth.service;
 
 import org.springframework.stereotype.Component;
 
+import com.lanny.spring_security_template.application.auth.policy.RefreshTokenPolicy;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 
 import lombok.RequiredArgsConstructor;
 
@@ -19,7 +19,7 @@ public class RefreshTokenValidator {
 
     private final RefreshTokenStore refreshTokenStore;
     private final TokenBlacklistGateway blacklist;
-    private final SecurityJwtProperties props;
+    private final RefreshTokenPolicy policy;
 
     /**
      * Perform all validation checks on the given JWT claims.
@@ -28,7 +28,7 @@ public class RefreshTokenValidator {
      */
     public void validate(JwtClaimsDTO claims) {
         // 1️Validate audience
-        if (claims.aud() == null || !claims.aud().contains(props.refreshAudience())) {
+        if (claims.aud() == null || !claims.aud().contains(policy.expectedRefreshAudience())) {
             throw new IllegalArgumentException("Invalid refresh token audience");
         }
 

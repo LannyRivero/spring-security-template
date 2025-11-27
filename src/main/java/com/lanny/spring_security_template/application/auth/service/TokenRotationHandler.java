@@ -1,11 +1,10 @@
 package com.lanny.spring_security_template.application.auth.service;
 
+import com.lanny.spring_security_template.application.auth.policy.RotationPolicy;
 import com.lanny.spring_security_template.application.auth.port.out.*;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
-import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -25,12 +24,12 @@ public class TokenRotationHandler {
     private final RefreshTokenStore refreshTokenStore;
     private final SessionRegistryGateway sessionRegistry;
     private final TokenBlacklistGateway blacklist;
-    private final SecurityJwtProperties props;
-    private final AuthMetricsServiceImpl metrics;
+    private final RotationPolicy rotationPolicy;
+    private final AuthMetricsService metrics;
 
     /** Checks whether refresh token rotation is enabled */
     public boolean shouldRotate() {
-        return props.rotateRefreshTokens();
+        return rotationPolicy.isRotationEnabled();
     }
 
     /** Performs full rotation and returns new JWT result */

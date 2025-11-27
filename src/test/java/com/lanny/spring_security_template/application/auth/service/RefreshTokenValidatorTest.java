@@ -1,9 +1,9 @@
 package com.lanny.spring_security_template.application.auth.service;
 
+import com.lanny.spring_security_template.application.auth.policy.RefreshTokenPolicy;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -21,9 +21,9 @@ class RefreshTokenValidatorTest {
 
     private final RefreshTokenStore refreshTokenStore = mock(RefreshTokenStore.class);
     private final TokenBlacklistGateway blacklist = mock(TokenBlacklistGateway.class);
-    private final SecurityJwtProperties props = mock(SecurityJwtProperties.class);
+    private final RefreshTokenPolicy policy = mock(RefreshTokenPolicy.class);
 
-    private final RefreshTokenValidator validator = new RefreshTokenValidator(refreshTokenStore, blacklist, props);
+    private final RefreshTokenValidator validator = new RefreshTokenValidator(refreshTokenStore, blacklist, policy);
 
     private JwtClaimsDTO createClaims(String audValue) {
         return new JwtClaimsDTO(
@@ -42,7 +42,7 @@ class RefreshTokenValidatorTest {
     void shouldValidateSuccessfully() {
         // Arrange
         JwtClaimsDTO claims = createClaims("refresh-service");
-        when(props.refreshAudience()).thenReturn("refresh-service");
+        when(policy.expectedRefreshAudience()).thenReturn("refresh-service");
         when(refreshTokenStore.exists("jti-001")).thenReturn(true);
         when(blacklist.isRevoked("jti-001")).thenReturn(false);
 
@@ -58,7 +58,7 @@ class RefreshTokenValidatorTest {
     @DisplayName(" should throw when audience is invalid")
     void shouldThrowWhenInvalidAudience() {
         JwtClaimsDTO claims = createClaims("wrong-service");
-        when(props.refreshAudience()).thenReturn("refresh-service");
+        when(policy.expectedRefreshAudience()).thenReturn("refresh-service");
 
         assertThatThrownBy(() -> validator.validate(claims))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -72,7 +72,7 @@ class RefreshTokenValidatorTest {
     @DisplayName(" should throw when token not found in store")
     void shouldThrowWhenTokenNotFound() {
         JwtClaimsDTO claims = createClaims("refresh-service");
-        when(props.refreshAudience()).thenReturn("refresh-service");
+        when(policy.expectedRefreshAudience()).thenReturn("refresh-service");
         when(refreshTokenStore.exists("jti-001")).thenReturn(false);
 
         assertThatThrownBy(() -> validator.validate(claims))
@@ -87,7 +87,7 @@ class RefreshTokenValidatorTest {
     @DisplayName(" should throw when token is revoked or re-used")
     void shouldThrowWhenTokenRevoked() {
         JwtClaimsDTO claims = createClaims("refresh-service");
-        when(props.refreshAudience()).thenReturn("refresh-service");
+        when(policy.expectedRefreshAudience()).thenReturn("refresh-service");
         when(refreshTokenStore.exists("jti-001")).thenReturn(true);
         when(blacklist.isRevoked("jti-001")).thenReturn(true);
 

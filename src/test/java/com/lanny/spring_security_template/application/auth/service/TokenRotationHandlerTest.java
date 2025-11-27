@@ -12,6 +12,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.lanny.spring_security_template.application.auth.policy.RotationPolicy;
+import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
 import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
@@ -19,8 +21,6 @@ import com.lanny.spring_security_template.application.auth.port.out.TokenBlackli
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
-import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceImpl;
 
 /**
  * Unit tests for {@link TokenRotationHandler}.
@@ -34,8 +34,8 @@ class TokenRotationHandlerTest {
     private RefreshTokenStore refreshTokenStore;
     private SessionRegistryGateway sessionRegistry;
     private TokenBlacklistGateway blacklist;
-    private SecurityJwtProperties props;
-    private AuthMetricsServiceImpl metrics;
+    private RotationPolicy rotationPolicy;
+    private AuthMetricsService metrics;
     private TokenRotationHandler handler;
 
     private static final String USERNAME = "lanny";
@@ -53,13 +53,13 @@ class TokenRotationHandlerTest {
         refreshTokenStore = mock(RefreshTokenStore.class);
         sessionRegistry = mock(SessionRegistryGateway.class);
         blacklist = mock(TokenBlacklistGateway.class);
-        props = mock(SecurityJwtProperties.class);
-        metrics = mock(AuthMetricsServiceImpl.class);
+        rotationPolicy = mock(RotationPolicy.class);
+        metrics = mock(AuthMetricsService.class);
 
         handler = new TokenRotationHandler(
                 roleProvider, scopePolicy, tokenIssuer,
                 refreshTokenStore, sessionRegistry, blacklist,
-                props, metrics);
+                rotationPolicy, metrics);
 
         // Datos base
         claims = new JwtClaimsDTO(
@@ -118,14 +118,14 @@ class TokenRotationHandlerTest {
     @Test
     @DisplayName(" should return true when rotation enabled in properties")
     void testShouldRotateWhenEnabled() {
-        when(props.rotateRefreshTokens()).thenReturn(true);
+        when(rotationPolicy.isRotationEnabled()).thenReturn(true);
         assertThat(handler.shouldRotate()).isTrue();
     }
 
     @Test
     @DisplayName(" should return false when rotation disabled in properties")
     void testShouldNotRotateWhenDisabled() {
-        when(props.rotateRefreshTokens()).thenReturn(false);
+        when(rotationPolicy.isRotationEnabled()).thenReturn(false);
         assertThat(handler.shouldRotate()).isFalse();
     }
 }

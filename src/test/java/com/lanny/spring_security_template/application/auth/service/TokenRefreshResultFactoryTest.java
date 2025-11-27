@@ -1,12 +1,12 @@
 package com.lanny.spring_security_template.application.auth.service;
 
+import com.lanny.spring_security_template.application.auth.policy.TokenPolicyProperties;
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ class TokenRefreshResultFactoryTest {
     private ScopePolicy scopePolicy;
     private TokenProvider tokenProvider;
     private ClockProvider clockProvider;
-    private SecurityJwtProperties props;
+    private TokenPolicyProperties tokenPolicy;
 
     private TokenRefreshResultFactory factory;
 
@@ -46,12 +46,12 @@ class TokenRefreshResultFactoryTest {
         scopePolicy = mock(ScopePolicy.class);
         tokenProvider = mock(TokenProvider.class);
         clockProvider = mock(ClockProvider.class);
-        props = mock(SecurityJwtProperties.class);
+        tokenPolicy = mock(TokenPolicyProperties.class);
 
-        factory = new TokenRefreshResultFactory(roleProvider, scopePolicy, tokenProvider, clockProvider, props);
+        factory = new TokenRefreshResultFactory(roleProvider, scopePolicy, tokenProvider, clockProvider, tokenPolicy);
 
         when(clockProvider.now()).thenReturn(now);
-        when(props.accessTtl()).thenReturn(accessTtl);
+        when(tokenPolicy.accessTokenTtl()).thenReturn(accessTtl);
     }
 
     @Test
