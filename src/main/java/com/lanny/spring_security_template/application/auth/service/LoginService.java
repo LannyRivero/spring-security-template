@@ -4,6 +4,7 @@ import com.lanny.spring_security_template.application.auth.command.LoginCommand;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
 import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
+import com.lanny.spring_security_template.domain.event.SecurityEvent;
 import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.exception.UserLockedException;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
@@ -87,7 +88,7 @@ public class LoginService {
             log.warn("[AUTH_LOCK] User '{}' attempted login while locked", username);
 
             auditEventPublisher.publishAuthEvent(
-                "USER_LOCKED",
+                SecurityEvent.USER_LOCKED.name(),
                  username, 
                  now, 
                  "User attempted login while locked due to excessive failed attempts");
@@ -104,7 +105,7 @@ public class LoginService {
 
             log.info("[AUTH_SUCCESS] User '{}' logged in successfully", username);
             auditEventPublisher.publishAuthEvent(
-                "USER_LOGGED_IN", 
+                SecurityEvent.USER_LOGGED_IN.name(), 
                 username, 
                 now, 
                 "Successful authentication and token issuance");
@@ -117,7 +118,7 @@ public class LoginService {
             log.warn("[AUTH_FAIL] Invalid credentials for user '{}': {}", username, e.getMessage());
 
             auditEventPublisher.publishAuthEvent(
-                "LOGIN_FAILED", 
+                SecurityEvent.LOGIN_FAILURE.name(), 
                 username, 
                 now,
                  e.getMessage()

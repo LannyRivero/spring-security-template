@@ -11,6 +11,7 @@ import com.lanny.spring_security_template.application.auth.port.out.AuditEventPu
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
+import com.lanny.spring_security_template.domain.event.SecurityEvent;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 import lombok.RequiredArgsConstructor;
@@ -66,14 +67,14 @@ public class RefreshService {
         if (rotationHandler.shouldRotate()) {
             result = rotationHandler.rotate(claims);
             auditEventPublisher.publishAuthEvent(
-                    "TOKEN_ROTATED",
+                    SecurityEvent.TOKEN_ROTATED.name(),
                     username,
                     now,
                     "Refresh token rotated and new session issued");
         } else {
             result = resultFactory.newAccessOnly(claims, cmd.refreshToken());
             auditEventPublisher.publishAuthEvent(
-                    "TOKEN_REFRESHED",
+                    SecurityEvent.TOKEN_REFRESH.name(),
                     username,
                     now,
                     "Access token refreshed without rotation");

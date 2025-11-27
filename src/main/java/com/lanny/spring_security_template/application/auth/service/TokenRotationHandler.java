@@ -16,6 +16,7 @@ import com.lanny.spring_security_template.application.auth.port.out.SessionRegis
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
+import com.lanny.spring_security_template.domain.event.SecurityEvent;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 
@@ -96,7 +97,7 @@ public class TokenRotationHandler {
         sessionRegistry.removeSession(username, claims.jti());
 
         auditEventPublisher.publishAuthEvent(
-                "TOKEN_REVOKED",
+                SecurityEvent.TOKEN_REVOKED.name(),
                 username,
                 now,
                 "Old refresh token revoked during rotation");
@@ -113,7 +114,7 @@ public class TokenRotationHandler {
         metrics.recordTokenRefresh();
 
         auditEventPublisher.publishAuthEvent(
-                "TOKEN_ISSUED",
+                SecurityEvent.TOKEN_ISSUED.name(),
                 username,
                 now,
                 "New access and refresh tokens issued after rotation");
