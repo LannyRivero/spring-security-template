@@ -28,7 +28,6 @@ class SessionManagerTest {
     private RefreshTokenStore refreshTokenStore;
     private ClockProvider clockProvider;
     private AuditEventPublisher auditEventPublisher;
-    
 
     private SessionManager sessionManager;
 
@@ -45,7 +44,8 @@ class SessionManagerTest {
         clockProvider = mock(ClockProvider.class);
         auditEventPublisher = mock(AuditEventPublisher.class);
 
-        sessionManager = new SessionManager(sessionRegistry, blacklist, policy, refreshTokenStore, auditEventPublisher, clockProvider);
+        sessionManager = new SessionManager(sessionRegistry, blacklist, policy, refreshTokenStore, auditEventPublisher,
+                clockProvider);
 
         tokens = new IssuedTokens(
                 USERNAME,
@@ -103,5 +103,18 @@ class SessionManagerTest {
 
         verify(refreshTokenStore).delete("old1");
         verify(refreshTokenStore).delete("old2");
+    }
+
+    @Test
+    @DisplayName(" should revoke oldest session when maxSessions is 1")
+    void testShouldRevokeWhenLimitIsOne() {
+        when(policy.maxSessionsPerUser()).thenReturn(1);
+        when(sessionRegistry.getActiveSessions(USERNAME)).thenReturn(List.of("old1", "old2"));
+
+        sessionManager.register(tokens);
+
+        verify(blacklist).revoke("old1", tokens.refreshExp());
+        verify(sessionRegistry).removeSession(USERNAME, "old1");
+        verify(refreshTokenStore).delete("old1");
     }
 }

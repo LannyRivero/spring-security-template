@@ -51,4 +51,7 @@ public interface AuthMetricsService {
 
     /** Increment when a refresh token is re-used (possible replay attack). */
     void recordRefreshReused();
+
+    /** Increment when a user successfully changes their password. */
+    void recordPasswordChange();
 }

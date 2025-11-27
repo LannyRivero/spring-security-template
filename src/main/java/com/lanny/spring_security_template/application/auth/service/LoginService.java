@@ -1,16 +1,7 @@
 package com.lanny.spring_security_template.application.auth.service;
 
-import com.lanny.spring_security_template.application.auth.command.LoginCommand;
-import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
-import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
-import com.lanny.spring_security_template.application.auth.result.JwtResult;
-import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
-import com.lanny.spring_security_template.domain.exception.UserLockedException;
-import com.lanny.spring_security_template.domain.time.ClockProvider;
-
-import lombok.RequiredArgsConstructor;
-
 import java.time.Instant;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,35 +9,31 @@ import org.slf4j.MDC;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import com.lanny.spring_security_template.application.auth.command.LoginCommand;
+import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
+import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
+import com.lanny.spring_security_template.application.auth.result.JwtResult;
+import com.lanny.spring_security_template.domain.event.SecurityEvent;
+import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
+import com.lanny.spring_security_template.domain.exception.UserLockedException;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
+
+import lombok.RequiredArgsConstructor;
+
 /**
- * Main orchestrator for user login.
- *
- * <p>
- * This service coordinates the complete authentication flow:
+ * Coordinates the user authentication lifecycle:
  * <ul>
- * <li>Verifies lockout policy (prevents brute-force attacks)</li>
- * <li>Validates user credentials and account status</li>
- * <li>Issues access/refresh tokens via {@link TokenSessionCreator}</li>
- * <li>Records metrics and resets counters after successful login</li>
+ * <li>Validates user credentials and lockout policy</li>
+ * <li>Issues JWT tokens upon success</li>
+ * <li>Records metrics and publishes audit events</li>
  * </ul>
- * </p>
  *
  * <p>
- * Integration with {@link LoginAttemptPolicy} allows tracking and limiting
- * consecutive failed login attempts per user. When the threshold is reached,
- * the user is temporarily locked, complying with OWASP ASVS 2.3.2.
- * </p>
- *
- * <p>
- * On successful authentication:
+ * Compliant with OWASP ASVS controls:
  * <ul>
- * <li>The attempt counter is reset.</li>
- * <li>Metrics for successful logins are recorded.</li>
- * </ul>
- * On failure:
- * <ul>
- * <li>The failed attempt is recorded.</li>
- * <li>Brute-force metrics are incremented.</li>
+ * <li>2.3.2 – Account lockout after repeated failures</li>
+ * <li>2.10.1 – Log all authentication decisions</li>
+ * <li>2.10.3 – Record sufficient context for traceability</li>
  * </ul>
  * </p>
  */
@@ -64,66 +51,72 @@ public class LoginService {
     private final ClockProvider clockProvider;
 
     /**
-     * Performs the login flow:
+     * Executes the secure login process:
      * <ol>
-     * <li>Checks if the user is temporarily locked.</li>
-     * <li>Validates credentials.</li>
-     * <li>Issues tokens if authentication succeeds.</li>
-     * <li>Updates metrics and lockout counters accordingly.</li>
+     * <li>Checks if the user is locked (brute-force protection)</li>
+     * <li>Validates credentials through AuthenticationValidator</li>
+     * <li>Issues JWT tokens via TokenSessionCreator</li>
+     * <li>Updates metrics, resets counters, and publishes audit logs</li>
      * </ol>
      *
-     * @param cmd {@link LoginCommand} containing username and password
-     * @return {@link JwtResult} with access and refresh tokens
-     * @throws UserLockedException         if user is under temporary lockout
-     * @throws InvalidCredentialsException if credentials are invalid
-     * @throws UsernameNotFoundException   if user does not exist
+     * @param cmd Login command containing credentials
+     * @return JwtResult with access and refresh tokens
      */
     public JwtResult login(LoginCommand cmd) {
         String username = cmd.username();
         Instant now = clockProvider.now();
+        String traceId = UUID.randomUUID().toString();
 
-        if (loginAttemptPolicy.isUserLocked(username)) {
-            metrics.recordFailure();
-            log.warn("[AUTH_LOCK] User '{}' attempted login while locked", username);
-
-            auditEventPublisher.publishAuthEvent(
-                "USER_LOCKED",
-                 username, 
-                 now, 
-                 "User attempted login while locked due to excessive failed attempts");
-            throw new UserLockedException(username);
-        }
+        MDC.put("traceId", traceId);
+        MDC.put("username", username);
 
         try {
+            // 1️ Check if user is locked due to repeated failures
+            if (loginAttemptPolicy.isUserLocked(username)) {
+                metrics.recordFailure(username, "User locked");
+                log.warn("[AUTH_LOCK] user={} trace={} reason=locked_after_failures", username, traceId);
+
+                auditEventPublisher.publishAuthEvent(
+                        SecurityEvent.USER_LOCKED.name(),
+                        username,
+                        now,
+                        "User attempted login while locked after multiple failed attempts");
+                throw new UserLockedException(username);
+            }
+
+            // 2️ Validate credentials
             var user = validator.validate(cmd);
 
+            // 3️ Issue tokens
             JwtResult result = tokenCreator.create(user.username().value());
-            metrics.recordSuccess();
+            metrics.recordSuccess(username);
 
+            // 4️ Reset failed attempts counter
             loginAttemptPolicy.resetAttempts(username);
 
-            log.info("[AUTH_SUCCESS] User '{}' logged in successfully", username);
+            // 5️ Log and publish successful event
+            log.info("[AUTH_SUCCESS] user={} trace={} message=Login successful", username, traceId);
             auditEventPublisher.publishAuthEvent(
-                "USER_LOGGED_IN", 
-                username, 
-                now, 
-                "Successful authentication and token issuance");
+                    SecurityEvent.LOGIN_SUCCESS.name(),
+                    username,
+                    now,
+                    "Successful authentication and token issuance");
 
             return result;
 
         } catch (InvalidCredentialsException | UsernameNotFoundException e) {
+            // 6️ Handle authentication failure
             loginAttemptPolicy.recordFailedAttempt(username);
-            metrics.recordFailure();
-            log.warn("[AUTH_FAIL] Invalid credentials for user '{}': {}", username, e.getMessage());
+            metrics.recordFailure(username, e.getMessage());
+            log.warn("[AUTH_FAIL] user={} trace={} reason={}", username, traceId, e.getMessage());
 
             auditEventPublisher.publishAuthEvent(
-                "LOGIN_FAILED", 
-                username, 
-                now,
-                 e.getMessage()
-                 );
-            
+                    SecurityEvent.LOGIN_FAILURE.name(),
+                    username,
+                    now,
+                    e.getMessage());
             throw e;
+
         } finally {
             MDC.clear();
         }

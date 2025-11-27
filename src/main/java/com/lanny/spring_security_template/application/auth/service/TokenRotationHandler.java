@@ -16,28 +16,40 @@ import com.lanny.spring_security_template.application.auth.port.out.SessionRegis
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
+import com.lanny.spring_security_template.domain.event.SecurityEvent;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * Handles the full refresh token rotation lifecycle in a secure, auditable way.
+ * Handles secure, auditable refresh token rotation.
  *
  * <p>
- * Responsibilities:
+ * This component performs the full lifecycle of a refresh token rotation:
  * <ul>
- * <li>Revoke the old refresh token and register it in blacklist.</li>
- * <li>Remove associated session entries from registry and store.</li>
- * <li>Issue new access/refresh tokens and persist the new session.</li>
- * <li>Publish audit events for traceability (rotation + issuance).</li>
+ * <li>Revokes and blacklists the old refresh token.</li>
+ * <li>Deletes its persistent record and session references.</li>
+ * <li>Issues new access/refresh tokens using {@link TokenIssuer}.</li>
+ * <li>Persists and registers the new session.</li>
+ * <li>Publishes {@link SecurityEvent} audit logs and updates metrics.</li>
  * </ul>
  * </p>
  *
- * <p>
- * All operations are timestamped using {@link ClockProvider}
- * and logged with contextual MDC trace identifiers.
- * </p>
+ * <h2>Design Principles</h2>
+ * <ul>
+ * <li>Stateless and deterministic logic driven by {@link RotationPolicy}.</li>
+ * <li>Fully auditable through {@link AuditEventPublisher} and MDC trace
+ * context.</li>
+ * <li>Safe to execute concurrently thanks to isolation per refresh JTI.</li>
+ * </ul>
+ *
+ * <h2>Security Compliance</h2>
+ * <ul>
+ * <li>OWASP ASVS 2.8.5 – “Rotate refresh tokens after each use.”</li>
+ * <li>OWASP ASVS 2.10.3 – “Log all token issuance and revocation events.”</li>
+ * <li>OWASP ASVS 2.8.3 – “Limit and manage active sessions.”</li>
+ * </ul>
  */
 @Component
 @RequiredArgsConstructor
@@ -57,66 +69,60 @@ public class TokenRotationHandler {
     private final AuditEventPublisher auditEventPublisher;
 
     /**
-     * Determines whether rotation is enabled based on the current
-     * {@link RotationPolicy}.
+     * Checks if refresh token rotation is enabled via {@link RotationPolicy}.
      *
-     * @return true if rotation is active; false otherwise
+     * @return true if rotation is enabled, false otherwise
      */
     public boolean shouldRotate() {
         return rotationPolicy.isRotationEnabled();
     }
 
     /**
-     * Performs full rotation of a refresh token, revoking the old one
-     * and issuing new tokens for the given user.
-     *
-     * <p>
-     * The rotation flow guarantees:
-     * <ul>
-     * <li>Old token revocation (blacklist + session cleanup)</li>
-     * <li>New token persistence and session registration</li>
-     * <li>Audit and metrics consistency</li>
-     * </ul>
-     * </p>
+     * Performs a secure refresh token rotation:
+     * <ol>
+     * <li>Revokes and blacklists the old refresh token.</li>
+     * <li>Removes its session references and persistent entry.</li>
+     * <li>Issues a new token pair and persists the new session.</li>
+     * <li>Records metrics and audit events for compliance.</li>
+     * </ol>
      *
      * @param claims parsed JWT claims from the old refresh token
-     * @return {@link JwtResult} containing new tokens
+     * @return {@link JwtResult} containing new access and refresh tokens
      */
     public JwtResult rotate(JwtClaimsDTO claims) {
         final String username = claims.sub();
         final String traceId = MDC.get("traceId");
         final Instant now = clockProvider.now();
 
-        // Step 1: resolve roles/scopes
+        // Step 1️ Resolve current roles and scopes
         RoleScopeResult rs = RoleScopeResolver.resolve(username, roleProvider, scopePolicy);
 
-        // Step 2: revoke old token
+        // Step 2️ Revoke old refresh token
         blacklist.revoke(claims.jti(), Instant.ofEpochSecond(claims.exp()));
         refreshTokenStore.delete(claims.jti());
         sessionRegistry.removeSession(username, claims.jti());
 
         auditEventPublisher.publishAuthEvent(
-                "TOKEN_REVOKED",
+                SecurityEvent.TOKEN_REVOKED.name(),
                 username,
                 now,
-                "Old refresh token revoked during rotation");
+                "Old refresh token revoked during rotation.");
         log.info("[TOKEN_ROTATION] user={} trace={} event=revoked jti={}", username, traceId, claims.jti());
 
-        // Step 3: issue new tokens
+        // Step 3️ Issue new token pair
         IssuedTokens tokens = tokenIssuer.issueTokens(username, rs);
 
-        // Step 4: persist and register session
+        // Step 4️ Persist and register the new session
         refreshTokenStore.save(username, tokens.refreshJti(), tokens.issuedAt(), tokens.refreshExp());
         sessionRegistry.registerSession(username, tokens.refreshJti(), tokens.refreshExp());
 
-        // Step 5: metrics + audit
+        // Step 5️ Metrics and auditing
         metrics.recordTokenRefresh();
-
         auditEventPublisher.publishAuthEvent(
-                "TOKEN_ISSUED",
+                SecurityEvent.TOKEN_ISSUED.name(),
                 username,
                 now,
-                "New access and refresh tokens issued after rotation");
+                "New access and refresh tokens issued after rotation.");
         log.info("[TOKEN_ROTATION] user={} trace={} event=issued newJti={}", username, traceId, tokens.refreshJti());
 
         return tokens.toJwtResult();

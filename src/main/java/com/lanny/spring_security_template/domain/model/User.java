@@ -195,4 +195,29 @@ public final class User {
     public int hashCode() {
         return Objects.hash(id);
     }
+
+    /**
+     * Returns a new {@link User} instance with an updated password hash,
+     * preserving all other attributes.
+     *
+     * <p>
+     * This method respects the immutability of the aggregate and is
+     * the canonical way to perform password updates from the domain layer.
+     * </p>
+     *
+     * @param newPasswordHash the newly hashed password
+     * @return a new {@link User} instance with updated password
+     */
+    public User withChangedPassword(PasswordHash newPasswordHash) {
+        Objects.requireNonNull(newPasswordHash, "PasswordHash cannot be null");
+        return new User(
+                this.id,
+                this.username,
+                this.email,
+                newPasswordHash,
+                this.status,
+                this.roles,
+                this.scopes);
+    }
+
 }
