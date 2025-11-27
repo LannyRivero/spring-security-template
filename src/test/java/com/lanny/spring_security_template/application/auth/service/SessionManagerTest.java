@@ -9,10 +9,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.lanny.spring_security_template.application.auth.policy.SessionPolicy;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 
 /**
  * Unit tests for {@link SessionManager}.
@@ -22,7 +22,7 @@ class SessionManagerTest {
 
     private SessionRegistryGateway sessionRegistry;
     private TokenBlacklistGateway blacklist;
-    private SecurityJwtProperties props;
+    private SessionPolicy policy;
     private RefreshTokenStore refreshTokenStore;
 
     private SessionManager sessionManager;
@@ -35,10 +35,10 @@ class SessionManagerTest {
     void setUp() {
         sessionRegistry = mock(SessionRegistryGateway.class);
         blacklist = mock(TokenBlacklistGateway.class);
-        props = mock(SecurityJwtProperties.class);
+        policy = mock(SessionPolicy.class);
         refreshTokenStore = mock(RefreshTokenStore.class);
 
-        sessionManager = new SessionManager(sessionRegistry, blacklist, props, refreshTokenStore);
+        sessionManager = new SessionManager(sessionRegistry, blacklist, policy, refreshTokenStore);
 
         tokens = new IssuedTokens(
                 USERNAME,
@@ -55,7 +55,7 @@ class SessionManagerTest {
     @Test
     @DisplayName(" should register session successfully when within limit")
     void testShouldRegisterSessionWithinLimit() {
-        when(props.maxActiveSessions()).thenReturn(3);
+        when(policy.maxSessionsPerUser()).thenReturn(3);
         when(sessionRegistry.getActiveSessions(USERNAME)).thenReturn(List.of("old1", "old2"));
 
         sessionManager.register(tokens);
@@ -67,7 +67,7 @@ class SessionManagerTest {
     @Test
     @DisplayName(" should not enforce limit when maxActiveSessions is 0 (unlimited)")
     void testShouldAllowUnlimitedSessions() {
-        when(props.maxActiveSessions()).thenReturn(0);
+        when(policy.maxSessionsPerUser()).thenReturn(0);
 
         sessionManager.register(tokens);
 
@@ -78,7 +78,7 @@ class SessionManagerTest {
     @Test
     @DisplayName(" should revoke and delete oldest sessions when exceeding max limit")
     void testShouldRevokeOldSessionsWhenExceedingLimit() {
-        when(props.maxActiveSessions()).thenReturn(2);
+        when(policy.maxSessionsPerUser()).thenReturn(2);
         when(sessionRegistry.getActiveSessions(USERNAME))
                 .thenReturn(List.of("old1", "old2", "old3", "old4")); // 4 active sessions
 

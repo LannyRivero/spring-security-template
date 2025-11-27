@@ -11,9 +11,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.lanny.spring_security_template.application.auth.policy.TokenPolicyProperties;
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 
 /**
  * Unit tests for {@link TokenIssuer}.
@@ -23,7 +23,7 @@ class TokenIssuerTest {
 
     private TokenProvider tokenProvider;
     private ClockProvider clockProvider;
-    private SecurityJwtProperties props;
+    private TokenPolicyProperties tokenPolicy;
     private TokenIssuer tokenIssuer;
 
     private static final String USERNAME = "lanny";
@@ -40,13 +40,13 @@ class TokenIssuerTest {
     void setUp() {
         tokenProvider = mock(TokenProvider.class);
         clockProvider = mock(ClockProvider.class);
-        props = mock(SecurityJwtProperties.class);
+        tokenPolicy = mock(TokenPolicyProperties.class);
 
-        tokenIssuer = new TokenIssuer(tokenProvider, clockProvider, props);
+        tokenIssuer = new TokenIssuer(tokenProvider, clockProvider, tokenPolicy);
 
         when(clockProvider.now()).thenReturn(fixedNow);
-        when(props.accessTtl()).thenReturn(accessTtl);
-        when(props.refreshTtl()).thenReturn(refreshTtl);
+        when(tokenPolicy.accessTokenTtl()).thenReturn(accessTtl);
+        when(tokenPolicy.refreshTokenTtl()).thenReturn(refreshTtl);
     }
 
     @Test

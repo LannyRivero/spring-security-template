@@ -1,12 +1,12 @@
 package com.lanny.spring_security_template.application.auth.service;
 
+import com.lanny.spring_security_template.application.auth.policy.TokenPolicyProperties;
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +25,7 @@ public class TokenRefreshResultFactory {
     private final ScopePolicy scopePolicy;
     private final TokenProvider tokenProvider;
     private final ClockProvider clockProvider;
-    private final SecurityJwtProperties props;
+    private final TokenPolicyProperties tokenPolicy;
 
     public JwtResult newAccessOnly(JwtClaimsDTO claims, String refreshToken) {
         String username = claims.sub();
@@ -33,7 +33,7 @@ public class TokenRefreshResultFactory {
         RoleScopeResult rs = RoleScopeResolver.resolve(username, roleProvider, scopePolicy);
 
         Instant now = clockProvider.now();
-        Duration accessTtl = props.accessTtl();
+        Duration accessTtl = tokenPolicy.accessTokenTtl();
         Instant accessExp = now.plus(accessTtl);
 
         String newAccess = tokenProvider.generateAccessToken(

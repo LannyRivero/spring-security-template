@@ -1,8 +1,8 @@
 package com.lanny.spring_security_template.application.auth.service;
 
+import com.lanny.spring_security_template.application.auth.policy.TokenPolicyProperties;
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -16,13 +16,13 @@ public class TokenIssuer {
 
     private final TokenProvider tokenProvider;
     private final ClockProvider clockProvider;
-    private final SecurityJwtProperties props;
+    private final TokenPolicyProperties tokenPolicy;
 
     public IssuedTokens issueTokens(String username, RoleScopeResult rs) {
 
         Instant now = clockProvider.now();
-        Duration accessTtl = props.accessTtl();
-        Duration refreshTtl = props.refreshTtl();
+        Duration accessTtl = tokenPolicy.accessTokenTtl();
+        Duration refreshTtl = tokenPolicy.refreshTokenTtl();
 
         Instant accessExp = now.plus(accessTtl);
         Instant refreshExp = now.plus(refreshTtl);

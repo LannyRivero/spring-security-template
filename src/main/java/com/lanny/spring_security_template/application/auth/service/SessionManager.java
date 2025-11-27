@@ -1,9 +1,9 @@
 package com.lanny.spring_security_template.application.auth.service;
 
+import com.lanny.spring_security_template.application.auth.policy.SessionPolicy;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +15,7 @@ public class SessionManager {
 
     private final SessionRegistryGateway sessionRegistry;
     private final TokenBlacklistGateway blacklist;
-    private final SecurityJwtProperties props;
+    private final SessionPolicy policy;
     private final RefreshTokenStore refreshTokenStore;
 
     public void register(IssuedTokens tokens) {
@@ -28,7 +28,7 @@ public class SessionManager {
                 tokens.refreshJti(),
                 tokens.refreshExp());
 
-        int maxSessions = props.maxActiveSessions();
+        int maxSessions = policy.maxSessionsPerUser();
 
         if (maxSessions <= 0) {
             return; // sin límite
