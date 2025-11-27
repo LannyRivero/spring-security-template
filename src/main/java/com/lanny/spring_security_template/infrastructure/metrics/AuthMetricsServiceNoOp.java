@@ -40,39 +40,15 @@ public final class AuthMetricsServiceNoOp implements AuthMetricsService {
         // private constructor to enforce singleton
     }
 
-    @Override
-    public void recordLoginSuccess() {
-    }
-
-    @Override
-    public void recordLoginFailure() {
-    }
-
-    @Override
-    public void recordTokenRefresh() {
-    }
-
-    @Override
-    public void recordUserRegistration() {
-    }
-
-    @Override
-    public void recordBruteForceDetected() {
-    }
-
-    @Override
-    public void recordSessionRevoked() {
-    }
-
-    @Override
-    public void recordRotationFailed() {
-    }
-
-    @Override
-    public void recordUserLocked() {
-    }
-
-    @Override
-    public void recordRefreshReused() {
-    }
+    @Override public void recordLoginSuccess() {}
+    @Override public void recordLoginFailure() {}
+    @Override public void recordTokenRefresh() {}
+    @Override public void recordUserRegistration() {}
+    @Override public void recordBruteForceDetected() {}
+    @Override public void recordSessionRevoked() {}
+    @Override public void recordRotationFailed() {}
+    @Override public void recordUserLocked() {}
+    @Override public void recordRefreshReused() {}
+    @Override public void recordPasswordChange() {}
 }
+
