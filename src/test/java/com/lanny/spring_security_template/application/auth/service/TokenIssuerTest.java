@@ -21,84 +21,100 @@ import com.lanny.spring_security_template.domain.time.ClockProvider;
  */
 class TokenIssuerTest {
 
-    private TokenProvider tokenProvider;
-    private ClockProvider clockProvider;
-    private TokenPolicyProperties tokenPolicy;
-    private TokenIssuer tokenIssuer;
+        private TokenProvider tokenProvider;
+        private ClockProvider clockProvider;
+        private TokenPolicyProperties tokenPolicy;
+        private TokenIssuer tokenIssuer;
 
-    private static final String USERNAME = "lanny";
+        private static final String USERNAME = "lanny";
 
-    private final RoleScopeResult rs = new RoleScopeResult(
-            List.of("ROLE_USER"),
-            List.of("profile:read"));
+        private final RoleScopeResult rs = new RoleScopeResult(
+                        List.of("ROLE_USER"),
+                        List.of("profile:read"));
 
-    private final Instant fixedNow = Instant.parse("2030-01-01T00:00:00Z");
-    private final Duration accessTtl = Duration.ofMinutes(15);
-    private final Duration refreshTtl = Duration.ofDays(7);
+        private final Instant fixedNow = Instant.parse("2030-01-01T00:00:00Z");
+        private final Duration accessTtl = Duration.ofMinutes(15);
+        private final Duration refreshTtl = Duration.ofDays(7);
 
-    @BeforeEach
-    void setUp() {
-        tokenProvider = mock(TokenProvider.class);
-        clockProvider = mock(ClockProvider.class);
-        tokenPolicy = mock(TokenPolicyProperties.class);
+        @BeforeEach
+        void setUp() {
+                tokenProvider = mock(TokenProvider.class);
+                clockProvider = mock(ClockProvider.class);
+                tokenPolicy = mock(TokenPolicyProperties.class);
 
-        tokenIssuer = new TokenIssuer(tokenProvider, clockProvider, tokenPolicy);
+                tokenIssuer = new TokenIssuer(tokenProvider, clockProvider, tokenPolicy);
 
-        when(clockProvider.now()).thenReturn(fixedNow);
-        when(tokenPolicy.accessTokenTtl()).thenReturn(accessTtl);
-        when(tokenPolicy.refreshTokenTtl()).thenReturn(refreshTtl);
-    }
+                when(clockProvider.now()).thenReturn(fixedNow);
+                when(tokenPolicy.accessTokenTtl()).thenReturn(accessTtl);
+                when(tokenPolicy.refreshTokenTtl()).thenReturn(refreshTtl);
+        }
 
-    @Test
-    @DisplayName(" should issue valid access and refresh tokens with correct expiration times")
-    void testShouldIssueTokensCorrectly() {
-        // Arrange
-        when(tokenProvider.generateAccessToken(USERNAME, rs.roleNames(), rs.scopeNames(), accessTtl))
-                .thenReturn("access-token-xyz");
+        @Test
+        @DisplayName(" should issue valid access and refresh tokens with correct expiration times")
+        void testShouldIssueTokensCorrectly() {
+                // Arrange
+                when(tokenProvider.generateAccessToken(USERNAME, rs.roleNames(), rs.scopeNames(), accessTtl))
+                                .thenReturn("access-token-xyz");
 
-        when(tokenProvider.generateRefreshToken(USERNAME, refreshTtl))
-                .thenReturn("refresh-token-abc");
+                when(tokenProvider.generateRefreshToken(USERNAME, refreshTtl))
+                                .thenReturn("refresh-token-abc");
 
-        when(tokenProvider.extractJti("refresh-token-abc"))
-                .thenReturn("jti-123");
+                when(tokenProvider.extractJti("refresh-token-abc"))
+                                .thenReturn("jti-123");
 
-        // Act
-        IssuedTokens tokens = tokenIssuer.issueTokens(USERNAME, rs);
+                // Act
+                IssuedTokens tokens = tokenIssuer.issueTokens(USERNAME, rs);
 
-        // Assert
-        assertThat(tokens.username()).isEqualTo(USERNAME);
-        assertThat(tokens.accessToken()).isEqualTo("access-token-xyz");
-        assertThat(tokens.refreshToken()).isEqualTo("refresh-token-abc");
-        assertThat(tokens.refreshJti()).isEqualTo("jti-123");
+                // Assert
+                assertThat(tokens.username()).isEqualTo(USERNAME);
+                assertThat(tokens.accessToken()).isEqualTo("access-token-xyz");
+                assertThat(tokens.refreshToken()).isEqualTo("refresh-token-abc");
+                assertThat(tokens.refreshJti()).isEqualTo("jti-123");
 
-        assertThat(tokens.issuedAt()).isEqualTo(fixedNow);
-        assertThat(tokens.accessExp()).isEqualTo(fixedNow.plus(accessTtl));
-        assertThat(tokens.refreshExp()).isEqualTo(fixedNow.plus(refreshTtl));
+                assertThat(tokens.issuedAt()).isEqualTo(fixedNow);
+                assertThat(tokens.accessExp()).isEqualTo(fixedNow.plus(accessTtl));
+                assertThat(tokens.refreshExp()).isEqualTo(fixedNow.plus(refreshTtl));
 
-        assertThat(tokens.roleNames()).containsExactly("ROLE_USER");
-        assertThat(tokens.scopeNames()).containsExactly("profile:read");
+                assertThat(tokens.roleNames()).containsExactly("ROLE_USER");
+                assertThat(tokens.scopeNames()).containsExactly("profile:read");
 
-        verify(tokenProvider).generateAccessToken(USERNAME, rs.roleNames(), rs.scopeNames(), accessTtl);
-        verify(tokenProvider).generateRefreshToken(USERNAME, refreshTtl);
-        verify(tokenProvider).extractJti("refresh-token-abc");
-    }
+                verify(tokenProvider).generateAccessToken(USERNAME, rs.roleNames(), rs.scopeNames(), accessTtl);
+                verify(tokenProvider).generateRefreshToken(USERNAME, refreshTtl);
+                verify(tokenProvider).extractJti("refresh-token-abc");
+        }
 
-    @Test
-    @DisplayName(" should handle missing scopes or roles gracefully")
-    void testShouldHandleEmptyScopesOrRoles() {
-        RoleScopeResult empty = new RoleScopeResult(List.of(), List.of());
+        @Test
+        @DisplayName(" should handle missing scopes or roles gracefully")
+        void testShouldHandleEmptyScopesOrRoles() {
+                RoleScopeResult empty = new RoleScopeResult(List.of(), List.of());
 
-        when(tokenProvider.generateAccessToken(USERNAME, List.of(), List.of(), accessTtl))
-                .thenReturn("access-empty");
-        when(tokenProvider.generateRefreshToken(USERNAME, refreshTtl))
-                .thenReturn("refresh-empty");
-        when(tokenProvider.extractJti("refresh-empty"))
-                .thenReturn("jti-empty");
+                when(tokenProvider.generateAccessToken(USERNAME, List.of(), List.of(), accessTtl))
+                                .thenReturn("access-empty");
+                when(tokenProvider.generateRefreshToken(USERNAME, refreshTtl))
+                                .thenReturn("refresh-empty");
+                when(tokenProvider.extractJti("refresh-empty"))
+                                .thenReturn("jti-empty");
 
-        IssuedTokens tokens = tokenIssuer.issueTokens(USERNAME, empty);
+                IssuedTokens tokens = tokenIssuer.issueTokens(USERNAME, empty);
 
-        assertThat(tokens.accessToken()).isEqualTo("access-empty");
-        assertThat(tokens.refreshToken()).isEqualTo("refresh-empty");
-        assertThat(tokens.refreshJti()).isEqualTo("jti-empty");
-    }
+                assertThat(tokens.accessToken()).isEqualTo("access-empty");
+                assertThat(tokens.refreshToken()).isEqualTo("refresh-empty");
+                assertThat(tokens.refreshJti()).isEqualTo("jti-empty");
+        }
+
+        @Test
+        @DisplayName(" should calculate expiration based on fixed ClockProvider")
+        void testShouldCalculateExpirationsBasedOnClock() {
+                when(tokenProvider.generateAccessToken(USERNAME, rs.roleNames(), rs.scopeNames(), accessTtl))
+                                .thenReturn("access-fixed");
+                when(tokenProvider.generateRefreshToken(USERNAME, refreshTtl))
+                                .thenReturn("refresh-fixed");
+                when(tokenProvider.extractJti("refresh-fixed")).thenReturn("jti-fixed");
+
+                IssuedTokens tokens = tokenIssuer.issueTokens(USERNAME, rs);
+
+                assertThat(tokens.accessExp()).isEqualTo(fixedNow.plus(accessTtl));
+                assertThat(tokens.refreshExp()).isEqualTo(fixedNow.plus(refreshTtl));
+        }
+
 }
