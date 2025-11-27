@@ -58,6 +58,8 @@ public enum SecurityEvent {
     /** User account temporarily locked due to brute-force protection */
     USER_LOCKED,
 
+    USER_REGISTERED,
+
     /** Password successfully changed by user */
     PASSWORD_CHANGED,
 
