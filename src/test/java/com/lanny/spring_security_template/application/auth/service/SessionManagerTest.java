@@ -10,9 +10,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.lanny.spring_security_template.application.auth.policy.SessionPolicy;
+import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 /**
  * Unit tests for {@link SessionManager}.
@@ -24,6 +26,9 @@ class SessionManagerTest {
     private TokenBlacklistGateway blacklist;
     private SessionPolicy policy;
     private RefreshTokenStore refreshTokenStore;
+    private ClockProvider clockProvider;
+    private AuditEventPublisher auditEventPublisher;
+    
 
     private SessionManager sessionManager;
 
@@ -37,8 +42,10 @@ class SessionManagerTest {
         blacklist = mock(TokenBlacklistGateway.class);
         policy = mock(SessionPolicy.class);
         refreshTokenStore = mock(RefreshTokenStore.class);
+        clockProvider = mock(ClockProvider.class);
+        auditEventPublisher = mock(AuditEventPublisher.class);
 
-        sessionManager = new SessionManager(sessionRegistry, blacklist, policy, refreshTokenStore);
+        sessionManager = new SessionManager(sessionRegistry, blacklist, policy, refreshTokenStore, auditEventPublisher, clockProvider);
 
         tokens = new IssuedTokens(
                 USERNAME,
