@@ -6,7 +6,6 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import com.lanny.spring_security_template.application.auth.command.LoginCommand;
@@ -16,6 +15,7 @@ import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.event.SecurityEvent;
 import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.exception.UserLockedException;
+import com.lanny.spring_security_template.domain.exception.UserNotFoundException;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 import lombok.RequiredArgsConstructor;
@@ -104,7 +104,7 @@ public class LoginService {
 
             return result;
 
-        } catch (InvalidCredentialsException | UsernameNotFoundException e) {
+        } catch (InvalidCredentialsException | UserNotFoundException e) {
             // 6️ Handle authentication failure
             loginAttemptPolicy.recordFailedAttempt(username);
             metrics.recordFailure(username, e.getMessage());
