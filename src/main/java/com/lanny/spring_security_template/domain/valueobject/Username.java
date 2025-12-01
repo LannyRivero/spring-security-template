@@ -3,23 +3,10 @@ package com.lanny.spring_security_template.domain.valueobject;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import com.lanny.spring_security_template.domain.exception.InvalidUsernameException;
+
 /**
  * Value Object representing a normalized, validated username.
- *
- * <p>
- * Usernames are:
- * </p>
- * <ul>
- * <li>Case-insensitive (stored as lowercase)</li>
- * <li>Validated against a safe character set</li>
- * <li>Validated by length constraints</li>
- * <li>Immutable</li>
- * </ul>
- *
- * <p>
- * This class centralizes all username-related rules
- * inside the domain model, ensuring consistency.
- * </p>
  */
 public final class Username {
 
@@ -39,21 +26,23 @@ public final class Username {
         String normalized = raw.trim().toLowerCase();
 
         if (normalized.length() < MIN_LENGTH || normalized.length() > MAX_LENGTH) {
-            throw new IllegalArgumentException(
+            throw new InvalidUsernameException(
                     "Username must be between " + MIN_LENGTH + " and " + MAX_LENGTH + " characters");
         }
 
         if (!VALID_PATTERN.matcher(normalized).matches()) {
-            throw new IllegalArgumentException(
+            throw new InvalidUsernameException(
                     "Username contains invalid characters. Allowed: letters, numbers, '.', '_', '-'");
+        }
+
+        if (normalized.startsWith(".") || normalized.endsWith(".") || normalized.contains("..")) {
+            throw new InvalidUsernameException(
+                    "Username cannot start/end with '.' or contain consecutive dots");
         }
 
         this.value = normalized;
     }
 
-    /**
-     * Static factory method.
-     */
     public static Username of(String raw) {
         return new Username(raw);
     }
