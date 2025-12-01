@@ -1,6 +1,7 @@
 package com.lanny.spring_security_template.domain.policy;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.lanny.spring_security_template.domain.model.Role;
 import com.lanny.spring_security_template.domain.model.Scope;
@@ -76,7 +77,11 @@ public interface ScopePolicy {
      * @param roles    the roles to evaluate
      * @return true if the access is permitted
      */
-    boolean can(String action, String resource, Set<Role> roles);
+    default boolean can(String action, String resource, Set<Role> roles) {
+        return resolveScopes(roles).stream()
+                .anyMatch(scope -> scope.action().equalsIgnoreCase(action)
+                        && scope.resource().equalsIgnoreCase(resource));
+    }
 
     /**
      * Checks whether the provided roles grant the given Scope by name.
@@ -91,5 +96,22 @@ public interface ScopePolicy {
      * @param roles     the granted roles
      * @return true if the scope is granted
      */
-    boolean hasScope(String scopeName, Set<Role> roles);
+    default boolean hasScope(String scopeName, Set<Role> roles) {
+        return resolveScopes(roles).stream()
+                .anyMatch(scope -> scope.name().equalsIgnoreCase(scopeName));
+    }
+
+    /**
+     * Resolves authorities suitable for Spring Security / JWT:
+     * - ROLE_...
+     * - SCOPE_resource:action
+     */
+    default Set<String> resolveAuthorities(Set<Role> roles) {
+        Set<String> authorities = roles.stream()
+                .map(Role::toAuthorities)
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
+
+        return Set.copyOf(authorities);
+    }
 }
