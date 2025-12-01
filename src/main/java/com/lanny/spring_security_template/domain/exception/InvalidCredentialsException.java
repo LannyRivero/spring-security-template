@@ -1,21 +1,14 @@
 package com.lanny.spring_security_template.domain.exception;
 
 /**
- * Thrown when a user attempts to authenticate with invalid credentials.
- * 
- * <p>Mapped to <strong>HTTP 401 Unauthorized</strong> in the web layer.
- * Should never leak details such as whether the username exists.</p>
+ * Thrown when user credentials (username/password) are invalid.
  */
-public class InvalidCredentialsException extends DomainException {
+public final class InvalidCredentialsException extends DomainException {
 
-    public static final String CODE = "ERR-AUTH-001";
-
-    public InvalidCredentialsException() {
-        super(CODE, "Invalid username or password");
-    }
+    private static final String CODE = "AUTH-001";
+    private static final String KEY = "auth.invalid_credentials";
 
     public InvalidCredentialsException(String message) {
-        super(CODE, message);
+        super(CODE, KEY, message);
     }
 }
-
