@@ -14,6 +14,7 @@ import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
 import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
 import com.lanny.spring_security_template.domain.valueobject.UserId;
 import com.lanny.spring_security_template.domain.valueobject.Username;
+import com.lanny.spring_security_template.infrastructure.mapper.DomainModelMapper;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.UserEntity;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.repository.UserJpaRepository;
 
@@ -113,8 +114,8 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
                 EmailAddress.of(entity.getEmail()),
                 PasswordHash.of(entity.getPasswordHash()),
                 status,
-                roles,
-                scopes);
+                DomainModelMapper.toRoles(roles),
+                DomainModelMapper.toScopes(scopes));
     }
 
     // ======================================================================
