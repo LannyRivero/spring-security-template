@@ -1,22 +1,19 @@
 package com.lanny.spring_security_template.domain.model;
 
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
+import com.lanny.spring_security_template.domain.exception.InvalidRoleException;
+
 /**
- * Rich domain Value Object representing a Role with normalized name and
- * associated scopes.
+ * Rich domain Value Object representing a Role with normalized name and scopes.
  *
- * <p>
- * Normalization rules (enterprise standard):
- * <ul>
- * <li>Trimmed</li>
- * <li>Uppercase</li>
- * <li>Always starts with "ROLE_"</li>
- * <li>Matches pattern ROLE_[A-Z0-9_-]+</li>
- * </ul>
- *
- * This ensures consistency with Spring Security and avoids malformed roles.
+ * Normalization:
+ * - Trimmed
+ * - Uppercase
+ * - Always starts with "ROLE_"
+ * - Pattern: ROLE_[A-Z0-9_-]+
  */
 public record Role(String name, Set<Scope> scopes) {
 
@@ -24,14 +21,19 @@ public record Role(String name, Set<Scope> scopes) {
         Objects.requireNonNull(name, "Role name cannot be null");
         Objects.requireNonNull(scopes, "Role scopes cannot be null");
 
-        // 1. Normalize
-        name = normalize(name);
+        String normalized = normalize(name);
+        validateRoleName(normalized);
 
-        // 2. Validate
-        validateRoleName(name);
-
-        // 3. Defensive copy
+        name = normalized;
         scopes = Set.copyOf(scopes);
+    }
+
+    /**
+     * Factory for creating a Role with an empty scope set.
+     * Useful for persistence → domain mapping.
+     */
+    public static Role from(String rawName) {
+        return new Role(rawName, Set.of());
     }
 
     private static String normalize(String raw) {
@@ -44,9 +46,8 @@ public record Role(String name, Set<Scope> scopes) {
 
     private static void validateRoleName(String role) {
         if (!role.matches("ROLE_[A-Z0-9_-]+")) {
-            throw new IllegalArgumentException(
-                    "Invalid role format '" + role +
-                            "'. Expected ROLE_[A-Z0-9_-]+");
+            throw new InvalidRoleException(
+                    "Invalid role format '" + role + "'. Expected ROLE_[A-Z0-9_-]+");
         }
     }
 
@@ -75,19 +76,15 @@ public record Role(String name, Set<Scope> scopes) {
     }
 
     public Role mergeWith(Role other) {
-        Set<Scope> merged = new java.util.HashSet<>(this.scopes);
+        Set<Scope> merged = new HashSet<>(this.scopes);
         merged.addAll(other.scopes);
         return new Role(this.name, merged);
     }
 
     public Set<String> toAuthorities() {
-        Set<String> authorities = new java.util.HashSet<>();
-
-        // name already normalized with ROLE_
-        authorities.add(name);
-
+        Set<String> authorities = new HashSet<>();
+        authorities.add(name); // ROLE_...
         scopes.forEach(scope -> authorities.add("SCOPE_" + scope.name()));
-
         return authorities;
     }
 }

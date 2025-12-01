@@ -3,33 +3,13 @@ package com.lanny.spring_security_template.domain.valueobject;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import com.lanny.spring_security_template.domain.exception.InvalidEmailException;
+
 /**
  * Value Object representing a validated, normalized email address.
- *
- * <p>
- * Emails are always:
- * </p>
- * <ul>
- * <li>Trimmed</li>
- * <li>Stored in lowercase</li>
- * <li>Validated with a safe and reasonable email pattern</li>
- * <li>Immutable</li>
- * </ul>
- *
- * <p>
- * This VO does not aim to fully validate RFC-5322 emails, but instead
- * enforces a practical and secure subset suitable for authentication systems.
- * </p>
  */
 public final class EmailAddress {
 
-    /**
-     * Reasonable and safe validation pattern.
-     * 
-     * Allowed:
-     * - Letters, digits, dot, underscore, dash in local-part
-     * - Standard domain with at least one dot
-     */
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private static final int MAX_LENGTH = 254; // RFC recommendation
@@ -41,20 +21,20 @@ public final class EmailAddress {
     }
 
     public static EmailAddress of(String raw) {
-        Objects.requireNonNull(raw, "Email cannot be null or blank");
+        Objects.requireNonNull(raw, "Email cannot be null");
 
         String normalized = raw.trim().toLowerCase();
 
         if (normalized.isBlank()) {
-            throw new IllegalArgumentException("Email cannot be blank");
+            throw new InvalidEmailException("Email cannot be blank");
         }
 
         if (normalized.length() > MAX_LENGTH) {
-            throw new IllegalArgumentException("Email is too long (max 254 chars)");
+            throw new InvalidEmailException("Email is too long (max 254 chars)");
         }
 
         if (!EMAIL_PATTERN.matcher(normalized).matches()) {
-            throw new IllegalArgumentException("Invalid email format");
+            throw new InvalidEmailException("Invalid email format");
         }
 
         return new EmailAddress(normalized);

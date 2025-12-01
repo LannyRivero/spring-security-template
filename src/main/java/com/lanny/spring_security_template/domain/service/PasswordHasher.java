@@ -16,4 +16,13 @@ public interface PasswordHasher {
      * Check if a raw password matches an existing hash.
      */
     boolean matches(String rawPassword, String hashedPassword);
+
+    /**
+     * Indicates whether the provided hash should be upgraded (algorithm/parameters
+     * outdated).
+     * Default: no rehash required.
+     */
+    default boolean needsRehash(String hashedPassword) {
+        return false;
+    }
 }

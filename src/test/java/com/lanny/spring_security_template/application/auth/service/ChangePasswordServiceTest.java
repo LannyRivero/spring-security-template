@@ -22,6 +22,7 @@ import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
 import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
 import com.lanny.spring_security_template.domain.valueobject.UserId;
 import com.lanny.spring_security_template.domain.valueobject.Username;
+import com.lanny.spring_security_template.infrastructure.mapper.DomainModelMapper;
 
 class ChangePasswordServiceTest {
 
@@ -60,8 +61,8 @@ class ChangePasswordServiceTest {
                                 EmailAddress.of("user@example.com"),
                                 PasswordHash.of(VALID_HASH),
                                 UserStatus.ACTIVE,
-                                List.of("ROLE_USER"),
-                                List.of("read:profile"));
+                                DomainModelMapper.toRoles(List.of("ROLE_USER")),
+                                DomainModelMapper.toScopes(List.of("read:profile")));
         }
 
         // -------------------------------------------------------------------------

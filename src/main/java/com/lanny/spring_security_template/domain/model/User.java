@@ -2,10 +2,14 @@ package com.lanny.spring_security_template.domain.model;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.HashSet;
 
 import com.lanny.spring_security_template.domain.exception.UserDeletedException;
 import com.lanny.spring_security_template.domain.exception.UserDisabledException;
 import com.lanny.spring_security_template.domain.exception.UserLockedException;
+import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
+import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
 import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
@@ -13,18 +17,10 @@ import com.lanny.spring_security_template.domain.valueobject.UserId;
 import com.lanny.spring_security_template.domain.valueobject.Username;
 
 /**
- * Aggregate root representing a system user.
+ * Aggregate Root representing a system user.
  *
- * <p>
- * Applies all domain rules related to authentication, status validation,
- * password verification and identity consistency, while keeping all fields
- * immutable.
- * </p>
- *
- * <p>
- * This aggregate is pure domain code: it contains no references to
- * infrastructure, frameworks or annotations.
- * </p>
+ * All authentication rules, password checks, and account state
+ * validations live here.
  */
 public final class User {
 
@@ -33,20 +29,20 @@ public final class User {
     private final EmailAddress email;
     private final PasswordHash passwordHash;
     private final UserStatus status;
-    private final List<String> roles;
-    private final List<String> scopes;
 
-    // ======================================================
-    // CONSTRUCTOR PRIVADO
-    // ======================================================
+    /** Value Objects — not strings */
+    private final List<Role> roles;
+    private final List<Scope> scopes;
+
     private User(
             UserId id,
             Username username,
             EmailAddress email,
             PasswordHash passwordHash,
             UserStatus status,
-            List<String> roles,
-            List<String> scopes) {
+            List<Role> roles,
+            List<Scope> scopes) {
+
         this.id = Objects.requireNonNull(id);
         this.username = Objects.requireNonNull(username);
         this.email = Objects.requireNonNull(email);
@@ -57,48 +53,43 @@ public final class User {
     }
 
     // ======================================================
-    // FACTORY METHODS
+    // FACTORIES
     // ======================================================
 
-    /**
-     * Creates a new active user with default roles/scopes.
-     * Used typically in registration flows (dev/admin).
-     */
     public static User createNew(
             Username username,
             EmailAddress email,
             PasswordHash passwordHash,
-            List<String> roles,
-            List<String> scopes) {
+            List<Role> roles,
+            List<Scope> scopes) {
+
         return new User(
                 UserId.newId(),
                 username,
                 email,
                 passwordHash,
                 UserStatus.ACTIVE,
-                sanitize(roles),
-                sanitize(scopes));
+                sanitizeRoles(roles),
+                sanitizeScopes(scopes));
     }
 
-    /**
-     * Reconstructs an existing user (hydration from persistence).
-     */
     public static User rehydrate(
             UserId id,
             Username username,
             EmailAddress email,
             PasswordHash passwordHash,
             UserStatus status,
-            List<String> roles,
-            List<String> scopes) {
+            List<Role> roles,
+            List<Scope> scopes) {
+
         return new User(
                 id,
                 username,
                 email,
                 passwordHash,
                 status,
-                sanitize(roles),
-                sanitize(scopes));
+                sanitizeRoles(roles),
+                sanitizeScopes(scopes));
     }
 
     // ======================================================
@@ -106,11 +97,7 @@ public final class User {
     // ======================================================
 
     /**
-     * Ensures the user can authenticate.
-     * Throws domain exceptions depending on status:
-     * - LOCKED → UserLockedException
-     * - DISABLED → UserDisabledException
-     * - DELETED → UserDeletedException
+     * Ensures the user is allowed to authenticate based on account status.
      */
     public void ensureCanAuthenticate() {
         switch (status) {
@@ -123,31 +110,66 @@ public final class User {
     }
 
     /**
-     * Verifies a password and throws the appropriate domain exception if invalid.
-     * Used in login flows.
+     * Validates password using domain rules.
      */
     public void verifyPassword(String rawPassword, PasswordHasher hasher) {
         ensureCanAuthenticate();
         if (!hasher.matches(rawPassword, passwordHash.value())) {
-            throw new com.lanny.spring_security_template.domain.exception.InvalidCredentialsException(
-                    "Invalid password for " + username.value());
+            throw new InvalidCredentialsException("Invalid password for " + username.value());
         }
     }
 
     // ======================================================
-    // INTERNAL SANITIZATION
+    // AUTHORITIES (DERIVED STATE)
     // ======================================================
 
-    private static List<String> sanitize(List<String> list) {
-        Objects.requireNonNull(list);
-        return list.stream()
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .toList();
+    /**
+     * Simple authority resolution:
+     * - ROLE_...
+     * - SCOPE_xxx:yyy
+     */
+    public Set<String> authorities() {
+        Set<String> result = new HashSet<>();
+
+        roles.forEach(r -> result.add(r.name()));
+        scopes.forEach(s -> result.add("SCOPE_" + s.name()));
+
+        return Set.copyOf(result);
+    }
+
+    /**
+     * Authority resolution using a Policy (RBAC / ABAC).
+     * This is used when roles imply extra scopes dynamically.
+     */
+    public Set<String> authorities(ScopePolicy policy) {
+        Set<String> result = new HashSet<>();
+
+        // roles directos
+        roles.forEach(r -> result.add(r.name()));
+
+        // scopes derivados por política
+        policy.resolveScopes(Set.copyOf(roles))
+                .forEach(s -> result.add("SCOPE_" + s.name()));
+
+        return Set.copyOf(result);
     }
 
     // ======================================================
-    // GETTERS (IMMUTABLE)
+    // SANITIZATION HELPERS
+    // ======================================================
+
+    private static List<Role> sanitizeRoles(List<Role> list) {
+        Objects.requireNonNull(list);
+        return list.stream().filter(Objects::nonNull).toList();
+    }
+
+    private static List<Scope> sanitizeScopes(List<Scope> list) {
+        Objects.requireNonNull(list);
+        return list.stream().filter(Objects::nonNull).toList();
+    }
+
+    // ======================================================
+    // IMMUTABLE GETTERS
     // ======================================================
 
     public UserId id() {
@@ -170,12 +192,27 @@ public final class User {
         return status;
     }
 
-    public List<String> roles() {
+    public List<Role> roles() {
         return roles;
     }
 
-    public List<String> scopes() {
+    public List<Scope> scopes() {
         return scopes;
+    }
+
+    // ======================================================
+    // PASSWORD UPDATE (IMMUTABLE)
+    // ======================================================
+
+    public User withChangedPassword(PasswordHash newHash) {
+        return new User(
+                this.id,
+                this.username,
+                this.email,
+                newHash,
+                this.status,
+                this.roles,
+                this.scopes);
     }
 
     // ======================================================
@@ -184,40 +221,12 @@ public final class User {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (!(o instanceof User user))
-            return false;
-        return Objects.equals(id, user.id);
+        return (this == o) ||
+                (o instanceof User other && Objects.equals(this.id, other.id));
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(id);
     }
-
-    /**
-     * Returns a new {@link User} instance with an updated password hash,
-     * preserving all other attributes.
-     *
-     * <p>
-     * This method respects the immutability of the aggregate and is
-     * the canonical way to perform password updates from the domain layer.
-     * </p>
-     *
-     * @param newPasswordHash the newly hashed password
-     * @return a new {@link User} instance with updated password
-     */
-    public User withChangedPassword(PasswordHash newPasswordHash) {
-        Objects.requireNonNull(newPasswordHash, "PasswordHash cannot be null");
-        return new User(
-                this.id,
-                this.username,
-                this.email,
-                newPasswordHash,
-                this.status,
-                this.roles,
-                this.scopes);
-    }
-
 }

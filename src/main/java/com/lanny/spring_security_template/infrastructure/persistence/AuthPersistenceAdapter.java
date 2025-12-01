@@ -7,6 +7,8 @@ import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
 import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
 import com.lanny.spring_security_template.domain.valueobject.UserId;
 import com.lanny.spring_security_template.domain.valueobject.Username;
+import com.lanny.spring_security_template.infrastructure.mapper.DomainModelMapper;
+
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -19,9 +21,7 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
     private final Map<String, User> demoUsers = new HashMap<>();
 
     public AuthPersistenceAdapter() {
-        // --------------------------------------------
-        // DEMO users using the new domain model API
-        // --------------------------------------------
+
         demoUsers.put("1",
                 User.rehydrate(
                         UserId.from("1"),
@@ -29,8 +29,8 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
                         EmailAddress.of("admin@example.com"),
                         PasswordHash.of("{noop}admin123"),
                         UserStatus.ACTIVE,
-                        List.of("ROLE_ADMIN"),
-                        List.of("profile:read", "profile:write")));
+                        DomainModelMapper.toRoles(List.of("ROLE_ADMIN")),
+                        DomainModelMapper.toScopes(List.of("profile:read", "profile:write"))));
 
         demoUsers.put("2",
                 User.rehydrate(
@@ -39,8 +39,8 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
                         EmailAddress.of("user@example.com"),
                         PasswordHash.of("{noop}user123"),
                         UserStatus.ACTIVE,
-                        List.of("ROLE_USER"),
-                        List.of("profile:read")));
+                        DomainModelMapper.toRoles(List.of("ROLE_USER")),
+                        DomainModelMapper.toScopes(List.of("profile:read"))));
     }
 
     @Override

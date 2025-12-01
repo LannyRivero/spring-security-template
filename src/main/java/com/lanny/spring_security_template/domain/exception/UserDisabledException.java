@@ -1,21 +1,22 @@
 package com.lanny.spring_security_template.domain.exception;
 
 /**
- * Thrown when a user account has been permanently disabled
- * by an administrator or security policy.
- *
- * <p>Mapped to <strong>HTTP 403 Forbidden</strong>.</p>
+ * Thrown when a user account is disabled by an administrator.
  */
-public class UserDisabledException extends DomainException {
+public final class UserDisabledException extends DomainException {
 
-    public static final String CODE = "ERR-AUTH-003";
+    private static final String CODE = "ERR-AUTH-003";
+    private static final String KEY  = "auth.user_disabled";
+    private static final String DEFAULT_MESSAGE = "User account is disabled";
 
+    /** Default constructor with standard message */
     public UserDisabledException() {
-        super(CODE, "User account is disabled");
+        super(CODE, KEY, DEFAULT_MESSAGE);
     }
 
+    /** Custom message constructor */
     public UserDisabledException(String message) {
-        super(CODE, message);
+        super(CODE, KEY, message);
     }
 }
 
