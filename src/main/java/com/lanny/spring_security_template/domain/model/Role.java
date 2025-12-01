@@ -28,6 +28,14 @@ public record Role(String name, Set<Scope> scopes) {
         scopes = Set.copyOf(scopes);
     }
 
+    /**
+     * Factory for creating a Role with an empty scope set.
+     * Useful for persistence → domain mapping.
+     */
+    public static Role from(String rawName) {
+        return new Role(rawName, Set.of());
+    }
+
     private static String normalize(String raw) {
         String n = raw.trim().toUpperCase();
         if (!n.startsWith("ROLE_")) {
