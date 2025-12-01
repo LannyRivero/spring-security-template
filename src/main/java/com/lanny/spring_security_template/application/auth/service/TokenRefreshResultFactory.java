@@ -3,7 +3,6 @@ package com.lanny.spring_security_template.application.auth.service;
 import java.time.Duration;
 import java.time.Instant;
 
-import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.application.auth.policy.TokenPolicyProperties;
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
@@ -56,7 +55,6 @@ import lombok.RequiredArgsConstructor;
  * return ResponseEntity.ok(result);
  * }</pre>
  */
-@Component
 @RequiredArgsConstructor
 public class TokenRefreshResultFactory {
 

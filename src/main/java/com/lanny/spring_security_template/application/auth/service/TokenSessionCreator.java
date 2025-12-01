@@ -1,6 +1,5 @@
 package com.lanny.spring_security_template.application.auth.service;
 
-import org.springframework.stereotype.Service;
 
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
@@ -40,7 +39,6 @@ import lombok.RequiredArgsConstructor;
  * <li>OWASP ASVS 2.8.4 – Track issued tokens for revocation and auditing.</li>
  * </ul>
  */
-@Service
 @RequiredArgsConstructor
 public class TokenSessionCreator {
 

@@ -1,8 +1,5 @@
 package com.lanny.spring_security_template.application.auth.service;
 
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.lanny.spring_security_template.application.auth.policy.PasswordPolicy;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
@@ -16,10 +13,10 @@ import lombok.RequiredArgsConstructor;
 /**
  * Pure password change use-case logic.
  *
- * Clean: no logging, no MDC, no auditing, no metrics.
- * All cross-cutting concerns are handled by the AuthUseCase decorator.
+ * No logging, no MDC, no auditing, no metrics.
+ * No Spring annotations.
+ * Cross-cutting concerns belong to decorators and infrastructure.
  */
-@Service
 @RequiredArgsConstructor
 public class ChangePasswordService {
 
@@ -28,7 +25,6 @@ public class ChangePasswordService {
     private final PasswordHasher passwordHasher;
     private final PasswordPolicy passwordPolicy;
 
-    @Transactional
     public void changePassword(String username, String currentPassword, String newPassword) {
 
         if (username == null || username.isBlank() ||
@@ -37,7 +33,7 @@ public class ChangePasswordService {
             throw new IllegalArgumentException("Username and passwords must not be blank");
         }
 
-        // 1. Retrieve user (generic error → prevent user enumeration)
+        // 1. Retrieve user (generic error → prevent enumeration)
         User user = userAccountGateway.findByUsernameOrEmail(username)
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid current password"));
 
