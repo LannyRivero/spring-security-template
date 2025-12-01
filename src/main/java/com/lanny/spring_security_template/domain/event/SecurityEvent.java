@@ -4,80 +4,133 @@ package com.lanny.spring_security_template.domain.event;
  * Enumeration of standardized security-related events.
  *
  * <p>
- * Defines all relevant events emitted by the authentication and session
- * subsystems.
- * Each constant represents a distinct security lifecycle event, ensuring
- * uniform
- * audit logging and observability integration across the platform.
+ * Defines all relevant events emitted by the authentication, token,
+ * session, and password subsystems. Each constant represents a distinct
+ * security lifecycle event, enabling consistent audit logging,
+ * observability, SIEM ingestion and compliance with OWASP ASVS logging rules.
  * </p>
- *
- * <p>
- * <strong>Aligned with OWASP ASVS:</strong>
- * </p>
- * <ul>
- * <li>2.10.1 – Log all authentication decisions</li>
- * <li>2.10.3 – Log all session management events</li>
- * <li>2.10.4 – Include enough context for traceability</li>
- * <li>2.8.x – Password change and recovery flows</li>
- * </ul>
- *
- * <p>
- * <strong>Typical usage:</strong>
- * </p>
- * 
- * <pre>{@code
- * auditEventPublisher.publishAuthEvent(
- *         SecurityEvent.LOGIN_SUCCESS.name(),
- *         username,
- *         clockProvider.now(),
- *         "User authenticated successfully");
- * }</pre>
  */
 public enum SecurityEvent {
 
+    // ----------------------------------------------------------------------
+    // AUTHENTICATION EVENTS
+    // ----------------------------------------------------------------------
+
     /** Successful user authentication */
-    LOGIN_SUCCESS,
+    LOGIN_SUCCESS(Category.AUTH, Severity.INFO,
+            "User authenticated successfully"),
 
     /** Failed user authentication (invalid credentials or unknown user) */
-    LOGIN_FAILURE,
+    LOGIN_FAILURE(Category.AUTH, Severity.WARN,
+            "Authentication failed: invalid credentials or unknown user"),
 
-    LOGIN_ATTEMPT,
+    /** Login attempt before outcome is known */
+    LOGIN_ATTEMPT(Category.AUTH, Severity.INFO,
+            "User attempted to authenticate"),
 
-    /** Token successfully refreshed */
-    TOKEN_REFRESH,
+    // ----------------------------------------------------------------------
+    // TOKEN EVENTS
+    // ----------------------------------------------------------------------
 
-    TOKEN_REFRESH_ATTEMPT,
+    /** Successful token refresh */
+    TOKEN_REFRESH(Category.TOKEN, Severity.INFO,
+            "Refresh token successfully exchanged for new tokens"),
 
-    TOKEN_REFRESH_FAILED,
+    /** Attempt to refresh token before outcome is known */
+    TOKEN_REFRESH_ATTEMPT(Category.TOKEN, Severity.INFO,
+            "Attempt to refresh authentication token"),
 
-    /** Token rotation occurred (old token revoked, new issued) */
-    TOKEN_ROTATED,
+    /** Token refresh failed */
+    TOKEN_REFRESH_FAILED(Category.TOKEN, Severity.WARN,
+            "Refresh token invalid or expired"),
 
-    /** Token explicitly revoked (logout, rotation, admin action) */
-    TOKEN_REVOKED,
+    /** Token rotation executed (old revoked, new issued) */
+    TOKEN_ROTATED(Category.TOKEN, Severity.INFO,
+            "Token rotation completed"),
 
-    /** Token(s) issued (login, refresh, rotation) */
-    TOKEN_ISSUED,
+    /** Token explicitly revoked by logout, rotation, or admin action */
+    TOKEN_REVOKED(Category.TOKEN, Severity.INFO,
+            "Authentication token revoked"),
 
-    /** User account temporarily locked due to brute-force protection */
-    USER_LOCKED,
+    /** New tokens issued (login, refresh, rotation) */
+    TOKEN_ISSUED(Category.TOKEN, Severity.INFO,
+            "Authentication tokens issued"),
 
-    USER_REGISTERED,
+    // ----------------------------------------------------------------------
+    // USER ACCOUNT EVENTS
+    // ----------------------------------------------------------------------
 
-    /** Password successfully changed by user */
-    PASSWORD_CHANGED,
+    /** Account was locked due to brute-force protection */
+    USER_LOCKED(Category.USER, Severity.WARN,
+            "User account locked due to security policies"),
 
-    /** Password change failed (invalid current password or weak new password) */
-    PASSWORD_CHANGE_FAILED,
+    /** Successful user registration */
+    USER_REGISTERED(Category.USER, Severity.INFO,
+            "New user registered"),
 
-    PASSWORD_CHANGE_ATTEMPT;
+    // ----------------------------------------------------------------------
+    // PASSWORD EVENTS
+    // ----------------------------------------------------------------------
 
-    /**
-     * Returns a standardized code for external logging or metrics.
-     * 
-     * @return code in format SEC_EVENTNAME (e.g. SEC_LOGIN_SUCCESS)
-     */
+    /** Password successfully changed */
+    PASSWORD_CHANGED(Category.PASSWORD, Severity.INFO,
+            "Password updated successfully"),
+
+    /** Password change attempt failed */
+    PASSWORD_CHANGE_FAILED(Category.PASSWORD, Severity.WARN,
+            "Password change failed"),
+
+    /** Attempt to change password before validation */
+    PASSWORD_CHANGE_ATTEMPT(Category.PASSWORD, Severity.INFO,
+            "User attempted to change password");
+
+    // ----------------------------------------------------------------------
+    // INTERNAL FIELDS
+    // ----------------------------------------------------------------------
+
+    private final Category category;
+    private final Severity severity;
+    private final String description;
+
+    SecurityEvent(Category category, Severity severity, String description) {
+        this.category = category;
+        this.severity = severity;
+        this.description = description;
+    }
+
+    // ----------------------------------------------------------------------
+    // ACCESSORS FOR OBSERVABILITY
+    // ----------------------------------------------------------------------
+
+    /** Returns a standardized code for logging and metrics: SEC_EVENTNAME */
     public String code() {
         return "SEC_" + name();
+    }
+
+    /** Returns the high-level category of the event */
+    public Category category() {
+        return category;
+    }
+
+    /** Log severity for monitoring systems */
+    public Severity severity() {
+        return severity;
+    }
+
+    /** Human-readable description for logs/SIEM */
+    public String description() {
+        return description;
+    }
+
+    // ----------------------------------------------------------------------
+    // ENUMS
+    // ----------------------------------------------------------------------
+
+    public enum Category {
+        AUTH, TOKEN, USER, PASSWORD
+    }
+
+    public enum Severity {
+        INFO, WARN, ERROR
     }
 }
