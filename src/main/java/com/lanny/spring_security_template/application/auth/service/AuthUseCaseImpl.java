@@ -10,6 +10,8 @@ import com.lanny.spring_security_template.application.auth.result.MeResult;
 
 import com.lanny.spring_security_template.infrastructure.adapter.usecase.ChangePasswordTransactionalAdapter;
 import com.lanny.spring_security_template.infrastructure.adapter.usecase.DevRegisterTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.LoginTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.RefreshTransactionalAdapter;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,8 +23,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthUseCaseImpl implements AuthUseCase {
 
-    private final LoginService loginService;
-    private final RefreshService refreshService;
+    private final LoginTransactionalAdapter loginAdapter;
+    private final RefreshTransactionalAdapter refreshAdapter;
     private final MeService meService;
     private final DevRegisterTransactionalAdapter devRegisterAdapter;
     private final ChangePasswordTransactionalAdapter changePasswordAdapter;
@@ -30,12 +32,12 @@ public class AuthUseCaseImpl implements AuthUseCase {
     @Override
     public JwtResult login(LoginCommand cmd) {
         validateInput(cmd.username(), cmd.password());
-        return loginService.login(cmd);
+        return loginAdapter.login(cmd);
     }
 
     @Override
     public JwtResult refresh(RefreshCommand cmd) {
-        return refreshService.refresh(cmd);
+        return refreshAdapter.refresh(cmd);
     }
 
     @Override

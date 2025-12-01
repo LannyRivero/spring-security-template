@@ -13,8 +13,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.lanny.spring_security_template.application.auth.policy.RotationPolicy;
-import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
-import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
 import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
@@ -22,7 +20,6 @@ import com.lanny.spring_security_template.application.auth.port.out.TokenBlackli
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
-import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 /**
  * Unit tests for {@link TokenRotationHandler}.
@@ -37,9 +34,6 @@ class TokenRotationHandlerTest {
         private SessionRegistryGateway sessionRegistry;
         private TokenBlacklistGateway blacklist;
         private RotationPolicy rotationPolicy;
-        private AuthMetricsService metrics;
-        private AuditEventPublisher auditEventPublisher;
-        private ClockProvider clockProvider;
         private TokenRotationHandler handler;
 
         private static final String USERNAME = "lanny";
@@ -58,16 +52,12 @@ class TokenRotationHandlerTest {
                 sessionRegistry = mock(SessionRegistryGateway.class);
                 blacklist = mock(TokenBlacklistGateway.class);
                 rotationPolicy = mock(RotationPolicy.class);
-                metrics = mock(AuthMetricsService.class);
-                auditEventPublisher = mock(AuditEventPublisher.class);
-                clockProvider = mock(ClockProvider.class);
 
                 handler = new TokenRotationHandler(
                                 roleProvider, scopePolicy, tokenIssuer,
                                 refreshTokenStore, sessionRegistry, blacklist,
-                                rotationPolicy, metrics, clockProvider, auditEventPublisher);
+                                rotationPolicy);
 
-                // Datos base
                 claims = new JwtClaimsDTO(
                                 USERNAME,
                                 OLD_JTI,
@@ -109,7 +99,6 @@ class TokenRotationHandlerTest {
                 assertThat(result.accessToken()).isEqualTo("access-new");
                 assertThat(result.refreshToken()).isEqualTo("refresh-new");
 
-                // Verificar orden lógico de acciones
                 verify(blacklist).revoke(eq(OLD_JTI), any());
                 verify(refreshTokenStore).delete(OLD_JTI);
                 verify(sessionRegistry).removeSession(USERNAME, OLD_JTI);
@@ -117,9 +106,6 @@ class TokenRotationHandlerTest {
                 verify(tokenIssuer).issueTokens(eq(USERNAME), any());
                 verify(refreshTokenStore).save(eq(USERNAME), eq(NEW_JTI), any(), any());
                 verify(sessionRegistry).registerSession(eq(USERNAME), eq(NEW_JTI), any());
-                verify(metrics).recordTokenRefresh();
-                verify(auditEventPublisher, atLeastOnce()).publishAuthEvent(anyString(), eq(USERNAME), any(),
-                                anyString());
 
                 verifyNoMoreInteractions(blacklist, refreshTokenStore, sessionRegistry, tokenIssuer);
         }

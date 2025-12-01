@@ -13,11 +13,15 @@ import com.lanny.spring_security_template.domain.time.ClockProvider;
 @Configuration
 public class AuthApplicationConfig {
 
+    /*
+     * ============================================================
+     * CORE VALIDATORS & METRICS
+     * ============================================================
+     */
     @Bean
     public AuthenticationValidator authenticationValidator(
             UserAccountGateway userAccountGateway,
             PasswordHasher passwordHasher) {
-
         return new AuthenticationValidator(userAccountGateway, passwordHasher);
     }
 
@@ -26,22 +30,30 @@ public class AuthApplicationConfig {
         return new LoginMetricsRecorder(metricsService);
     }
 
+    /*
+     * ============================================================
+     * TOKEN ISSUANCE
+     * ============================================================
+     */
     @Bean
     public TokenIssuer tokenIssuer(
             TokenProvider tokenProvider,
             ClockProvider clockProvider,
             TokenPolicyProperties tokenPolicy) {
-
         return new TokenIssuer(tokenProvider, clockProvider, tokenPolicy);
     }
 
+    /*
+     * ============================================================
+     * SESSION MANAGEMENT
+     * ============================================================
+     */
     @Bean
     public SessionManager sessionManager(
             SessionRegistryGateway sessionRegistry,
             TokenBlacklistGateway blacklist,
             SessionPolicy policy,
             RefreshTokenStore refreshTokenStore) {
-
         return new SessionManager(sessionRegistry, blacklist, policy, refreshTokenStore);
     }
 
@@ -52,17 +64,20 @@ public class AuthApplicationConfig {
             TokenIssuer issuer,
             SessionManager sessionManager,
             RefreshTokenStore store) {
-
         return new TokenSessionCreator(roleProvider, scopePolicy, issuer, sessionManager, store);
     }
 
+    /*
+     * ============================================================
+     * LOGIN SERVICE
+     * ============================================================
+     */
     @Bean
     public LoginService loginService(
             AuthenticationValidator validator,
             TokenSessionCreator tokenSessionCreator,
             LoginMetricsRecorder loginMetricsRecorder,
             LoginAttemptPolicy loginAttemptPolicy) {
-
         return new LoginService(
                 validator,
                 tokenSessionCreator,
@@ -70,12 +85,16 @@ public class AuthApplicationConfig {
                 loginAttemptPolicy);
     }
 
+    /*
+     * ============================================================
+     * REFRESH TOKEN SERVICES
+     * ============================================================
+     */
     @Bean
     public RefreshTokenValidator refreshTokenValidator(
             RefreshTokenStore store,
             TokenBlacklistGateway blacklist,
             RefreshTokenPolicy policy) {
-
         return new RefreshTokenValidator(store, blacklist, policy);
     }
 
@@ -87,10 +106,7 @@ public class AuthApplicationConfig {
             RefreshTokenStore store,
             SessionRegistryGateway registry,
             TokenBlacklistGateway blacklist,
-            RotationPolicy rotationPolicy
-
-    ) {
-
+            RotationPolicy rotationPolicy) {
         return new TokenRotationHandler(
                 roleProvider,
                 scopePolicy,
@@ -108,7 +124,6 @@ public class AuthApplicationConfig {
             TokenProvider tokenProvider,
             ClockProvider clockProvider,
             TokenPolicyProperties tokenPolicy) {
-
         return new TokenRefreshResultFactory(
                 roleProvider,
                 scopePolicy,
@@ -127,22 +142,30 @@ public class AuthApplicationConfig {
         return new RefreshService(tokenProvider, validator, rotationHandler, resultFactory);
     }
 
+    /*
+     * ============================================================
+     * ME SERVICE
+     * ============================================================
+     */
     @Bean
     public MeService meService(
             UserAccountGateway userAccountGateway,
             RoleProvider roleProvider,
             ScopePolicy scopePolicy) {
-
         return new MeService(userAccountGateway, roleProvider, scopePolicy);
     }
 
+    /*
+     * ============================================================
+     * CHANGE PASSWORD SERVICE
+     * ============================================================
+     */
     @Bean
     public ChangePasswordService changePasswordService(
             UserAccountGateway userGateway,
             RefreshTokenStore refreshStore,
             PasswordHasher passwordHasher,
             PasswordPolicy passwordPolicy) {
-
         return new ChangePasswordService(
                 userGateway,
                 refreshStore,
@@ -150,13 +173,17 @@ public class AuthApplicationConfig {
                 passwordPolicy);
     }
 
+    /*
+     * ============================================================
+     * DEV REGISTER SERVICE
+     * ============================================================
+     */
     @Bean
     public DevRegisterService devRegisterService(
             UserAccountGateway gateway,
             PasswordHasher passwordHasher,
             PasswordPolicy passwordPolicy,
             AuthMetricsService metrics) {
-
         return new DevRegisterService(
                 gateway,
                 passwordHasher,

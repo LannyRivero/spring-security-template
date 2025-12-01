@@ -1,7 +1,6 @@
 package com.lanny.spring_security_template.application.auth;
 
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
-import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
@@ -9,7 +8,6 @@ import com.lanny.spring_security_template.application.auth.service.RefreshServic
 import com.lanny.spring_security_template.application.auth.service.RefreshTokenValidator;
 import com.lanny.spring_security_template.application.auth.service.TokenRefreshResultFactory;
 import com.lanny.spring_security_template.application.auth.service.TokenRotationHandler;
-import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,11 +34,9 @@ class RefreshServiceTimeTest {
                 RefreshTokenValidator validator = mock(RefreshTokenValidator.class);
                 TokenRotationHandler rotationHandler = mock(TokenRotationHandler.class);
                 TokenRefreshResultFactory resultFactory = mock(TokenRefreshResultFactory.class);
-                ClockProvider clockProvider = mock(ClockProvider.class);
-                AuditEventPublisher auditEventPublisher = mock(AuditEventPublisher.class);
 
                 RefreshService service = new RefreshService(
-                                tokenProvider, validator, rotationHandler, resultFactory, clockProvider, auditEventPublisher);
+                                tokenProvider, validator, rotationHandler, resultFactory);
 
                 String refreshToken = "valid-refresh-token";
 
@@ -81,11 +77,9 @@ class RefreshServiceTimeTest {
                 RefreshTokenValidator validator = mock(RefreshTokenValidator.class);
                 TokenRotationHandler rotationHandler = mock(TokenRotationHandler.class);
                 TokenRefreshResultFactory resultFactory = mock(TokenRefreshResultFactory.class);
-                ClockProvider clockProvider = mock(ClockProvider.class);
-                AuditEventPublisher auditEventPublisher = mock(AuditEventPublisher.class);
 
                 RefreshService service = new RefreshService(
-                                tokenProvider, validator, rotationHandler, resultFactory, clockProvider, auditEventPublisher);
+                                tokenProvider, validator, rotationHandler, resultFactory);
 
                 when(tokenProvider.validateAndGetClaims("invalid-token"))
                                 .thenReturn(Optional.empty());
