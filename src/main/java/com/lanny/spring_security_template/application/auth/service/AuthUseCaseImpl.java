@@ -8,13 +8,15 @@ import com.lanny.spring_security_template.application.auth.query.MeQuery;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
 
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.ChangePasswordTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.DevRegisterTransactionalAdapter;
+
 import lombok.RequiredArgsConstructor;
 
 /**
  * Core implementation of AuthUseCase.
  *
- * Contains only orchestration logic. No logging, MDC, auditing
- * or any other cross-cutting concern.
+ * Pure orchestration. No logging, no MDC, no Spring, no cross-cutting concerns.
  */
 @RequiredArgsConstructor
 public class AuthUseCaseImpl implements AuthUseCase {
@@ -22,8 +24,8 @@ public class AuthUseCaseImpl implements AuthUseCase {
     private final LoginService loginService;
     private final RefreshService refreshService;
     private final MeService meService;
-    private final DevRegisterService devRegisterService;
-    private final ChangePasswordService changePasswordService;
+    private final DevRegisterTransactionalAdapter devRegisterAdapter;
+    private final ChangePasswordTransactionalAdapter changePasswordAdapter;
 
     @Override
     public JwtResult login(LoginCommand cmd) {
@@ -43,12 +45,12 @@ public class AuthUseCaseImpl implements AuthUseCase {
 
     @Override
     public void registerDev(RegisterCommand cmd) {
-        devRegisterService.register(cmd);
+        devRegisterAdapter.register(cmd);
     }
 
     @Override
     public void changePassword(String username, String oldPassword, String newPassword) {
-        changePasswordService.changePassword(username, oldPassword, newPassword);
+        changePasswordAdapter.changePassword(username, oldPassword, newPassword);
     }
 
     private void validateInput(String username, String password) {

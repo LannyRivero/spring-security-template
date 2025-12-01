@@ -3,7 +3,6 @@ package com.lanny.spring_security_template.application.auth.service;
 import java.time.Duration;
 import java.time.Instant;
 
-import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.application.auth.policy.TokenPolicyProperties;
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
@@ -47,7 +46,6 @@ import lombok.RequiredArgsConstructor;
  * <li>OWASP ASVS 2.10.3 – "Ensure token issuance events are auditable."</li>
  * </ul>
  */
-@Component
 @RequiredArgsConstructor
 public class TokenIssuer {
 

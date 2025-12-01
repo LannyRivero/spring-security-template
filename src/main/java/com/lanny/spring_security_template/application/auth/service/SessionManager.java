@@ -2,38 +2,26 @@ package com.lanny.spring_security_template.application.auth.service;
 
 import java.time.Instant;
 import java.util.List;
-
-import org.springframework.stereotype.Component;
+import java.util.Objects;
 
 import com.lanny.spring_security_template.application.auth.policy.SessionPolicy;
-import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
-import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- *  Manages user sessions according to the configured {@link SessionPolicy}.
+ * Pure application-layer session manager.
  *
- * <p>
- * This component enforces session registration and concurrency limits:
- * <ul>
- *   <li>Registers each new refresh token as an active session.</li>
- *   <li>Revokes oldest sessions when the max session count is exceeded.</li>
- *   <li>Publishes audit events for registration and revocation actions.</li>
- * </ul>
- * </p>
+ * Enforces:
+ * - Session registration
+ * - Concurrent session limits
+ * - Automatic revocation of oldest sessions
  *
- * <h2>Security Compliance</h2>
- * <ul>
- *   <li>OWASP ASVS 2.8.3 – “Limit concurrent sessions per user.”</li>
- *   <li>OWASP ASVS 2.8.4 – “Revoke oldest sessions when limits exceeded.”</li>
- *   <li>OWASP ASVS 2.10.3 – “Log all session management events.”</li>
- * </ul>
+ * NO logging, NO auditing, NO Spring.
+ * Cross-cutting concerns belong in the AuthUseCaseDecorator.
  */
-@Component
 @RequiredArgsConstructor
 public class SessionManager {
 
@@ -41,60 +29,51 @@ public class SessionManager {
     private final TokenBlacklistGateway blacklist;
     private final SessionPolicy policy;
     private final RefreshTokenStore refreshTokenStore;
-    private final AuditEventPublisher auditEventPublisher;
-    private final ClockProvider clockProvider;
 
     /**
-     * Registers a new user session and enforces concurrency limits.
+     * Registers a new session and enforces max session concurrency.
      *
-     * @param tokens newly issued access/refresh token pair
+     * @param tokens issued token information
      */
     public void register(IssuedTokens tokens) {
-        String username = tokens.username();
-        Instant now = clockProvider.now();
 
-        //  Step 1: Register new session
-        sessionRegistry.registerSession(username, tokens.refreshJti(), tokens.refreshExp());
-        auditEventPublisher.publishAuthEvent(
-                "SESSION_REGISTERED",
-                username,
-                now,
-                "New session registered for refresh token JTI=" + tokens.refreshJti()
-        );
+        Objects.requireNonNull(tokens, "IssuedTokens must not be null");
+
+        String username = tokens.username();
+        String refreshJti = tokens.refreshJti();
+        Instant refreshExp = tokens.refreshExp();
+
+        // 1. Register the new session
+        sessionRegistry.registerSession(username, refreshJti, refreshExp);
 
         int maxSessions = policy.maxSessionsPerUser();
+        if (maxSessions <= 0) {
+            // Unlimited sessions allowed
+            return;
+        }
 
-        //  Step 2: If unlimited sessions are allowed, exit early
-        if (maxSessions <= 0) return;
+        // 2. Fetch active sessions
+        List<String> activeSessions = sessionRegistry.getActiveSessions(username);
 
-        List<String> sessions = sessionRegistry.getActiveSessions(username);
+        if (activeSessions.size() <= maxSessions) {
+            return;
+        }
 
-        //  Step 3: Enforce session limit
-        if (sessions.size() <= maxSessions) return;
+        // 3. Calculate how many sessions to revoke
+        int excess = activeSessions.size() - maxSessions;
 
-        int excess = sessions.size() - maxSessions;
-
-        //  Step 4: Revoke the oldest sessions first
+        // 4. Revoke oldest sessions first
         for (int i = 0; i < excess; i++) {
-            String jtiToRemove = sessions.get(i);
+            String jtiToRemove = activeSessions.get(i);
 
-            // 1. Revoke from blacklist
-            blacklist.revoke(jtiToRemove, tokens.refreshExp());
+            // Revoke in blacklist
+            blacklist.revoke(jtiToRemove, refreshExp);
 
-            // 2. Remove from session registry
+            // Remove from registry
             sessionRegistry.removeSession(username, jtiToRemove);
 
-            // 3. Delete from persistent refresh store
+            // Remove from persistent store
             refreshTokenStore.delete(jtiToRemove);
-
-            // 4. Publish audit event
-            auditEventPublisher.publishAuthEvent(
-                    "SESSION_REVOKED",
-                    username,
-                    now,
-                    "Revoked session with refresh JTI=" + jtiToRemove + " due to session limit exceeded"
-            );
         }
     }
 }
-

@@ -5,7 +5,6 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.application.auth.policy.RotationPolicy;
 import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
@@ -51,7 +50,6 @@ import lombok.RequiredArgsConstructor;
  * <li>OWASP ASVS 2.8.3 – “Limit and manage active sessions.”</li>
  * </ul>
  */
-@Component
 @RequiredArgsConstructor
 public class TokenRotationHandler {
 
