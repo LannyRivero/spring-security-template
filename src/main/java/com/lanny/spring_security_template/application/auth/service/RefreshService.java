@@ -8,10 +8,35 @@ import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Pure application service for handling refresh-token operations.
+ * Application service responsible for orchestrating the refresh-token workflow.
  *
- * No logging, no MDC, no auditing, no Spring.
- * Cross-cutting concerns handled by AuthUseCaseLoggingDecorator.
+ * <p>
+ * This class belongs to the pure <strong>application layer</strong> and
+ * contains
+ * no framework dependencies such as Spring, logging frameworks, MDC, or HTTP
+ * concerns.
+ * All cross-cutting responsibilities (audit, logging, correlation IDs, metrics)
+ * must be handled by decorators (e.g., {@code AuthUseCaseLoggingDecorator}).
+ * </p>
+ *
+ * <h2>Responsibilities</h2>
+ * <ul>
+ * <li>Validate the refresh token via {@link TokenProvider}</li>
+ * <li>Perform internal refresh-token validation (jti, expiration, replay
+ * checks)</li>
+ * <li>Apply rotation rules via {@link TokenRotationHandler}</li>
+ * <li>Produce new token results using {@link TokenRefreshResultFactory}</li>
+ * </ul>
+ *
+ * <h2>Non-responsibilities</h2>
+ * <ul>
+ * <li>No persistence</li>
+ * <li>No logging</li>
+ * <li>No exception mapping for HTTP</li>
+ * <li>No Spring Security logic</li>
+ * </ul>
+ *
+ * This strict separation keeps the refresh flow purely domain-oriented.
  */
 @RequiredArgsConstructor
 public class RefreshService {
@@ -22,7 +47,24 @@ public class RefreshService {
     private final TokenRefreshResultFactory resultFactory;
 
     /**
-     * Orchestrates the refresh token process.
+     * Executes the refresh-token workflow for the provided {@link RefreshCommand}.
+     *
+     * <p>
+     * Steps:
+     * </p>
+     * <ol>
+     * <li>Extract and validate JWT claims from the refresh token</li>
+     * <li>Perform domain-level refresh-token validation</li>
+     * <li>Either rotate the refresh token or reuse it</li>
+     * <li>Return a {@link JwtResult} for the client</li>
+     * </ol>
+     *
+     * @param cmd command object containing the original refresh token
+     * @return a {@link JwtResult} containing new access or access+refresh tokens
+     *
+     * @throws IllegalArgumentException
+     *                                  if the refresh token is invalid, expired,
+     *                                  revoked, or malformed
      */
     public JwtResult refresh(RefreshCommand cmd) {
 
@@ -31,16 +73,23 @@ public class RefreshService {
                 .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
     }
 
+    /**
+     * Applies validation and rotation rules to the extracted JWT claims.
+     *
+     * @param claims validated JWT claims obtained from the provider
+     * @param cmd    the refresh command containing the original refresh token
+     * @return a new {@link JwtResult}
+     */
     private JwtResult handleRefresh(JwtClaimsDTO claims, RefreshCommand cmd) {
-        // Validate token integrity (signature, expiration, jti, etc.)
+        // Validate token signature, expiration, JTI, and security rules
         validator.validate(claims);
 
-        // Rotation or reuse
+        // Determine if refresh token rotation is required
         if (rotationHandler.shouldRotate()) {
             return rotationHandler.rotate(claims);
-        } else {
-            return resultFactory.newAccessOnly(claims, cmd.refreshToken());
         }
+
+        // Otherwise return only a new access token, reusing the same refresh token
+        return resultFactory.newAccessOnly(claims, cmd.refreshToken());
     }
 }
-
