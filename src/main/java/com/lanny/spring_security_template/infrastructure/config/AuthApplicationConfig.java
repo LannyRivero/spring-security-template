@@ -4,34 +4,65 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.lanny.spring_security_template.application.auth.service.*;
+import com.lanny.spring_security_template.application.auth.policy.*;
+import com.lanny.spring_security_template.application.auth.port.out.*;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
-import com.lanny.spring_security_template.application.auth.policy.*;
-import com.lanny.spring_security_template.application.auth.port.out.*;
 
 @Configuration
 public class AuthApplicationConfig {
 
-    // ---------------------------
-    // AUTHENTICATION VALIDATOR
-    // ---------------------------
     @Bean
     public AuthenticationValidator authenticationValidator(
             UserAccountGateway userAccountGateway,
             PasswordHasher passwordHasher) {
+
         return new AuthenticationValidator(userAccountGateway, passwordHasher);
     }
 
-    // ---------------------------
-    // LOGIN SERVICE
-    // ---------------------------
+    @Bean
+    public LoginMetricsRecorder loginMetricsRecorder(AuthMetricsService metricsService) {
+        return new LoginMetricsRecorder(metricsService);
+    }
+
+    @Bean
+    public TokenIssuer tokenIssuer(
+            TokenProvider tokenProvider,
+            ClockProvider clockProvider,
+            TokenPolicyProperties tokenPolicy) {
+
+        return new TokenIssuer(tokenProvider, clockProvider, tokenPolicy);
+    }
+
+    @Bean
+    public SessionManager sessionManager(
+            SessionRegistryGateway sessionRegistry,
+            TokenBlacklistGateway blacklist,
+            SessionPolicy policy,
+            RefreshTokenStore refreshTokenStore) {
+
+        return new SessionManager(sessionRegistry, blacklist, policy, refreshTokenStore);
+    }
+
+    @Bean
+    public TokenSessionCreator tokenSessionCreator(
+            RoleProvider roleProvider,
+            ScopePolicy scopePolicy,
+            TokenIssuer issuer,
+            SessionManager sessionManager,
+            RefreshTokenStore store) {
+
+        return new TokenSessionCreator(roleProvider, scopePolicy, issuer, sessionManager, store);
+    }
+
     @Bean
     public LoginService loginService(
             AuthenticationValidator validator,
             TokenSessionCreator tokenSessionCreator,
             LoginMetricsRecorder loginMetricsRecorder,
             LoginAttemptPolicy loginAttemptPolicy) {
+
         return new LoginService(
                 validator,
                 tokenSessionCreator,
@@ -39,32 +70,72 @@ public class AuthApplicationConfig {
                 loginAttemptPolicy);
     }
 
-    // ---------------------------
-    // REFRESH SERVICE
-    // ---------------------------
+    @Bean
+    public RefreshTokenValidator refreshTokenValidator(
+            RefreshTokenStore store,
+            TokenBlacklistGateway blacklist,
+            RefreshTokenPolicy policy) {
+
+        return new RefreshTokenValidator(store, blacklist, policy);
+    }
+
+    @Bean
+    public TokenRotationHandler tokenRotationHandler(
+            RoleProvider roleProvider,
+            ScopePolicy scopePolicy,
+            TokenIssuer tokenIssuer,
+            RefreshTokenStore store,
+            SessionRegistryGateway registry,
+            TokenBlacklistGateway blacklist,
+            RotationPolicy rotationPolicy
+
+    ) {
+
+        return new TokenRotationHandler(
+                roleProvider,
+                scopePolicy,
+                tokenIssuer,
+                store,
+                registry,
+                blacklist,
+                rotationPolicy);
+    }
+
+    @Bean
+    public TokenRefreshResultFactory tokenRefreshResultFactory(
+            RoleProvider roleProvider,
+            ScopePolicy scopePolicy,
+            TokenProvider tokenProvider,
+            ClockProvider clockProvider,
+            TokenPolicyProperties tokenPolicy) {
+
+        return new TokenRefreshResultFactory(
+                roleProvider,
+                scopePolicy,
+                tokenProvider,
+                clockProvider,
+                tokenPolicy);
+    }
+
     @Bean
     public RefreshService refreshService(
             TokenProvider tokenProvider,
             RefreshTokenValidator validator,
             TokenRotationHandler rotationHandler,
             TokenRefreshResultFactory resultFactory) {
+
         return new RefreshService(tokenProvider, validator, rotationHandler, resultFactory);
     }
 
-    // ---------------------------
-    // ME SERVICE
-    // ---------------------------
     @Bean
     public MeService meService(
             UserAccountGateway userAccountGateway,
             RoleProvider roleProvider,
             ScopePolicy scopePolicy) {
+
         return new MeService(userAccountGateway, roleProvider, scopePolicy);
     }
 
-    // ---------------------------
-    // CHANGE PASSWORD SERVICE
-    // ---------------------------
     @Bean
     public ChangePasswordService changePasswordService(
             UserAccountGateway userGateway,
@@ -79,9 +150,6 @@ public class AuthApplicationConfig {
                 passwordPolicy);
     }
 
-    // ---------------------------
-    // DEV REGISTER SERVICE
-    // ---------------------------
     @Bean
     public DevRegisterService devRegisterService(
             UserAccountGateway gateway,
@@ -94,96 +162,5 @@ public class AuthApplicationConfig {
                 passwordHasher,
                 metrics,
                 passwordPolicy);
-    }
-
-    // ---------------------------
-    // TOKEN ISSUING
-    // ---------------------------
-    @Bean
-    public TokenIssuer tokenIssuer(TokenProvider tokenProvider, ClockProvider clockProvider,
-            TokenPolicyProperties tokenPolicy) {
-        return new TokenIssuer(tokenProvider, clockProvider, tokenPolicy);
-    }
-
-    @Bean
-    public TokenSessionCreator tokenSessionCreator(
-            RoleProvider roleProvider,
-            ScopePolicy scopePolicy,
-            TokenIssuer issuer,
-            SessionManager sessionManager,
-            RefreshTokenStore store) {
-        return new TokenSessionCreator(
-                roleProvider,
-                scopePolicy,
-                issuer,
-                sessionManager,
-                store);
-    }
-
-    @Bean
-    public TokenRotationHandler tokenRotationHandler(
-
-            RoleProvider roleProvider,
-            ScopePolicy scopePolicy,
-            TokenIssuer tokenIssuer,
-            RefreshTokenStore store,
-            SessionRegistryGateway registry,
-            TokenBlacklistGateway blacklist,
-            RotationPolicy rotationPolicy) {
-        return new TokenRotationHandler(
-                roleProvider,
-                scopePolicy,
-                tokenIssuer,
-                store,
-                registry,
-                blacklist,
-                rotationPolicy);
-    }
-
-    @Bean
-    public RefreshTokenValidator refreshTokenValidator(
-            RefreshTokenStore store,
-            TokenBlacklistGateway blacklist,
-            RefreshTokenPolicy policy) {
-        return new RefreshTokenValidator(store, blacklist, policy);
-    }
-
-    @Bean
-    public RoleScopeResolver roleScopeResolver(RoleProvider provider) {
-        return new RoleScopeResolver(provider);
-    }
-
-    @Bean
-    public SessionManager sessionManager(
-            SessionRegistryGateway sessionRegistry,
-            TokenBlacklistGateway blacklist,
-            SessionPolicy policy,
-            RefreshTokenStore refreshTokenStore) {
-        return new SessionManager(
-                sessionRegistry,
-                blacklist,
-                policy,
-                refreshTokenStore);
-    }
-
-    @Bean
-    public LoginMetricsRecorder loginMetricsRecorder(AuthMetricsService metricsService) {
-        return new LoginMetricsRecorder(metricsService);
-    }
-
-    @Bean
-    public TokenRefreshResultFactory tokenRefreshResultFactory(
-            RoleProvider roleProvider,
-            ScopePolicy scopePolicy,
-            TokenProvider tokenProvider,
-            ClockProvider clockProvider,
-            TokenPolicyProperties tokenPolicy) {
-        return new TokenRefreshResultFactory(
-                roleProvider,
-                scopePolicy,
-                tokenProvider,
-                clockProvider,
-                tokenPolicy);
-
     }
 }
