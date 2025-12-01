@@ -10,11 +10,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.lanny.spring_security_template.application.auth.policy.SessionPolicy;
-import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
-import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 /**
  * Unit tests for {@link SessionManager}.
@@ -26,8 +24,6 @@ class SessionManagerTest {
     private TokenBlacklistGateway blacklist;
     private SessionPolicy policy;
     private RefreshTokenStore refreshTokenStore;
-    private ClockProvider clockProvider;
-    private AuditEventPublisher auditEventPublisher;
 
     private SessionManager sessionManager;
 
@@ -41,11 +37,8 @@ class SessionManagerTest {
         blacklist = mock(TokenBlacklistGateway.class);
         policy = mock(SessionPolicy.class);
         refreshTokenStore = mock(RefreshTokenStore.class);
-        clockProvider = mock(ClockProvider.class);
-        auditEventPublisher = mock(AuditEventPublisher.class);
 
-        sessionManager = new SessionManager(sessionRegistry, blacklist, policy, refreshTokenStore, auditEventPublisher,
-                clockProvider);
+        sessionManager = new SessionManager(sessionRegistry, blacklist, policy, refreshTokenStore);
 
         tokens = new IssuedTokens(
                 USERNAME,
@@ -87,14 +80,12 @@ class SessionManagerTest {
     void testShouldRevokeOldSessionsWhenExceedingLimit() {
         when(policy.maxSessionsPerUser()).thenReturn(2);
         when(sessionRegistry.getActiveSessions(USERNAME))
-                .thenReturn(List.of("old1", "old2", "old3", "old4")); // 4 active sessions
+                .thenReturn(List.of("old1", "old2", "old3", "old4"));
 
         sessionManager.register(tokens);
 
-        // Debe registrar nueva sesión
         verify(sessionRegistry).registerSession(USERNAME, "refresh-jti", tokens.refreshExp());
 
-        // Exceso de 2 → eliminar los 2 más antiguos
         verify(blacklist).revoke("old1", tokens.refreshExp());
         verify(blacklist).revoke("old2", tokens.refreshExp());
 

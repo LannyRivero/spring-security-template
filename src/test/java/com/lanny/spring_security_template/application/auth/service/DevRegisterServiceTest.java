@@ -16,23 +16,29 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.lanny.spring_security_template.application.auth.command.RegisterCommand;
+import com.lanny.spring_security_template.application.auth.policy.PasswordPolicy;
+import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
 import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
 import com.lanny.spring_security_template.domain.valueobject.Username;
-import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
 class DevRegisterServiceTest {
 
     @Mock
     private UserAccountGateway userAccountGateway;
+
     @Mock
     private PasswordHasher passwordHasher;
+
     @Mock
-    private AuthMetricsServiceImpl metrics;
+    private AuthMetricsService metrics;
+
+    @Mock
+    private PasswordPolicy passwordPolicy;
 
     @InjectMocks
     private DevRegisterService devRegisterService;
@@ -51,9 +57,11 @@ class DevRegisterServiceTest {
                 List.of("profile:read"));
     }
 
+    // -------------------------------------------------------------
     @Test
-    @DisplayName(" should hash password, create new User, save it and record metric")
+    @DisplayName("testShouldCreateAndSaveUserWhenCommandValid → hashes password, builds VO and persists user")
     void testShouldCreateAndSaveUserWhenCommandValid() {
+
         when(passwordHasher.hash("rawPass123")).thenReturn(VALID_HASH);
 
         devRegisterService.register(command);
@@ -64,15 +72,19 @@ class DevRegisterServiceTest {
         verify(metrics).recordUserRegistration();
 
         User savedUser = userCaptor.getValue();
-        assertThat(savedUser.username().value()).isEqualTo("lanny");
-        assertThat(savedUser.email().value()).isEqualTo("lanny@example.com");
-        assertThat(savedUser.passwordHash().value()).isEqualTo(VALID_HASH);
+
+        assertThat(savedUser.username()).isEqualTo(Username.of("lanny"));
+        assertThat(savedUser.email()).isEqualTo(EmailAddress.of("lanny@example.com"));
+        assertThat(savedUser.passwordHash()).isEqualTo(PasswordHash.of(VALID_HASH));
     }
 
+    // -------------------------------------------------------------
     @Test
-    @DisplayName(" should propagate exception when PasswordHasher fails")
+    @DisplayName("testShouldPropagateExceptionWhenPasswordHasherFails → hashing error should bubble up")
     void testShouldPropagateExceptionWhenPasswordHasherFails() {
-        when(passwordHasher.hash(any())).thenThrow(new IllegalStateException("Hashing failure"));
+
+        when(passwordHasher.hash(anyString()))
+                .thenThrow(new IllegalStateException("Hashing failure"));
 
         assertThatThrownBy(() -> devRegisterService.register(command))
                 .isInstanceOf(IllegalStateException.class)
@@ -82,11 +94,14 @@ class DevRegisterServiceTest {
         verifyNoInteractions(userAccountGateway, metrics);
     }
 
+    // -------------------------------------------------------------
     @Test
-    @DisplayName(" should propagate exception when UserAccountGateway fails to save user")
+    @DisplayName("testShouldPropagateExceptionWhenUserAccountGatewayFails → persist error should bubble up")
     void testShouldPropagateExceptionWhenUserAccountGatewayFails() {
-        when(passwordHasher.hash(any())).thenReturn(VALID_HASH);
-        doThrow(new RuntimeException("DB failure")).when(userAccountGateway).save(any(User.class));
+
+        when(passwordHasher.hash(anyString())).thenReturn(VALID_HASH);
+        doThrow(new RuntimeException("DB failure"))
+                .when(userAccountGateway).save(any(User.class));
 
         assertThatThrownBy(() -> devRegisterService.register(command))
                 .isInstanceOf(RuntimeException.class)
@@ -97,15 +112,18 @@ class DevRegisterServiceTest {
         verifyNoInteractions(metrics);
     }
 
+    // -------------------------------------------------------------
     @Test
-    @DisplayName(" should handle empty roles and scopes gracefully")
+    @DisplayName("testShouldCreateUserWhenRolesAndScopesEmpty → handles empty lists gracefully")
     void testShouldCreateUserWhenRolesAndScopesEmpty() {
+
         RegisterCommand cmd = new RegisterCommand(
                 "simpleUser",
                 "user@mail.com",
                 "123456",
                 List.of(),
                 List.of());
+
         when(passwordHasher.hash("123456")).thenReturn(VALID_HASH);
 
         devRegisterService.register(cmd);
@@ -115,15 +133,17 @@ class DevRegisterServiceTest {
         verify(metrics).recordUserRegistration();
     }
 
+    // -------------------------------------------------------------
     @Test
-    @DisplayName(" should build value objects correctly using static factories")
+    @DisplayName("testShouldUseValueObjectFactories → VO creation should be correct")
     void testShouldUseValueObjectFactories() {
+
         when(passwordHasher.hash("rawPass123")).thenReturn(VALID_HASH);
 
         devRegisterService.register(command);
 
-        verify(userAccountGateway).save(argThat(user -> user.username().equals(Username.of("lanny"))
-                && user.email().equals(EmailAddress.of("lanny@example.com"))
-                && user.passwordHash().equals(PasswordHash.of(VALID_HASH))));
+        verify(userAccountGateway).save(argThat(user -> user.username().equals(Username.of("lanny")) &&
+                user.email().equals(EmailAddress.of("lanny@example.com")) &&
+                user.passwordHash().equals(PasswordHash.of(VALID_HASH))));
     }
 }

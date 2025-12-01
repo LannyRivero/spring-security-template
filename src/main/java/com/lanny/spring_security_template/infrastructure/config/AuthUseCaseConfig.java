@@ -4,31 +4,31 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
-import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
+import com.lanny.spring_security_template.application.auth.service.AuthUseCaseImpl;
 import com.lanny.spring_security_template.application.auth.service.*;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.*;
+import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.ChangePasswordTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.DevRegisterTransactionalAdapter;
 
 @Configuration
 public class AuthUseCaseConfig {
 
     /*
      * ============================================================
-     * CORE USE CASE
+     * CORE USE CASE (NO SPRING, NO LOGGING, NO TRANSACTIONS)
      * ============================================================
      */
     @Bean
     AuthUseCase authUseCaseCore(
-            LoginService loginService,
-            RefreshService refreshService,
+            LoginTransactionalAdapter loginAdapter,
+            RefreshTransactionalAdapter refreshAdapter,
             MeService meService,
             DevRegisterTransactionalAdapter devRegisterAdapter,
             ChangePasswordTransactionalAdapter changePasswordAdapter) {
 
         return new AuthUseCaseImpl(
-                loginService,
-                refreshService,
+                loginAdapter,
+                refreshAdapter,
                 meService,
                 devRegisterAdapter,
                 changePasswordAdapter);
@@ -36,7 +36,7 @@ public class AuthUseCaseConfig {
 
     /*
      * ============================================================
-     * DECORATED USE CASE
+     * DECORATED USE CASE (Logging + Audit + MDC)
      * ============================================================
      */
     @Bean
@@ -44,6 +44,10 @@ public class AuthUseCaseConfig {
             AuthUseCase authUseCaseCore,
             AuditEventPublisher audit,
             ClockProvider clock) {
-        return new AuthUseCaseLoggingDecorator(authUseCaseCore, audit, clock);
+
+        return new AuthUseCaseLoggingDecorator(
+                authUseCaseCore,
+                audit,
+                clock);
     }
 }

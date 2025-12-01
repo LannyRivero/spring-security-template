@@ -1,7 +1,7 @@
 package com.lanny.spring_security_template.application.auth.service;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
@@ -35,7 +35,9 @@ class ChangePasswordServiceTest {
         private static final String USERNAME = "lanny";
         private static final String CURRENT_PASSWORD = "OldPass1!";
         private static final String NEW_PASSWORD = "NewPass1!";
-        private static final String VALID_HASH = "$2a$10$abcdefghijklmnopqrstuv1234567890abcdefghiJKLMNOpqrstuVWXYZ";
+
+        // MUST satisfy PasswordHash.of() → empieza con '$' y es largo
+        private static final String VALID_HASH = "$2a$10$abcdefghijklmnopqrstuv1234567890abcdefghiJKLMNOpq";
 
         private User user;
 
@@ -62,62 +64,94 @@ class ChangePasswordServiceTest {
                                 List.of("read:profile"));
         }
 
+        // -------------------------------------------------------------------------
         @Test
-        @DisplayName("Should change password successfully and invalidate sessions")
+        @DisplayName("testShouldChangePasswordSuccessfully → update user & invalidate sessions")
         void testShouldChangePasswordSuccessfully() {
-                when(userAccountGateway.findByUsernameOrEmail(USERNAME)).thenReturn(Optional.of(user));
-                when(passwordHasher.matches(CURRENT_PASSWORD, VALID_HASH)).thenReturn(true);
-                when(passwordHasher.hash(NEW_PASSWORD)).thenReturn(VALID_HASH); // ← FIX
 
+                // Arrange
+                when(userAccountGateway.findByUsernameOrEmail(USERNAME))
+                                .thenReturn(Optional.of(user));
+
+                when(passwordHasher.matches(CURRENT_PASSWORD, VALID_HASH))
+                                .thenReturn(true);
+
+                // new hash MUST be valid for PasswordHash.of()
+                String newHashValue = "$2b$10$NEWNEWNEWVALIDHASH1234567890ABCDE";
+                when(passwordHasher.hash(NEW_PASSWORD)).thenReturn(newHashValue);
+
+                // Act
                 service.changePassword(USERNAME, CURRENT_PASSWORD, NEW_PASSWORD);
 
+                // Assert
                 verify(passwordPolicy).validate(NEW_PASSWORD);
                 verify(passwordHasher).hash(NEW_PASSWORD);
-                verify(userAccountGateway).update(any(User.class));
+
+                // Capture the user passed to update()
+                verify(userAccountGateway)
+                                .update(argThat(updated -> updated.passwordHash().value().equals(newHashValue)));
+
                 verify(refreshTokenStore).deleteAllForUser(USERNAME);
         }
 
+        // -------------------------------------------------------------------------
         @Test
-        @DisplayName("Should throw when current password is incorrect")
+        @DisplayName("testShouldThrowWhenCurrentPasswordIncorrect")
         void testShouldThrowWhenCurrentPasswordIncorrect() {
-                when(userAccountGateway.findByUsernameOrEmail(USERNAME)).thenReturn(Optional.of(user));
-                when(passwordHasher.matches(CURRENT_PASSWORD, VALID_HASH)).thenReturn(false);
+
+                when(userAccountGateway.findByUsernameOrEmail(USERNAME))
+                                .thenReturn(Optional.of(user));
+
+                when(passwordHasher.matches(CURRENT_PASSWORD, VALID_HASH))
+                                .thenReturn(false);
 
                 assertThatThrownBy(() -> service.changePassword(USERNAME, CURRENT_PASSWORD, NEW_PASSWORD))
                                 .isInstanceOf(InvalidCredentialsException.class)
                                 .hasMessageContaining("Invalid current password");
 
                 verify(passwordHasher).matches(CURRENT_PASSWORD, VALID_HASH);
-                verify(passwordPolicy, never()).validate(any());
-                verify(refreshTokenStore, never()).deleteAllForUser(any());
+                verifyNoInteractions(passwordPolicy);
                 verify(userAccountGateway, never()).update(any());
+                verify(refreshTokenStore, never()).deleteAllForUser(any());
         }
 
+        // -------------------------------------------------------------------------
         @Test
-        @DisplayName("Should throw when user is not found")
+        @DisplayName("testShouldThrowWhenUserNotFound")
         void testShouldThrowWhenUserNotFound() {
-                when(userAccountGateway.findByUsernameOrEmail(USERNAME)).thenReturn(Optional.empty());
+
+                when(userAccountGateway.findByUsernameOrEmail(USERNAME))
+                                .thenReturn(Optional.empty());
 
                 assertThatThrownBy(() -> service.changePassword(USERNAME, CURRENT_PASSWORD, NEW_PASSWORD))
                                 .isInstanceOf(InvalidCredentialsException.class)
-                                .hasMessageContaining("Invalid current password");
+                                .hasMessage("Invalid current password");
 
+                verify(userAccountGateway).findByUsernameOrEmail(USERNAME);
                 verifyNoInteractions(passwordHasher, passwordPolicy, refreshTokenStore);
         }
 
+        // -------------------------------------------------------------------------
         @Test
-        @DisplayName("Should throw when password violates PasswordPolicy")
-        void testShouldThrowWhenPasswordInvalid() {
-                when(userAccountGateway.findByUsernameOrEmail(USERNAME)).thenReturn(Optional.of(user));
-                when(passwordHasher.matches(CURRENT_PASSWORD, VALID_HASH)).thenReturn(true);
-                doThrow(new IllegalArgumentException("weak password")).when(passwordPolicy).validate(NEW_PASSWORD);
+        @DisplayName("testShouldThrowWhenPasswordViolatesPolicy")
+        void testShouldThrowWhenPasswordViolatesPolicy() {
+
+                when(userAccountGateway.findByUsernameOrEmail(USERNAME))
+                                .thenReturn(Optional.of(user));
+
+                when(passwordHasher.matches(CURRENT_PASSWORD, VALID_HASH))
+                                .thenReturn(true);
+
+                doThrow(new IllegalArgumentException("weak password"))
+                                .when(passwordPolicy)
+                                .validate(NEW_PASSWORD);
 
                 assertThatThrownBy(() -> service.changePassword(USERNAME, CURRENT_PASSWORD, NEW_PASSWORD))
                                 .isInstanceOf(IllegalArgumentException.class)
                                 .hasMessageContaining("weak password");
 
                 verify(passwordPolicy).validate(NEW_PASSWORD);
+                verifyNoInteractions(refreshTokenStore);
                 verify(userAccountGateway, never()).update(any());
-                verify(refreshTokenStore, never()).deleteAllForUser(any());
         }
 }

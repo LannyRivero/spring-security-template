@@ -10,10 +10,46 @@ import com.lanny.spring_security_template.domain.exception.UserNotFoundException
 import lombok.RequiredArgsConstructor;
 
 /**
- * Pure application service for handling login logic.
+ * Core application service responsible for executing the login use case.
  *
- * No logging, no MDC, no auditing.
- * Cross-cutting concerns handled by AuthUseCaseLoggingDecorator.
+ * <p>
+ * This component encapsulates all domain-driven authentication rules:
+ * </p>
+ *
+ * <ul>
+ * <li>User lockout enforcement via {@link LoginAttemptPolicy}</li>
+ * <li>Credential validation through {@link AuthenticationValidator}</li>
+ * <li>Token issuance using {@link TokenSessionCreator}</li>
+ * <li>Login success/failure metrics through {@link LoginMetricsRecorder}</li>
+ * </ul>
+ *
+ * <p>
+ * This service contains <strong>zero</strong> cross-cutting concerns:
+ * no logging, no auditing, no MDC, no Spring annotations.
+ * Those concerns are implemented in {@code AuthUseCaseLoggingDecorator}
+ * and infrastructure adapters, keeping the application layer pure and testable.
+ * </p>
+ *
+ * <h2>Flow summary</h2>
+ * <ol>
+ * <li>Reject request if the user is temporarily locked</li>
+ * <li>Validate credentials (username/password)</li>
+ * <li>Create a new authenticated session and issue JWT tokens</li>
+ * <li>Reset failed login attempts on success</li>
+ * <li>Record success/failure metrics</li>
+ * </ol>
+ *
+ * <h2>Error semantics</h2>
+ * <ul>
+ * <li>{@link UserLockedException}: user exceeded allowed failed attempts</li>
+ * <li>{@link InvalidCredentialsException}: password mismatch or invalid
+ * input</li>
+ * <li>{@link UserNotFoundException}: invalid username/email</li>
+ * </ul>
+ *
+ * <p>
+ * Designed for Clean Architecture and high observability through decorators.
+ * </p>
  */
 @RequiredArgsConstructor
 public class LoginService {
@@ -23,39 +59,54 @@ public class LoginService {
     private final LoginMetricsRecorder metrics;
     private final LoginAttemptPolicy loginAttemptPolicy;
 
+    /**
+     * Executes the login use case:
+     * <ul>
+     * <li>Validates user credentials</li>
+     * <li>Issues access/refresh tokens</li>
+     * <li>Updates login attempt counters</li>
+     * <li>Records login metrics</li>
+     * </ul>
+     *
+     * @param cmd the login request payload (username + raw password)
+     * @return a {@link JwtResult} containing access and refresh tokens
+     *
+     * @throws UserLockedException         if the user is temporarily locked by
+     *                                     policy
+     * @throws InvalidCredentialsException if credentials are incorrect
+     * @throws UserNotFoundException       if the user does not exist
+     */
     public JwtResult login(LoginCommand cmd) {
         String username = cmd.username();
 
-        // 1. Check if user is locked
+        // 1. Check lockout policy
         if (loginAttemptPolicy.isUserLocked(username)) {
             metrics.recordFailure(username, "User locked");
             throw new UserLockedException(username);
         }
 
         try {
-            // 2. Validate credentials
+            // 2. Validate credentials using domain rules
             var user = validator.validate(cmd);
 
-            // 3. Issue tokens
+            // 3. Generate and persist session tokens
             JwtResult result = tokenCreator.create(user.username().value());
 
-            // 4. Reset failed attempts counter
+            // 4. Reset failed attempts after success
             loginAttemptPolicy.resetAttempts(username);
 
-            // 5. Register metrics
+            // 5. Record success metric
             metrics.recordSuccess(username);
 
             return result;
 
         } catch (InvalidCredentialsException | UserNotFoundException e) {
-            // Increment failed attempts
-            loginAttemptPolicy.recordFailedAttempt(username);
 
-            // Metrics only (no logs or audit)
+            // Record failure for login analytics
+            loginAttemptPolicy.recordFailedAttempt(username);
             metrics.recordFailure(username, e.getMessage());
 
             throw e;
         }
     }
 }
-

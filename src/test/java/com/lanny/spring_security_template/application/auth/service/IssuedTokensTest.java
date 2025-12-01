@@ -10,122 +10,152 @@ import org.junit.jupiter.api.Test;
 
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 
-/**
- * Unit tests for {@link IssuedTokens}.
- *
- * Focus: verify conversion to JwtResult and record integrity.
- * This record is a pure data holder, but correctness is critical
- * for token lifecycle flows (access + refresh).
- */
 class IssuedTokensTest {
 
-    @Test
-    @DisplayName(" should correctly convert to JwtResult with matching fields")
-    void testShouldConvertToJwtResultCorrectly() {
-        Instant now = Instant.now();
-        Instant accessExp = now.plusSeconds(600);
-        Instant refreshExp = now.plusSeconds(3600);
+        private static final Instant NOW = Instant.parse("2024-01-01T10:00:00Z");
+        private static final Instant ACCESS_EXP = Instant.parse("2024-01-01T11:00:00Z");
+        private static final Instant REFRESH_EXP = Instant.parse("2024-01-02T10:00:00Z");
 
-        IssuedTokens tokens = new IssuedTokens(
-                "lanny",
-                "ACCESS_TOKEN",
-                "REFRESH_TOKEN",
-                "JTI-123",
-                now,
-                accessExp,
-                refreshExp,
-                List.of("ADMIN", "USER"),
-                List.of("profile:read", "profile:write")
-        );
+        private static final List<String> ROLES = List.of("ADMIN", "USER");
+        private static final List<String> SCOPES = List.of("read:profile", "write:profile");
 
-        JwtResult result = tokens.toJwtResult();
+        // ----------------------------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldCreateRecordSuccessfully → Valid constructor values produce a correct IssuedTokens instance")
+        void testShouldCreateRecordSuccessfully() {
 
-        assertThat(result.accessToken()).isEqualTo("ACCESS_TOKEN");
-        assertThat(result.refreshToken()).isEqualTo("REFRESH_TOKEN");
-        assertThat(result.expiresAt()).isEqualTo(accessExp);
-    }
+                IssuedTokens tokens = new IssuedTokens(
+                                "lanny",
+                                "access-token-123",
+                                "refresh-token-456",
+                                "jti-abc",
+                                NOW,
+                                ACCESS_EXP,
+                                REFRESH_EXP,
+                                ROLES,
+                                SCOPES);
 
-    @Test
-    @DisplayName(" should allow null tokens and propagate them in JwtResult")
-    void testShouldPropagateNullValuesGracefully() {
-        Instant exp = Instant.now().plusSeconds(120);
-        IssuedTokens tokens = new IssuedTokens(
-                "user",
-                null,
-                null,
-                "JTI-XYZ",
-                Instant.now(),
-                exp,
-                null,
-                List.of(),
-                List.of()
-        );
+                assertThat(tokens.username()).isEqualTo("lanny");
+                assertThat(tokens.accessToken()).isEqualTo("access-token-123");
+                assertThat(tokens.refreshToken()).isEqualTo("refresh-token-456");
+                assertThat(tokens.refreshJti()).isEqualTo("jti-abc");
+                assertThat(tokens.issuedAt()).isEqualTo(NOW);
+                assertThat(tokens.accessExp()).isEqualTo(ACCESS_EXP);
+                assertThat(tokens.refreshExp()).isEqualTo(REFRESH_EXP);
+                assertThat(tokens.roleNames()).containsExactly("ADMIN", "USER");
+                assertThat(tokens.scopeNames()).containsExactly("read:profile", "write:profile");
+        }
 
-        JwtResult result = tokens.toJwtResult();
+        // ----------------------------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldThrowWhenTimestampChronologyInvalid → issuedAt > accessExp OR accessExp > refreshExp must fail")
+        void testShouldThrowWhenTimestampChronologyInvalid() {
 
-        assertThat(result.accessToken()).isNull();
-        assertThat(result.refreshToken()).isNull();
-        assertThat(result.expiresAt()).isEqualTo(exp);
-    }
+                Instant badIssuedAt = ACCESS_EXP.plusSeconds(10);
 
-    @Test
-    @DisplayName(" should respect record equality and hashCode contract")
-    void testShouldRespectRecordEqualityAndHashCode() {
-        Instant now = Instant.now();
+                assertThatThrownBy(() -> new IssuedTokens(
+                                "u",
+                                "a",
+                                "r",
+                                "jti",
+                                badIssuedAt, // issuedAt AFTER accessExp
+                                ACCESS_EXP,
+                                REFRESH_EXP,
+                                ROLES,
+                                SCOPES)).isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("chronology");
 
-        IssuedTokens a = new IssuedTokens(
-                "lanny",
-                "AT",
-                "RT",
-                "JTI1",
-                now,
-                now.plusSeconds(100),
-                now.plusSeconds(200),
-                List.of("ADMIN"),
-                List.of("scope:all")
-        );
+                Instant badAccessExp = REFRESH_EXP.plusSeconds(5);
 
-        IssuedTokens b = new IssuedTokens(
-                "lanny",
-                "AT",
-                "RT",
-                "JTI1",
-                now,
-                now.plusSeconds(100),
-                now.plusSeconds(200),
-                List.of("ADMIN"),
-                List.of("scope:all")
-        );
+                assertThatThrownBy(() -> new IssuedTokens(
+                                "u",
+                                "a",
+                                "r",
+                                "jti",
+                                NOW,
+                                badAccessExp, // accessExp AFTER refreshExp
+                                REFRESH_EXP,
+                                ROLES,
+                                SCOPES)).isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("chronology");
+        }
 
-        assertThat(a).isEqualTo(b);
-        assertThat(a.hashCode()).isEqualTo(b.hashCode());
-    }
+        // ----------------------------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldThrowWhenRequiredFieldsAreNull → Null values must be rejected explicitly")
+        void testShouldThrowWhenRequiredFieldsAreNull() {
 
-    @Test
-    @DisplayName(" should store correct role and scope lists without mutation")
-    void testShouldKeepRolesAndScopesImmutable() {
-        Instant now = Instant.now();
-        List<String> roles = List.of("ADMIN");
-        List<String> scopes = List.of("profile:read");
+                assertThatThrownBy(() -> new IssuedTokens(
+                                null, "a", "r", "jti", NOW, ACCESS_EXP, REFRESH_EXP, ROLES, SCOPES))
+                                .isInstanceOf(NullPointerException.class);
 
-        IssuedTokens tokens = new IssuedTokens(
-                "lanny",
-                "AT",
-                "RT",
-                "JTI",
-                now,
-                now.plusSeconds(100),
-                now.plusSeconds(200),
-                roles,
-                scopes
-        );
+                assertThatThrownBy(() -> new IssuedTokens(
+                                "u", null, "r", "jti", NOW, ACCESS_EXP, REFRESH_EXP, ROLES, SCOPES))
+                                .isInstanceOf(NullPointerException.class);
 
-        assertThat(tokens.roleNames()).containsExactly("ADMIN");
-        assertThat(tokens.scopeNames()).containsExactly("profile:read");
+                assertThatThrownBy(() -> new IssuedTokens(
+                                "u", "a", null, "jti", NOW, ACCESS_EXP, REFRESH_EXP, ROLES, SCOPES))
+                                .isInstanceOf(NullPointerException.class);
 
-        // Verify immutability (record stores by reference, but we rely on List.of() immutability)
-        assertThatThrownBy(() -> tokens.roleNames().add("NEW_ROLE"))
-                .isInstanceOf(UnsupportedOperationException.class);
-    }
+                assertThatThrownBy(() -> new IssuedTokens(
+                                "u", "a", "r", "jti", null, ACCESS_EXP, REFRESH_EXP, ROLES, SCOPES))
+                                .isInstanceOf(NullPointerException.class);
+
+                assertThatThrownBy(() -> new IssuedTokens(
+                                "u", "a", "r", "jti", NOW, null, REFRESH_EXP, ROLES, SCOPES))
+                                .isInstanceOf(NullPointerException.class);
+
+                assertThatThrownBy(() -> new IssuedTokens(
+                                "u", "a", "r", "jti", NOW, ACCESS_EXP, null, ROLES, SCOPES))
+                                .isInstanceOf(NullPointerException.class);
+        }
+
+        // ----------------------------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldConvertToJwtResult → Conversion to JwtResult should preserve tokens and expiration")
+        void testShouldConvertToJwtResult() {
+
+                IssuedTokens tokens = new IssuedTokens(
+                                "lanny",
+                                "accessX",
+                                "refreshY",
+                                "jti",
+                                NOW,
+                                ACCESS_EXP,
+                                REFRESH_EXP,
+                                ROLES,
+                                SCOPES);
+
+                JwtResult result = tokens.toJwtResult();
+
+                assertThat(result.accessToken()).isEqualTo("accessX");
+                assertThat(result.refreshToken()).isEqualTo("refreshY");
+                assertThat(result.expiresAt()).isEqualTo(ACCESS_EXP);
+        }
+
+        // ----------------------------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldProduceAuditDetails → Audit string should contain key metadata")
+        void testShouldProduceAuditDetails() {
+
+                IssuedTokens tokens = new IssuedTokens(
+                                "user1",
+                                "a",
+                                "r",
+                                "jti",
+                                NOW,
+                                ACCESS_EXP,
+                                REFRESH_EXP,
+                                ROLES,
+                                SCOPES);
+
+                String audit = tokens.toAuditDetails();
+
+                assertThat(audit)
+                                .contains("user1")
+                                .contains("ADMIN")
+                                .contains("read:profile")
+                                .contains(NOW.toString())
+                                .contains(REFRESH_EXP.toString());
+        }
 }
-
