@@ -46,6 +46,10 @@ public enum SecurityEvent {
     /** Token successfully refreshed */
     TOKEN_REFRESH,
 
+    TOKEN_REFRESH_ATTEMPT,
+
+    TOKEN_REFRESH_FAILED,
+
     /** Token rotation occurred (old token revoked, new issued) */
     TOKEN_ROTATED,
 
@@ -64,7 +68,9 @@ public enum SecurityEvent {
     PASSWORD_CHANGED,
 
     /** Password change failed (invalid current password or weak new password) */
-    PASSWORD_CHANGE_FAILED;
+    PASSWORD_CHANGE_FAILED,
+
+    PASSWORD_CHANGE_ATTEMPT;
 
     /**
      * Returns a standardized code for external logging or metrics.

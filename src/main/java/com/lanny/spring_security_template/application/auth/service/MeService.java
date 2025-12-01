@@ -2,12 +2,12 @@ package com.lanny.spring_security_template.application.auth.service;
 
 import java.util.Set;
 
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
+import com.lanny.spring_security_template.domain.exception.UserNotFoundException;
 import com.lanny.spring_security_template.domain.model.Role;
 import com.lanny.spring_security_template.domain.model.Scope;
 import com.lanny.spring_security_template.domain.model.User;
@@ -77,7 +77,7 @@ public class MeService {
      */
     public MeResult me(String username) {
         User user = userAccountGateway.findByUsernameOrEmail(username)
-                .orElseThrow(() -> new UsernameNotFoundException(username));
+                .orElseThrow(() -> new UserNotFoundException(username));
 
         Set<Role> roles = roleProvider.resolveRoles(username);
         Set<Scope> scopes = scopePolicy.resolveScopes(roles);
