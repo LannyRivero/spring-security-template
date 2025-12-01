@@ -1,9 +1,14 @@
 package com.lanny.spring_security_template.application.auth.service;
 
+import java.util.List;
+import java.util.Set;
+
 import com.lanny.spring_security_template.application.auth.command.RegisterCommand;
 import com.lanny.spring_security_template.application.auth.policy.PasswordPolicy;
 import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
+import com.lanny.spring_security_template.domain.model.Role;
+import com.lanny.spring_security_template.domain.model.Scope;
 import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import com.lanny.spring_security_template.domain.valueobject.EmailAddress;
@@ -88,16 +93,25 @@ public class DevRegisterService {
         // Hash password
         PasswordHash hash = PasswordHash.of(passwordHasher.hash(cmd.rawPassword()));
 
-        // Create domain user
+        // Convert raw strings → domain objects
+        List<Role> roles = cmd.roles().stream()
+                .map(roleName -> new Role(roleName, Set.of()))
+                .toList();
+
+        List<Scope> scopes = cmd.scopes().stream()
+                .map(Scope::of)
+                .toList();
+
         User newUser = User.createNew(
                 Username.of(cmd.username()),
                 EmailAddress.of(cmd.email()),
                 hash,
-                cmd.roles(),
-                cmd.scopes());
+                roles,
+                scopes);
 
         // Persist user and record metrics
         userAccountGateway.save(newUser);
         metrics.recordUserRegistration();
     }
+
 }
