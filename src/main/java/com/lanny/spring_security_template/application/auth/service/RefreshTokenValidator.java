@@ -8,10 +8,12 @@ import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaim
 import lombok.RequiredArgsConstructor;
 
 /**
- * Pure application-level refresh token validator.
- *
- * No Spring, no logging, no auditing, no MDC.
- * Cross-cutting concerns are handled by AuthUseCaseLoggingDecorator.
+ * Core validator that enforces the security rules governing refresh tokens.
+ * 
+ * <p>
+ * Performs audience verification, existence validation in the token store, and
+ * blacklist checks. Any failure results in {@link IllegalArgumentException}.
+ * </p>
  */
 @RequiredArgsConstructor
 public class RefreshTokenValidator {
@@ -21,27 +23,26 @@ public class RefreshTokenValidator {
     private final RefreshTokenPolicy policy;
 
     /**
-     * Performs all validation checks on the given JWT claims.
+     * Validates the given refresh-token claims against all security policies.
      *
-     * @param claims the JWT claims extracted from a refresh token
-     * @throws IllegalArgumentException if any validation rule fails
+     * @param claims the decoded JWT claims obtained from a refresh token
+     * @throws IllegalArgumentException if any validation rule is violated
      */
     public void validate(JwtClaimsDTO claims) {
 
-        // Step 1: Validate audience
+        // 1 — Validate audience
         if (claims.aud() == null || !claims.aud().contains(policy.expectedRefreshAudience())) {
             throw new IllegalArgumentException("Invalid refresh token audience");
         }
 
-        // Step 2: Validate existence in store
+        // 2 — Validate token exists in store
         if (!refreshTokenStore.exists(claims.jti())) {
             throw new IllegalArgumentException("Refresh token not found (revoked or expired)");
         }
 
-        // Step 3: Validate that token is not blacklisted
+        // 3 — Validate token not revoked (blacklist)
         if (blacklist.isRevoked(claims.jti())) {
             throw new IllegalArgumentException("Refresh token revoked or re-used");
         }
     }
 }
-
