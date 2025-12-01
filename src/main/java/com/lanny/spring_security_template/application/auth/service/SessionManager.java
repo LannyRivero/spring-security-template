@@ -12,15 +12,40 @@ import com.lanny.spring_security_template.application.auth.port.out.TokenBlackli
 import lombok.RequiredArgsConstructor;
 
 /**
- * Pure application-layer session manager.
+ * Application-layer session manager enforcing server-side session lifecycle rules
+ * for refresh tokens.
  *
- * Enforces:
- * - Session registration
- * - Concurrent session limits
- * - Automatic revocation of oldest sessions
+ * <p>
+ * Responsibilities:
+ * </p>
+ * <ul>
+ *   <li><strong>Session Registration</strong> — Every newly issued refresh token
+ *       is stored with its expiration metadata for later validation.</li>
  *
- * NO logging, NO auditing, NO Spring.
- * Cross-cutting concerns belong in the AuthUseCaseDecorator.
+ *   <li><strong>Concurrent Session Limiting</strong> — Enforces the maximum number
+ *       of allowed concurrent sessions per user, as configured by
+ *       {@link SessionPolicy}.</li>
+ *
+ *   <li><strong>Automatic Session Revocation</strong> — If a user exceeds their
+ *       session limit, the oldest refresh tokens are revoked, removed from the
+ *       registry, and deleted from persistent storage.</li>
+ * </ul>
+ *
+ * <p>
+ * This component is intentionally <strong>pure application logic</strong>:
+ * no logging, no Spring annotations, no MDC, no auditing.  
+ * Cross-cutting concerns (audit events, logging, metrics) belong in
+ * higher-level decorators such as {@code AuthUseCaseLoggingDecorator}.
+ * </p>
+ *
+ * <p>
+ * Design principles followed:
+ * </p>
+ * <ul>
+ *   <li>Single Responsibility — session lifecycle enforcement only.</li>
+ *   <li>Infrastructure-agnostic — depends only on gateway interfaces.</li>
+ *   <li>Deterministic behavior — oldest sessions always revoked first.</li>
+ * </ul>
  */
 @RequiredArgsConstructor
 public class SessionManager {
@@ -31,9 +56,30 @@ public class SessionManager {
     private final RefreshTokenStore refreshTokenStore;
 
     /**
-     * Registers a new session and enforces max session concurrency.
+     * Registers a newly issued refresh token and enforces the maximum
+     * number of concurrent sessions for a given user.
      *
-     * @param tokens issued token information
+     * <p>
+     * The algorithm:
+     * </p>
+     *
+     * <ol>
+     *   <li>Register the new refresh-token session in the session registry.</li>
+     *   <li>If concurrent-session limiting is disabled (<code>maxSessionsPerUser <= 0</code>),
+     *       return immediately.</li>
+     *   <li>Retrieve all active sessions for the user.</li>
+     *   <li>If the number of sessions exceeds the configured limit, revoke the
+     *       oldest sessions first using the following steps:
+     *       <ul>
+     *         <li>Blacklist the refresh token (prevents reuse).</li>
+     *         <li>Remove its entry from the session registry.</li>
+     *         <li>Delete its record from persistent refresh-token storage.</li>
+     *       </ul>
+     *   </li>
+     * </ol>
+     *
+     * @param tokens metadata about the newly issued access + refresh token pair
+     * @throws NullPointerException if the given {@code IssuedTokens} is {@code null}
      */
     public void register(IssuedTokens tokens) {
 
@@ -43,7 +89,7 @@ public class SessionManager {
         String refreshJti = tokens.refreshJti();
         Instant refreshExp = tokens.refreshExp();
 
-        // 1. Register the new session
+        // 1. Register new session
         sessionRegistry.registerSession(username, refreshJti, refreshExp);
 
         int maxSessions = policy.maxSessionsPerUser();
@@ -52,28 +98,29 @@ public class SessionManager {
             return;
         }
 
-        // 2. Fetch active sessions
+        // 2. Get current active sessions
         List<String> activeSessions = sessionRegistry.getActiveSessions(username);
 
         if (activeSessions.size() <= maxSessions) {
             return;
         }
 
-        // 3. Calculate how many sessions to revoke
+        // 3. Determine how many sessions must be revoked
         int excess = activeSessions.size() - maxSessions;
 
-        // 4. Revoke oldest sessions first
+        // 4. Revoke the oldest sessions deterministically
         for (int i = 0; i < excess; i++) {
             String jtiToRemove = activeSessions.get(i);
 
             // Revoke in blacklist
             blacklist.revoke(jtiToRemove, refreshExp);
 
-            // Remove from registry
+            // Remove from in-memory or cached registry
             sessionRegistry.removeSession(username, jtiToRemove);
 
-            // Remove from persistent store
+            // Remove from persistent storage
             refreshTokenStore.delete(jtiToRemove);
         }
     }
 }
+
