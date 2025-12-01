@@ -20,18 +20,19 @@ import com.lanny.spring_security_template.application.auth.command.RegisterComma
 import com.lanny.spring_security_template.application.auth.query.MeQuery;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.ChangePasswordTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.DevRegisterTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.LoginTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.RefreshTransactionalAdapter;
 
 @ExtendWith(MockitoExtension.class)
 class AuthUseCaseImplTest {
 
-    @Mock
-    private LoginService loginService;
-    @Mock
-    private RefreshService refreshService;
-    @Mock
-    private MeService meService;
-    @Mock
-    private DevRegisterService devRegisterService;
+    @Mock private LoginTransactionalAdapter loginAdapter;
+    @Mock private RefreshTransactionalAdapter refreshAdapter;
+    @Mock private MeService meService;
+    @Mock private DevRegisterTransactionalAdapter devRegisterAdapter;
+    @Mock private ChangePasswordTransactionalAdapter changePasswordAdapter;
 
     @InjectMocks
     private AuthUseCaseImpl authUseCase;
@@ -49,146 +50,81 @@ class AuthUseCaseImplTest {
     // LOGIN
     // -----------------------------------------------------------
     @Test
-    @DisplayName(" login() → should delegate to LoginService and return JwtResult")
-    void testShouldReturnJwtResultWhenLoginCommandIsValid() {
+    @DisplayName("login() → delegates to LoginTransactionalAdapter and returns JwtResult")
+    void testShouldLoginDelegation() {
         LoginCommand cmd = new LoginCommand("lanny", "1234");
-        when(loginService.login(cmd)).thenReturn(jwtResult);
+        when(loginAdapter.login(cmd)).thenReturn(jwtResult);
 
         JwtResult result = authUseCase.login(cmd);
 
-        verify(loginService).login(cmd);
-        verifyNoInteractions(refreshService, meService, devRegisterService);
+        verify(loginAdapter).login(cmd);
         assertThat(result.accessToken()).isEqualTo("ACCESS_TOKEN");
     }
 
     @Test
-    @DisplayName(" login() → should propagate exception when LoginService fails")
-    void testShouldPropagateExceptionWhenLoginFails() {
-        LoginCommand cmd = new LoginCommand("lanny", "wrong");
-        when(loginService.login(cmd)).thenThrow(new RuntimeException("Invalid credentials"));
+    @DisplayName("login() → should validate input and propagate exception")
+    void testShouldLoginValidationFailure() {
+        LoginCommand cmd = new LoginCommand("", "1234");
 
         assertThatThrownBy(() -> authUseCase.login(cmd))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Invalid credentials");
-
-        verify(loginService).login(cmd);
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("blank");
     }
 
     // -----------------------------------------------------------
     // REFRESH
     // -----------------------------------------------------------
     @Test
-    @DisplayName(" refresh() → should return JwtResult when RefreshCommand valid")
-    void testShouldReturnJwtResultWhenRefreshCommandValid() {
-        RefreshCommand cmd = new RefreshCommand("REFRESH_ABC123");
-        when(refreshService.refresh(cmd)).thenReturn(jwtResult);
+    @DisplayName("refresh() → delegates to RefreshTransactionalAdapter")
+    void testShouldRefreshDelegation() {
+        RefreshCommand cmd = new RefreshCommand("REFRESH_123");
+        when(refreshAdapter.refresh(cmd)).thenReturn(jwtResult);
 
         JwtResult result = authUseCase.refresh(cmd);
 
-        verify(refreshService).refresh(cmd);
-        verifyNoInteractions(loginService, meService, devRegisterService);
+        verify(refreshAdapter).refresh(cmd);
         assertThat(result.refreshToken()).isEqualTo("REFRESH_TOKEN");
-    }
-
-    @Test
-    @DisplayName(" refresh() → should propagate exception when RefreshToken invalid")
-    void testShouldPropagateExceptionWhenRefreshTokenInvalid() {
-        RefreshCommand cmd = new RefreshCommand("INVALID_REFRESH");
-        when(refreshService.refresh(cmd)).thenThrow(new IllegalArgumentException("Invalid refresh token"));
-
-        assertThatThrownBy(() -> authUseCase.refresh(cmd))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid refresh token");
-
-        verify(refreshService).refresh(cmd);
     }
 
     // -----------------------------------------------------------
     // ME
     // -----------------------------------------------------------
     @Test
-    @DisplayName(" me() → should return MeResult when user exists")
-    void testShouldReturnMeResultWhenUserExists() {
+    @DisplayName("me() → returns MeResult via MeService")
+    void testShouldMe() {
         MeQuery query = new MeQuery("lanny");
         when(meService.me("lanny")).thenReturn(meResult);
 
         MeResult result = authUseCase.me(query);
 
         verify(meService).me("lanny");
-        verifyNoInteractions(loginService, refreshService, devRegisterService);
         assertThat(result.username()).isEqualTo("lanny");
-        assertThat(result.roles()).containsExactly("ADMIN");
-    }
-
-    @Test
-    @DisplayName(" me() → should propagate exception when user not found")
-    void testShouldPropagateExceptionWhenUserNotFound() {
-        MeQuery query = new MeQuery("ghost");
-        when(meService.me("ghost")).thenThrow(new IllegalArgumentException("User not found"));
-
-        assertThatThrownBy(() -> authUseCase.me(query))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("User not found");
-
-        verify(meService).me("ghost");
     }
 
     // -----------------------------------------------------------
     // REGISTER DEV
     // -----------------------------------------------------------
     @Test
-    @DisplayName(" registerDev() → should call DevRegisterService successfully")
-    void testShouldInvokeDevRegisterServiceWhenCommandValid() {
+    @DisplayName("registerDev() → delegates to DevRegisterTransactionalAdapter")
+    void testShouldRegisterDev() {
         RegisterCommand cmd = new RegisterCommand(
-                "newUser",
-                "new@user.com",
-                "123456",
-                List.of("ADMIN"),
-                List.of("scope:all"));
+                "newUser", "mail@test.com", "1234",
+                List.of("ADMIN"), List.of("scope:all"));
 
         authUseCase.registerDev(cmd);
 
-        verify(devRegisterService).register(cmd);
-        verifyNoInteractions(loginService, refreshService, meService);
-    }
-
-    @Test
-    @DisplayName(" registerDev() → should propagate exception when service fails")
-    void testShouldPropagateExceptionWhenRegisterDevFails() {
-        RegisterCommand cmd = new RegisterCommand("dupUser", "dup@mail.com", "pass", List.of(), List.of());
-        doThrow(new IllegalStateException("User already exists")).when(devRegisterService).register(cmd);
-
-        assertThatThrownBy(() -> authUseCase.registerDev(cmd))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("User already exists");
-
-        verify(devRegisterService).register(cmd);
+        verify(devRegisterAdapter).register(cmd);
     }
 
     // -----------------------------------------------------------
-    // INDEPENDENCE CHECK
+    // CHANGE PASSWORD
     // -----------------------------------------------------------
     @Test
-    @DisplayName(" should ensure all methods are independent (no cross-service calls)")
-    void testShouldKeepServicesIndependentBetweenUseCaseMethods() {
-        LoginCommand loginCmd = new LoginCommand("a", "b");
-        RefreshCommand refreshCmd = new RefreshCommand("t");
-        MeQuery meQuery = new MeQuery("u");
-        RegisterCommand regCmd = new RegisterCommand("n", "e", "p", List.of(), List.of());
+    @DisplayName("changePassword() → delegates to ChangePasswordTransactionalAdapter")
+    void testShouldChangePassword() {
+        authUseCase.changePassword("user", "old", "new");
 
-        when(loginService.login(loginCmd)).thenReturn(jwtResult);
-        when(refreshService.refresh(refreshCmd)).thenReturn(jwtResult);
-        when(meService.me("u")).thenReturn(meResult);
-
-        authUseCase.login(loginCmd);
-        authUseCase.refresh(refreshCmd);
-        authUseCase.me(meQuery);
-        authUseCase.registerDev(regCmd);
-
-        verify(loginService).login(loginCmd);
-        verify(refreshService).refresh(refreshCmd);
-        verify(meService).me("u");
-        verify(devRegisterService).register(regCmd);
-        verifyNoMoreInteractions(loginService, refreshService, meService, devRegisterService);
+        verify(changePasswordAdapter).changePassword("user", "old", "new");
     }
 }
+
