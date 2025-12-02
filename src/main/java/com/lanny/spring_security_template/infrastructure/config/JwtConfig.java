@@ -8,40 +8,22 @@ import org.springframework.context.annotation.Configuration;
  * JwtConfig
  * ======================================================================
  *
- * Infrastructure-level configuration responsible for enabling the
- * {@link SecurityJwtProperties} class as a Spring-bound configuration
- * properties component.
+ * Enables strongly-typed JWT configuration properties
+ * ({@link SecurityJwtProperties}) so they can be injected safely
+ * throughout the infrastructure layer.
  *
- * <h2>Architectural Purpose</h2>
- * <p>
- * This configuration activates strongly-typed JWT properties, ensuring that
- * security-sensitive values (issuer, TTLs, key IDs, audiences, etc.) are
- * loaded from external configuration (YAML, environment variables, Vault).
- * </p>
+ * Architectural Role:
+ * - Centralizes JWT binding from external configuration (YAML/ENV/Vault)
+ * - Avoids boilerplate
+ * - Keeps JWT settings out of application/domain layers
  *
- * <h2>Clean Architecture Alignment</h2>
- * <p>
- * This class:
- * </p>
- * <ul>
- * <li>does not create beans other than property holders</li>
- * <li>keeps JWT settings out of the application and domain layers</li>
- * <li>acts as a composition helper for infrastructure security components</li>
- * </ul>
- *
- * <h2>Security Considerations</h2>
- * <p>
- * By externalizing JWT properties:
- * </p>
- * <ul>
- * <li>environment-based key rotation becomes possible</li>
- * <li>different TTLs or audiences may be applied per environment</li>
- * <li>secret-key and RSA paths are managed outside the codebase</li>
- * </ul>
- *
- * This makes the system compliant with OWASP ASVS 1.1 (Configuration Security).
+ * Security Impact:
+ * - Supports environment-specific JWT keys
+ * - Allows TTL changes without redeploying
+ * - Required for secure key rotation strategies
  */
 @Configuration
 @EnableConfigurationProperties(SecurityJwtProperties.class)
 public class JwtConfig {
 }
+

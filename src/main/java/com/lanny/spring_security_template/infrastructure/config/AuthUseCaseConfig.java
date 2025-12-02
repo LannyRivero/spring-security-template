@@ -2,6 +2,7 @@ package com.lanny.spring_security_template.infrastructure.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
 import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
@@ -16,59 +17,27 @@ import com.lanny.spring_security_template.infrastructure.adapter.usecase.transac
 
 /**
  * ======================================================================
- * AuthUseCaseConfig
+ * AuthUseCaseConfig (Enterprise Version)
  * ======================================================================
  *
- * Infrastructure-level configuration responsible for assembling the
- * authentication application use case with:
+ * Infrastructure-level composition root for the authentication workflow.
  *
- * <ul>
- * <li>a pure core use case implementation ({@link AuthUseCaseImpl})</li>
- * <li>a decorator providing logging, auditing, and MDC propagation</li>
- * </ul>
+ * This configuration wires:
+ * - the pure core UseCase (AuthUseCaseImpl)
+ * - a decorator adding logging, auditing and MDC correlation
  *
- * <h2>Architectural Role</h2>
- * <p>
- * This class acts as the composition root for authentication flows.
- * It ensures that the core business logic remains free of:
- * </p>
- *
- * <ul>
- * <li>infrastructure concerns</li>
- * <li>observability (logging/audit)</li>
- * <li>transaction management</li>
- * </ul>
- *
- * The decorator pattern is used to apply cross-cutting behaviour in a
- * controlled and testable manner.
- *
- * <h2>Clean Architecture Compliance</h2>
- * <ul>
- * <li>No Spring dependencies inside the core use case.</li>
- * <li>Decorators live in infrastructure and depend only on interfaces.</li>
- * <li>Composition happens exclusively in configuration.</li>
- * </ul>
- *
- * <h2>Security & Auditing</h2>
- * <p>
- * The decorated instance provides:
- * </p>
- * <ul>
- * <li>transaction boundaries (via adapters)</li>
- * <li>structured logging</li>
- * <li>audit event publication for login, refresh, password changes, etc.</li>
- * </ul>
+ * Clean Architecture Compliance:
+ * - Core has no Spring, no logging, no auditing.
+ * - All cross-cutting concerns live in Infrastructure.
+ * - Controllers ONLY see the decorated version (@Primary).
  */
 @Configuration
 public class AuthUseCaseConfig {
 
     /**
-     * Creates the pure, undecorated application use case.
-     *
-     * <p>
-     * No logging, no auditing, no Spring-specific behaviour — just business
-     * logic orchestrating the application services.
-     * </p>
+     * ------------------------------------------------------------------
+     * CORE USE CASE (no logging, no Spring, no auditing)
+     * ------------------------------------------------------------------
      */
     @Bean
     AuthUseCase authUseCaseCore(
@@ -87,18 +56,15 @@ public class AuthUseCaseConfig {
     }
 
     /**
-     * Decorated AuthUseCase adding:
-     * <ul>
-     * <li>structured logging</li>
-     * <li>audit event publishing</li>
-     * <li>MDC correlation propagation</li>
-     * </ul>
+     * ------------------------------------------------------------------
+     * DECORATED USE CASE (logging + auditing + MDC)
+     * ------------------------------------------------------------------
      *
-     * <p>
-     * The decorator is the only version injected into controllers.
-     * </p>
+     * This is the version injected everywhere. It wraps the core with
+     * structured audit logging, correlation IDs and timestamp tracking.
      */
     @Bean
+    @Primary
     AuthUseCase authUseCase(
             AuthUseCase authUseCaseCore,
             AuditEventPublisher audit,
