@@ -2,109 +2,85 @@ package com.lanny.spring_security_template.infrastructure.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
-import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
-import com.lanny.spring_security_template.application.auth.policy.PasswordPolicy;
-import com.lanny.spring_security_template.application.auth.policy.RefreshTokenPolicy;
-import com.lanny.spring_security_template.application.auth.policy.RotationPolicy;
-import com.lanny.spring_security_template.application.auth.policy.SessionPolicy;
-import com.lanny.spring_security_template.application.auth.policy.TokenPolicyProperties;
-import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
-import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
-import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
-import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
-import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
-import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
-import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
-import com.lanny.spring_security_template.application.auth.service.AuthenticationValidator;
-import com.lanny.spring_security_template.application.auth.service.ChangePasswordService;
-import com.lanny.spring_security_template.application.auth.service.DevRegisterService;
-import com.lanny.spring_security_template.application.auth.service.LoginMetricsRecorder;
-import com.lanny.spring_security_template.application.auth.service.LoginService;
-import com.lanny.spring_security_template.application.auth.service.MeService;
-import com.lanny.spring_security_template.application.auth.service.RefreshService;
-import com.lanny.spring_security_template.application.auth.service.RefreshTokenValidator;
-import com.lanny.spring_security_template.application.auth.service.SessionManager;
-import com.lanny.spring_security_template.application.auth.service.TokenIssuer;
-import com.lanny.spring_security_template.application.auth.service.TokenRefreshResultFactory;
-import com.lanny.spring_security_template.application.auth.service.TokenRotationHandler;
-import com.lanny.spring_security_template.application.auth.service.TokenSessionCreator;
+import com.lanny.spring_security_template.application.auth.policy.*;
+import com.lanny.spring_security_template.application.auth.port.out.*;
+import com.lanny.spring_security_template.application.auth.service.*;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 /**
- * =====================================================================
- * AuthApplicationConfig
- * =====================================================================
+ * ============================================================
+ * AUTHENTICATION & AUTHORIZATION — APPLICATION ASSEMBLY
+ * ============================================================
  *
- * Central configuration class wiring all **Application Layer services**
- * for the authentication subsystem.
+ * This class is the **composition root** of the Authentication module.
+ * It wires all Application Services using:
  *
- * <p>
- * This class is the composition root for:
- * </p>
- * <ul>
- * <li>Login and Authentication validation</li>
- * <li>Token issuance and session lifecycle</li>
- * <li>Refresh-token rotation and validation</li>
- * <li>Me-profile lookup</li>
- * <li>Password change flow</li>
- * <li>Developer registration (dev-only)</li>
- * </ul>
+ * - Ports (in/out)
+ * - Domain Services
+ * - Security Policies
  *
- * <h2>Architectural Role</h2>
- * <p>
- * This configuration belongs strictly to the <b>Infrastructure Layer</b>,
- * acting as the assembler for Application Layer services using:
- * <i>ports, policies, gateways, and domain services</i>.
- * </p>
+ * No infrastructure-specific code is allowed here, keeping
+ * Clean Architecture boundaries sharp and auditable.
  *
- * <h2>Security Compliance</h2>
- * <ul>
- * <li>OWASP ASVS 2.1 – Centralized authentication mechanisms</li>
- * <li>OWASP ASVS 2.8 – Token lifecycle and secure session management</li>
- * <li>Clean Architecture – No framework leakage into the Application Layer</li>
- * </ul>
+ * Suitable for:
+ * - enterprise microservices
+ * - multi-tenant setups
+ * - high-security authentication systems
  *
- * <h2>Notes</h2>
- * <ul>
- * <li>All dependencies are injected via ports & policies.</li>
- * <li>No infrastructure logic is allowed inside services created here.</li>
- * <li>This class must remain free of business logic.</li>
- * </ul>
+ * Complies with:
+ * - OWASP ASVS 2.x
+ * - Clean Architecture
+ * - DDD application layering
  */
 @Configuration
 public class AuthApplicationConfig {
 
     // ============================================================
-    // CORE VALIDATORS & METRICS
+    // VALIDATORS & METRICS
     // ============================================================
 
-    /** Validator used during user authentication. */
+    /**
+     * Validates user credentials during login.
+     * No infrastructure leak.
+     */
     @Bean
     public AuthenticationValidator authenticationValidator(
-            UserAccountGateway userAccountGateway,
+            UserAccountGateway userGateway,
             PasswordHasher passwordHasher) {
-        return new AuthenticationValidator(userAccountGateway, passwordHasher);
+
+        return new AuthenticationValidator(userGateway, passwordHasher);
     }
 
-    /** Recorder for login-related metrics (success/failure). */
+    /**
+     * Application-layer metrics recorder.
+     * Decoupled from Micrometer via outbound port.
+     */
     @Bean
-    public LoginMetricsRecorder loginMetricsRecorder(AuthMetricsService metricsService) {
-        return new LoginMetricsRecorder(metricsService);
+    public LoginMetricsRecorder loginMetricsRecorder(AuthMetricsService metrics) {
+        return new LoginMetricsRecorder(metrics);
     }
 
     // ============================================================
     // TOKEN ISSUANCE
     // ============================================================
 
-    /** Issues access and refresh tokens according to token policies. */
+    /**
+     * Issues signed JWTs using a pure application-level contract.
+     * TokenProvider (Nimbus, Jose4j, etc.) lives entirely in infra.
+     *
+     * Marked @Lazy to avoid future cyclic dependencies.
+     */
     @Bean
+    @Lazy
     public TokenIssuer tokenIssuer(
             TokenProvider tokenProvider,
             ClockProvider clockProvider,
             TokenPolicyProperties tokenPolicy) {
+
         return new TokenIssuer(tokenProvider, clockProvider, tokenPolicy);
     }
 
@@ -112,47 +88,58 @@ public class AuthApplicationConfig {
     // SESSION MANAGEMENT
     // ============================================================
 
-    /** Tracks active sessions, handles blacklist + refresh token store. */
+    /**
+     * Manages active sessions and token revocations.
+     * High-level orchestration for refresh flow.
+     */
     @Bean
     public SessionManager sessionManager(
-            SessionRegistryGateway sessionRegistry,
+            SessionRegistryGateway registry,
             TokenBlacklistGateway blacklist,
-            SessionPolicy policy,
-            RefreshTokenStore refreshTokenStore) {
-        return new SessionManager(sessionRegistry, blacklist, policy, refreshTokenStore);
+            SessionPolicy sessionPolicy,
+            RefreshTokenStore refreshStore) {
+
+        return new SessionManager(registry, blacklist, sessionPolicy, refreshStore);
     }
 
-    /** Creates token sessions after login or registration. */
+    /**
+     * Creates token session (access + refresh) after login/registration.
+     * Handles role + scope resolution.
+     */
     @Bean
     public TokenSessionCreator tokenSessionCreator(
             RoleProvider roleProvider,
             ScopePolicy scopePolicy,
-            TokenIssuer issuer,
+            TokenIssuer tokenIssuer,
             SessionManager sessionManager,
-            RefreshTokenStore store) {
-        return new TokenSessionCreator(roleProvider, scopePolicy, issuer, sessionManager, store);
+            RefreshTokenStore refreshStore) {
+
+        return new TokenSessionCreator(roleProvider, scopePolicy, tokenIssuer, sessionManager, refreshStore);
     }
 
     // ============================================================
-    // LOGIN SERVICE
+    // LOGIN USE CASE
     // ============================================================
 
-    /** Main login flow orchestrator. */
+    /**
+     * The main login orchestration service.
+     * Handles:
+     * - credential validation
+     * - metrics
+     * - rate limiting policy
+     */
     @Bean
     public LoginService loginService(
             AuthenticationValidator validator,
-            TokenSessionCreator tokenSessionCreator,
-            LoginMetricsRecorder loginMetricsRecorder,
+            TokenSessionCreator sessionCreator,
+            LoginMetricsRecorder metricsRecorder,
             LoginAttemptPolicy loginAttemptPolicy) {
-        return new LoginService(
-                validator,
-                tokenSessionCreator,
-                loginMetricsRecorder,
-                loginAttemptPolicy);
+
+        return new LoginService(validator, sessionCreator, metricsRecorder, loginAttemptPolicy);
     }
 
     // ============================================================
-    // REFRESH TOKEN SERVICES
+    // REFRESH TOKEN FLOW
     // ============================================================
 
     @Bean
@@ -160,6 +147,7 @@ public class AuthApplicationConfig {
             RefreshTokenStore store,
             TokenBlacklistGateway blacklist,
             RefreshTokenPolicy policy) {
+
         return new RefreshTokenValidator(store, blacklist, policy);
     }
 
@@ -167,19 +155,13 @@ public class AuthApplicationConfig {
     public TokenRotationHandler tokenRotationHandler(
             RoleProvider roleProvider,
             ScopePolicy scopePolicy,
-            TokenIssuer tokenIssuer,
+            TokenIssuer issuer,
             RefreshTokenStore store,
             SessionRegistryGateway registry,
             TokenBlacklistGateway blacklist,
             RotationPolicy rotationPolicy) {
-        return new TokenRotationHandler(
-                roleProvider,
-                scopePolicy,
-                tokenIssuer,
-                store,
-                registry,
-                blacklist,
-                rotationPolicy);
+
+        return new TokenRotationHandler(roleProvider, scopePolicy, issuer, store, registry, blacklist, rotationPolicy);
     }
 
     @Bean
@@ -188,13 +170,9 @@ public class AuthApplicationConfig {
             ScopePolicy scopePolicy,
             TokenProvider tokenProvider,
             ClockProvider clockProvider,
-            TokenPolicyProperties tokenPolicy) {
-        return new TokenRefreshResultFactory(
-                roleProvider,
-                scopePolicy,
-                tokenProvider,
-                clockProvider,
-                tokenPolicy);
+            TokenPolicyProperties policy) {
+
+        return new TokenRefreshResultFactory(roleProvider, scopePolicy, tokenProvider, clockProvider, policy);
     }
 
     @Bean
@@ -208,48 +186,43 @@ public class AuthApplicationConfig {
     }
 
     // ============================================================
-    // ME SERVICE
+    // ME PROFILE SERVICE
     // ============================================================
 
     @Bean
     public MeService meService(
-            UserAccountGateway userAccountGateway,
+            UserAccountGateway userGateway,
             RoleProvider roleProvider,
             ScopePolicy scopePolicy) {
-        return new MeService(userAccountGateway, roleProvider, scopePolicy);
+
+        return new MeService(userGateway, roleProvider, scopePolicy);
     }
 
     // ============================================================
-    // CHANGE PASSWORD SERVICE
+    // PASSWORD CHANGE SERVICE
     // ============================================================
 
     @Bean
     public ChangePasswordService changePasswordService(
             UserAccountGateway userGateway,
             RefreshTokenStore refreshStore,
-            PasswordHasher passwordHasher,
+            PasswordHasher hasher,
             PasswordPolicy passwordPolicy) {
-        return new ChangePasswordService(
-                userGateway,
-                refreshStore,
-                passwordHasher,
-                passwordPolicy);
+
+        return new ChangePasswordService(userGateway, refreshStore, hasher, passwordPolicy);
     }
 
     // ============================================================
-    // DEV REGISTER SERVICE
+    // DEV-ONLY REGISTRATION (disabled in prod)
     // ============================================================
 
     @Bean
     public DevRegisterService devRegisterService(
             UserAccountGateway gateway,
-            PasswordHasher passwordHasher,
+            PasswordHasher hasher,
             PasswordPolicy passwordPolicy,
             AuthMetricsService metrics) {
-        return new DevRegisterService(
-                gateway,
-                passwordHasher,
-                metrics,
-                passwordPolicy);
+
+        return new DevRegisterService(gateway, hasher, metrics, passwordPolicy);
     }
 }
