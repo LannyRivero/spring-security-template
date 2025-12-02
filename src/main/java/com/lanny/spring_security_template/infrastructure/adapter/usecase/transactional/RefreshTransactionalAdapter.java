@@ -1,6 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional;
 
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
@@ -9,7 +9,7 @@ import com.lanny.spring_security_template.application.auth.service.RefreshServic
 
 import lombok.RequiredArgsConstructor;
 
-@Component
+@Service
 @RequiredArgsConstructor
 public class RefreshTransactionalAdapter {
 
