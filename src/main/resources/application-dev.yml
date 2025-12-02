@@ -54,8 +54,8 @@ security:
   jwt:
     issuer: security-template
     audience: security-template-app
-    access-audience: security-template-app
-    refresh-audience: security-template-app
+    access-audience: access-service
+    refresh-audience: refresh-service
     max-active-sessions: 2
     algorithm: RSA
     access-ttl: PT1H
