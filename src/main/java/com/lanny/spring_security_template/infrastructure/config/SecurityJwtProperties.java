@@ -58,7 +58,7 @@ public record SecurityJwtProperties(
                 /** Access token lifetime (ISO-8601 duration, ex: PT15M) */
                 @DefaultValue("PT15M") Duration accessTtl,
 
-                /** Refresh token lifetime (ISO-8601 duration, ex: P7D) */
+                /** Refresh token lifetime (ISO-8601 duration, ex: P7D) */                
                 @DefaultValue("P7D") Duration refreshTtl,
 
                 /** Signing algorithm used (RSA or HMAC) */
