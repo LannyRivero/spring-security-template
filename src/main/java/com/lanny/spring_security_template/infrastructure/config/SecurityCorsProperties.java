@@ -10,29 +10,14 @@ import java.util.List;
 /**
  * Strongly-typed configuration for Cross-Origin Resource Sharing (CORS).
  *
- * <p>
- * Properties are mapped from <code>security.cors.*</code> and allow
- * environment-specific customization without modifying code.
- * This configuration is consumed by WebCommonConfig, where CORS rules
- * are applied globally.
- * </p>
+ * SECURITY NOTES (MANDATORY FOR ENTERPRISE):
+ * ------------------------------------------
+ * - In production environments, wildcard origins ("*") MUST NOT be allowed.
+ * - If allowCredentials = true => browsers reject "*" => fail-fast.
+ * - Strict validation prevents silent misconfiguration.
  *
- * <h2>Key Features</h2>
- * <ul>
- * <li>Supports environment-specific CORS policies.</li>
- * <li>Allows fine-grained control over allowed origins, methods, and
- * headers.</li>
- * <li>Compatible with strict security defaults for production
- * environments.</li>
- * </ul>
- *
- * <h2>Important Security Notes</h2>
- * <ul>
- * <li>If <b>allowCredentials = true</b>, wildcard origins (<code>*</code>) are
- * not permitted by browsers.</li>
- * <li>Use allow-origin-patterns instead when dynamic or wildcard origins are
- * required.</li>
- * </ul>
+ * This configuration is consumed by WebCommonConfig and enforced by
+ * SecurityConfig.
  */
 @Validated
 @ConfigurationProperties(prefix = "security.cors")
@@ -48,37 +33,51 @@ public record SecurityCorsProperties(
                 /** Allowed headers received in CORS requests */
                 @NotEmpty @DefaultValue({ "Authorization", "Content-Type" }) List<String> allowedHeaders,
 
-                /** Headers exposed to the browser (e.g. X-Correlation-Id) */
+                /** Headers exposed to the browser (e.g., X-Correlation-Id) */
                 @DefaultValue({ "X-Correlation-Id" }) List<String> exposedHeaders,
 
                 /** Whether cookies / Authorization headers can be sent cross-origin */
                 @DefaultValue("false") boolean allowCredentials){
+
         /**
          * Compact constructor for validation at bind-time.
-         *
-         * <p>
-         * Prevents invalid CORS settings:
-         * <ul>
-         * <li>If allowCredentials=true, then wildcard origin "*" is forbidden.</li>
-         * </ul>
-         * This is enforced because browsers will reject such a configuration,
-         * leaving developers confused if not validated early.
-         * </p>
+         * Enforces:
+         * - no "*" + allowCredentials=true (browser restriction)
+         * - no "*" in production environments (security rule)
          */
         public SecurityCorsProperties {
                 validateWildcardOriginWithCredentials(allowedOrigins, allowCredentials);
+                validateWildcardOriginInProduction(allowedOrigins);
         }
 
-        private static void validateWildcardOriginWithCredentials(List<String> allowedOrigins,
+        private static void validateWildcardOriginWithCredentials(
+                        List<String> allowedOrigins,
                         boolean allowCredentials) {
-
                 if (allowCredentials && allowedOrigins.contains("*")) {
-                        throw new IllegalArgumentException(
-                                        """
-                                                        Invalid CORS configuration: allowCredentials=true cannot be combined with allowedOrigins="*".
-                                                        Browsers reject this configuration for security reasons.
-                                                        Please set explicit origins instead of wildcard.
-                                                        """);
+                        throw new IllegalArgumentException("""
+                                        Invalid CORS configuration:
+                                        allowCredentials=true cannot be combined with allowedOrigins="*".
+                                        Browsers block this for security reasons.
+                                        """);
+                }
+        }
+
+        private static void validateWildcardOriginInProduction(List<String> allowedOrigins) {
+
+                String profile = System.getProperty("spring.profiles.active", "dev");
+
+                if (profile.equalsIgnoreCase("prod")
+                                || profile.equalsIgnoreCase("stage")
+                                || profile.equalsIgnoreCase("qa")) {
+
+                        if (allowedOrigins.contains("*")) {
+                                throw new IllegalStateException("""
+                                                SECURITY ERROR: Wildcard CORS origins ("*") are forbidden in production.
+                                                You MUST explicitly define trusted origins, e.g.:
+                                                - https://dashboard.company.com
+                                                - https://app.company.com
+                                                """);
+                        }
                 }
         }
 }
