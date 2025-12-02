@@ -72,16 +72,27 @@ public class LoggingAuditEventPublisher implements AuditEventPublisher {
     @Override
     public void publishAuthEvent(String eventType, String username, Instant timestamp, String details) {
 
-        String safeUser = (username == null || username.isBlank()) ? "anonymous" : username;
-        String safeDetails = (details == null || details.isBlank()) ? "-" : details;
-        String correlationId = MDC.get("correlationId");
+        String safeUser = sanitize(username, "anonymous");
+        String safeDetails = sanitize(details, "-");
+        String correlationId = sanitize(MDC.get("correlationId"), "-");
+        String clientIp = sanitize(MDC.get("clientIp"), "-");
+        String userAgent = sanitize(MDC.get("userAgent"), "-");
 
         getLogger().info(
-                "[AUDIT] event={} user={} timestamp={} details={} correlationId={}",
+                "[AUDIT] event={} user={} timestamp={} details={} correlationId={} ip={} agent={}",
                 eventType,
                 safeUser,
                 (timestamp != null ? timestamp : Instant.now()),
                 safeDetails,
-                (correlationId != null ? correlationId : "-"));
+                correlationId,
+                clientIp,
+                userAgent);
     }
+
+    private String sanitize(String input, String fallback) {
+        if (input == null || input.isBlank())
+            return fallback;
+        return input.replaceAll("[\\n\\r\t]", "_").trim();
+    }
+
 }
