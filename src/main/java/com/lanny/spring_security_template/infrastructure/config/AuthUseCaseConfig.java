@@ -9,10 +9,10 @@ import com.lanny.spring_security_template.application.auth.service.AuthUseCaseIm
 import com.lanny.spring_security_template.application.auth.service.AuthUseCaseLoggingDecorator;
 import com.lanny.spring_security_template.application.auth.service.MeService;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.ChangePasswordTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.DevRegisterTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.LoginTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.RefreshTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.ChangePasswordTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.DevRegisterTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.LoginTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.RefreshTransactionalAdapter;
 
 /**
  * ======================================================================

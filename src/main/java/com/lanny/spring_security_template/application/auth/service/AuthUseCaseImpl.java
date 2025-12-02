@@ -7,10 +7,10 @@ import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
 import com.lanny.spring_security_template.application.auth.query.MeQuery;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.ChangePasswordTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.DevRegisterTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.LoginTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.RefreshTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.ChangePasswordTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.DevRegisterTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.LoginTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.RefreshTransactionalAdapter;
 
 import lombok.RequiredArgsConstructor;
 

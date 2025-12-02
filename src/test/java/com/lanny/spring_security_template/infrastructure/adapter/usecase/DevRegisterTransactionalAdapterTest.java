@@ -2,6 +2,7 @@ package com.lanny.spring_security_template.infrastructure.adapter.usecase;
 
 import com.lanny.spring_security_template.application.auth.command.RegisterCommand;
 import com.lanny.spring_security_template.application.auth.service.DevRegisterService;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.DevRegisterTransactionalAdapter;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
