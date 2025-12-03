@@ -15,19 +15,13 @@ import org.springframework.stereotype.Component;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
-import com.nimbusds.jose.JOSEException;
-import com.nimbusds.jose.JOSEObjectType;
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.JWSVerifier;
+
+import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 
-/**
- * Utility for generating and validating JWTs (Access + Refresh) using RSA keys.
- */
 @Component
 public class JwtUtils {
 
@@ -43,20 +37,22 @@ public class JwtUtils {
         this.clockProvider = clockProvider;
     }
 
-    /** Generate access token (with roles & scopes) */
+    // ======================================================
+    // GENERACIÓN DE TOKENS
+    // ======================================================
+
     public String generateAccessToken(String subject, List<String> roles, List<String> scopes) {
         return generateToken(subject, roles, scopes, null, false);
     }
 
-    /** Generate refresh token */
     public String generateRefreshToken(String subject) {
         return generateToken(subject, List.of(), List.of(), null, true);
     }
 
-    /**
-     * Public overload allowing a custom TTL (used by TokenProvider)
-     */
-    public String generateToken(String subject, List<String> roles, List<String> scopes, Duration ttl,
+    public String generateToken(String subject,
+            List<String> roles,
+            List<String> scopes,
+            Duration ttl,
             boolean isRefresh) {
         try {
             Instant now = clockProvider.now();
@@ -64,10 +60,12 @@ public class JwtUtils {
                     ? now.plus(ttl)
                     : now.plus(isRefresh ? props.refreshTtl() : props.accessTtl());
 
+            // audience correcta
             String audience = isRefresh
                     ? Optional.ofNullable(props.refreshAudience()).orElse(props.accessAudience())
                     : props.accessAudience();
 
+            // Claims
             JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
                     .subject(subject)
                     .issuer(props.issuer())
@@ -85,51 +83,125 @@ public class JwtUtils {
 
             JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256)
                     .type(JOSEObjectType.JWT)
+                    .keyID(keyProvider.keyId())
                     .build();
 
             SignedJWT jwt = new SignedJWT(header, claims.build());
             jwt.sign(new RSASSASigner((RSAPrivateKey) keyProvider.privateKey()));
+
             return jwt.serialize();
 
         } catch (Exception e) {
-            throw new IllegalStateException("Error creating JWT", e);
+            throw new IllegalStateException("Error generating JWT: " + e.getMessage(), e);
         }
     }
 
-    /** Validate signature and expiration */
+    // ======================================================
+    // VALIDACIÓN COMPLETA
+    // ======================================================
+
     public JWTClaimsSet validateAndParse(String token) {
         try {
+            // 1. Parseo
             SignedJWT jwt = SignedJWT.parse(token);
-            JWSVerifier verifier = new RSASSAVerifier((RSAPublicKey) keyProvider.publicKey());
 
+            // 2. Validar header
+            validateHeader(jwt);
+
+            // 3. Validar firma
+            JWSVerifier verifier = new RSASSAVerifier((RSAPublicKey) keyProvider.publicKey());
             if (!jwt.verify(verifier)) {
                 throw new JOSEException("Invalid signature");
             }
 
+            // 4. Claims
             JWTClaimsSet claims = jwt.getJWTClaimsSet();
-            Instant now = clockProvider.now();
-
-            if (claims.getExpirationTime() == null || claims.getExpirationTime().toInstant().isBefore(now)) {
-                throw new JOSEException("Token expired");
-            }
-
-            if (!Objects.equals(claims.getIssuer(), props.issuer())) {
-                throw new JOSEException("Invalid issuer");
-            }
-
-            List<String> aud = claims.getAudience();
-            String expectedAud = isRefreshClaim(claims)
-                    ? Optional.ofNullable(props.refreshAudience()).orElse(props.accessAudience())
-                    : props.accessAudience();
-
-            if (aud != null && !aud.contains(expectedAud)) {
-                throw new JOSEException("Invalid audience");
-            }
+            validateClaims(claims);
 
             return claims;
 
+        } catch (java.text.ParseException e) {
+            throw new RuntimeException("Malformed JWT: " + e.getMessage(), e);
+
         } catch (Exception e) {
             throw new RuntimeException("Invalid token: " + e.getMessage(), e);
+        }
+    }
+
+    // ======================================================
+    // HEADER VALIDATION
+    // ======================================================
+    private void validateHeader(SignedJWT jwt) throws JOSEException {
+
+        // Algoritmo correcto
+        if (!JWSAlgorithm.RS256.equals(jwt.getHeader().getAlgorithm())) {
+            throw new JOSEException("Invalid alg");
+        }
+
+        // Tipo correcto
+        if (!JOSEObjectType.JWT.equals(jwt.getHeader().getType())) {
+            throw new JOSEException("Invalid typ");
+        }
+
+        // Validar KID
+        String kid = jwt.getHeader().getKeyID();
+        if (kid != null && !kid.equals(keyProvider.keyId())) {
+            throw new JOSEException("Unknown kid");
+        }
+    }
+
+    // ======================================================
+    // CLAIM VALIDATION
+    // ======================================================
+
+    private void validateClaims(JWTClaimsSet claims) throws JOSEException {
+        Instant now = clockProvider.now();
+
+        // Expiration
+        if (claims.getExpirationTime() == null ||
+                claims.getExpirationTime().toInstant().isBefore(now)) {
+            throw new JOSEException("Token expired");
+        }
+
+        // nbf (optional)
+        if (claims.getNotBeforeTime() != null &&
+                claims.getNotBeforeTime().toInstant().isAfter(now)) {
+            throw new JOSEException("Token not valid yet");
+        }
+
+        // Issuer
+        if (!Objects.equals(claims.getIssuer(), props.issuer())) {
+            throw new JOSEException("Invalid issuer");
+        }
+
+        // Audience correcta según tipo
+        String expectedAud = isRefreshClaim(claims)
+                ? Optional.ofNullable(props.refreshAudience()).orElse(props.accessAudience())
+                : props.accessAudience();
+
+        List<String> aud = claims.getAudience();
+        if (aud == null || !aud.contains(expectedAud)) {
+            throw new JOSEException("Invalid audience");
+        }
+
+        // Validar coherencia refresh/access
+        validateTokenType(claims);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void validateTokenType(JWTClaimsSet claims) throws JOSEException {
+        boolean refresh = isRefreshClaim(claims);
+
+        if (refresh) {
+            List<String> roles = (List<String>) claims.getClaim("roles");
+            List<String> scopes = (List<String>) claims.getClaim("scopes");
+
+            if (roles != null) {
+                throw new JOSEException("Refresh token must not contain roles");
+            }
+            if (scopes != null) {
+                throw new JOSEException("Refresh token must not contain scopes");
+            }
         }
     }
 
@@ -140,6 +212,10 @@ public class JwtUtils {
             return false;
         }
     }
+
+    // ======================================================
+    // HELPERS
+    // ======================================================
 
     public boolean isValid(String token) {
         try {
