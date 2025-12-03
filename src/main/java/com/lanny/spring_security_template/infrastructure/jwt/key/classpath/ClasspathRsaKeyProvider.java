@@ -11,48 +11,71 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
 /**
- * Loads RSA keys from the classpath for dev/test profiles.
- * 
- * Example configuration:
- * security.jwt.kid=dev-rsa-1
- * security.jwt.public-key-path=keys/rsa-public.pem
- * security.jwt.private-key-path=keys/rsa-private.pem
+ * RSA key provider that loads public/private keys from the classpath.
+ *
+ * <p>
+ * This implementation is intended exclusively for <b>dev</b> and <b>test</b>
+ * environments. For production, use a secure provider (e.g., keystore,
+ * Hashicorp Vault, AWS KMS, Azure KeyVault, GCP KMS).
+ * </p>
  */
 @Component
-@Profile({"dev", "test"})
+@Profile({ "dev", "test" })
 public class ClasspathRsaKeyProvider implements RsaKeyProvider {
 
   private final String kid;
-  private final RSAPublicKey pub;
-  private final RSAPrivateKey priv;
+  private final RSAPublicKey publicKey;
+  private final RSAPrivateKey privateKey;
 
-   public ClasspathRsaKeyProvider() {
-    this("test-rsa", "keys/rsa-public.pem", "keys/rsa-private.pem");
-  }
-
+  /**
+   * Constructor loading RSA keys from classpath locations provided in
+   * configuration properties.
+   */
   public ClasspathRsaKeyProvider(
       @Value("${security.jwt.kid:dev-rsa-1}") String kid,
       @Value("${security.jwt.public-key-path:keys/rsa-public.pem}") String pubPath,
-      @Value("${security.jwt.private-key-path:keys/rsa-private.pem}") String privPath
-  ) {
+      @Value("${security.jwt.private-key-path:keys/rsa-private.pem}") String privPath) {
+    if (kid == null || kid.isBlank()) {
+      throw new IllegalArgumentException("KID (key ID) cannot be null or blank.");
+    }
+
     this.kid = kid;
-    try (InputStream pubIs = resource(pubPath);
-         InputStream privIs = resource(privPath)) {
-      this.pub  = PemUtils.readPublicKey(pubIs);
-      this.priv = PemUtils.readPrivateKey(privIs);
+
+    try (InputStream pubIs = loadResource(pubPath);
+        InputStream privIs = loadResource(privPath)) {
+
+      this.publicKey = PemUtils.readPublicKey(pubIs);
+      this.privateKey = PemUtils.readPrivateKey(privIs);
+
     } catch (Exception e) {
-      throw new IllegalStateException("Cannot load RSA keys from classpath", e);
+      throw new IllegalStateException("Failed to load RSA keys from classpath.", e);
     }
   }
 
-  private InputStream resource(String path) {
-    var is = Thread.currentThread().getContextClassLoader().getResourceAsStream(path);
-    if (is == null)
-      throw new IllegalStateException("Resource not found: " + path);
+  /** Loads a classpath resource or fails fast. */
+  private InputStream loadResource(String path) {
+    InputStream is = Thread.currentThread()
+        .getContextClassLoader()
+        .getResourceAsStream(path);
+
+    if (is == null) {
+      throw new IllegalStateException("RSA key file not found in classpath: " + path);
+    }
     return is;
   }
 
-  @Override public String keyId() { return kid; }
-  @Override public RSAPublicKey publicKey() { return pub; }
-  @Override public RSAPrivateKey privateKey() { return priv; }
+  @Override
+  public String keyId() {
+    return kid;
+  }
+
+  @Override
+  public RSAPublicKey publicKey() {
+    return publicKey;
+  }
+
+  @Override
+  public RSAPrivateKey privateKey() {
+    return privateKey;
+  }
 }
