@@ -5,7 +5,6 @@ import org.springframework.stereotype.Component;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
-import java.util.Set;
 
 /**
  * UrlSecurityValidator
@@ -28,38 +27,10 @@ import java.util.Set;
 @Component
 public class UrlSecurityValidator {
 
-    private final OutboundHttpPolicyProperties policy;
-
-    public UrlSecurityValidator(OutboundHttpPolicyProperties policy) {
-        this.policy = policy;
-    }
-
-    private void validateAllowList(String host) {
-        if (!policy.allowListEnabled())
-            return;
-
-        if (policy.allowedHosts().contains(host))
-            return;
-
-        if (policy.allowSubdomains() && isAllowedSubdomain(host, policy.allowedHosts()))
-            return;
-
-        throw new IllegalArgumentException("Blocked outbound host by allow-list policy: " + host);
-    }
-
-    private boolean isAllowedSubdomain(String host, Set<String> allowedHosts) {
-        for (String allowed : allowedHosts) {
-            if (host.endsWith("." + allowed))
-                return true;
-        }
-        return false;
-    }
-
     public void validate(URI uri) {
 
         validateScheme(uri);
         validateHost(uri);
-        validateAllowList(uri.getHost());
         validateResolvedAddresses(uri.getHost());
     }
 
@@ -84,13 +55,13 @@ public class UrlSecurityValidator {
             for (InetAddress addr : addresses) {
                 if (isBlockedAddress(addr)) {
                     throw new IllegalArgumentException(
-                            "Blocked outbound destination: " + addr.getHostAddress());
+                        "Blocked outbound destination: " + addr.getHostAddress());
                 }
             }
 
         } catch (UnknownHostException ex) {
             throw new IllegalArgumentException(
-                    "Unable to resolve host: " + host, ex);
+                "Unable to resolve host: " + host, ex);
         }
     }
 
@@ -135,3 +106,4 @@ public class UrlSecurityValidator {
                 && (ip[0] & 0xFE) == 0xFC;
     }
 }
+
