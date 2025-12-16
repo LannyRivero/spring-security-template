@@ -4,7 +4,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
-import org.aspectj.lang.annotation.*;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
 import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -14,13 +15,21 @@ import org.springframework.stereotype.Component;
  *
  * Cross-cutting logging + metrics for application-layer use cases.
  *
- * - Applies to public methods in package:
- * com.lanny.spring_security_template.application.auth.service..*
+ * Scope:
+ * - ONLY application use cases (application..service..*)
  *
- * - Logs start/end with correlationId and basic context.
- * - Records Prometheus/Micrometer metrics:
+ * Metrics:
  * - usecase_calls_total
- * - usecase_duration_ms
+ * - usecase_duration_seconds
+ *
+ * Logging:
+ * - DEBUG for success
+ * - WARN for failures
+ *
+ * Design notes:
+ * - No arguments logged (PII-safe)
+ * - Cardinality controlled (finite tag set)
+ * - Fully infrastructure-level (no app coupling)
  */
 @Aspect
 @Component
@@ -34,14 +43,17 @@ public class UseCaseLoggingMetricsAspect {
                 this.meterRegistry = meterRegistry;
         }
 
-        @Around("execution(public * com.lanny.spring_security_template.application..*(..))")
+        @Around("execution(public * com.lanny.spring_security_template.application..service..*(..))")
         public Object measureUseCase(ProceedingJoinPoint pjp) throws Throwable {
 
                 String useCase = pjp.getSignature().getDeclaringType().getSimpleName();
+
                 String user = MDC.get("username");
                 if (user == null || user.isBlank()) {
                         user = "anonymous";
                 }
+
+                String correlationId = MDC.get("correlationId");
 
                 Timer.Sample sample = Timer.start(meterRegistry);
 
@@ -49,7 +61,7 @@ public class UseCaseLoggingMetricsAspect {
                         Object result = pjp.proceed();
 
                         sample.stop(
-                                        Timer.builder("usecase_duration")
+                                        Timer.builder("usecase_duration_seconds")
                                                         .tag("usecase", useCase)
                                                         .tag("status", "SUCCESS")
                                                         .register(meterRegistry));
@@ -59,13 +71,16 @@ public class UseCaseLoggingMetricsAspect {
                                         "usecase", useCase,
                                         "status", "SUCCESS").increment();
 
-                        log.debug("[USECASE_SUCCESS] usecase={} user={}", useCase, user);
+                        log.debug(
+                                        "[USECASE_SUCCESS] usecase={} user={} correlationId={}",
+                                        useCase, user, correlationId);
+
                         return result;
 
                 } catch (Throwable ex) {
 
                         sample.stop(
-                                        Timer.builder("usecase_duration")
+                                        Timer.builder("usecase_duration_seconds")
                                                         .tag("usecase", useCase)
                                                         .tag("status", "ERROR")
                                                         .register(meterRegistry));
@@ -75,7 +90,10 @@ public class UseCaseLoggingMetricsAspect {
                                         "usecase", useCase,
                                         "status", "ERROR").increment();
 
-                        log.warn("[USECASE_FAILURE] usecase={} user={}", useCase, user);
+                        log.warn(
+                                        "[USECASE_FAILURE] usecase={} user={} correlationId={}",
+                                        useCase, user, correlationId);
+
                         throw ex;
                 }
         }
