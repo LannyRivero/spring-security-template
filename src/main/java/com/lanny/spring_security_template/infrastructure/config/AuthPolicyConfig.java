@@ -44,7 +44,7 @@ public class AuthPolicyConfig {
     TokenPolicyProperties tokenPolicyProperties(SecurityJwtProperties props) {
 
         // Fail-fast validation (extra safety beyond validator)
-        Objects.requireNonNull(props.issuer(), "issuer cannot be null");
+        Objects.requireNonNull(props.issuer(), "issuer must be present before wiring TokenPolicyProperties");
         Objects.requireNonNull(props.accessAudience(), "accessAudience cannot be null");
         Objects.requireNonNull(props.refreshAudience(), "refreshAudience cannot be null");
 
@@ -92,7 +92,15 @@ public class AuthPolicyConfig {
      */
     @Bean
     SessionPolicy sessionPolicy(SecurityJwtProperties props) {
-        return props::maxActiveSessions;
+        int maxSessions = props.maxActiveSessions();
+
+        if (maxSessions < 1) {
+            throw new IllegalStateException(
+                    "Invalid maxActiveSessions configuration. " +
+                            "Value must be >= 1 for security reasons.");
+        }
+
+        return () -> maxSessions;
     }
 
     /**
