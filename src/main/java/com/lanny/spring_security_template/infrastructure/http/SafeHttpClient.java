@@ -7,9 +7,7 @@ import java.net.URI;
 import java.util.Objects;
 
 /**
- * =====================================================================
  * SafeHttpClient
- * =====================================================================
  *
  * Infrastructure adapter that encapsulates outbound HTTP calls.
  *
@@ -40,10 +38,10 @@ public class SafeHttpClient {
         Objects.requireNonNull(url, "url must not be null");
         Objects.requireNonNull(responseType, "responseType must not be null");
 
-        URI uri = Objects.requireNonNull(parseUri(url), "URI must not be null");
+        URI uri = parseUri(url);
         validator.validate(uri);
 
-        return restTemplate.getForObject(uri, responseType);
+        return restTemplate.getForObject(Objects.requireNonNull(uri), responseType);
     }
 
     public <T> T post(String url, Object body, Class<T> responseType) {
@@ -51,20 +49,21 @@ public class SafeHttpClient {
         Objects.requireNonNull(url, "url must not be null");
         Objects.requireNonNull(responseType, "responseType must not be null");
 
-        URI uri = Objects.requireNonNull(parseUri(url), "URI must not be null");
+        URI uri = parseUri(url);
         validator.validate(uri);
 
-        return restTemplate.postForObject(uri, body, responseType);
+        return restTemplate.postForObject(Objects.requireNonNull(uri), body, responseType);
     }
 
     /**
      * Parses and validates URI format.
      *
-     * NOTE:
-     * - URI.create never returns null
-     * - It throws IllegalArgumentException if the format is invalid
+     * Contract:
+     * - Returns a valid URI
+     * - Throws IllegalArgumentException if the format is invalid
      *
-     * We catch it here to provide a clearer, auditable error message.
+     * NOTE:
+     * URI.create never returns null.
      */
     private URI parseUri(String url) {
         try {
