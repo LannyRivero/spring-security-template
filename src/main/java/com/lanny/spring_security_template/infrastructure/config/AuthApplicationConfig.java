@@ -3,6 +3,7 @@ package com.lanny.spring_security_template.infrastructure.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.annotation.Profile;
 
 import com.lanny.spring_security_template.application.auth.policy.*;
 import com.lanny.spring_security_template.application.auth.port.out.*;
@@ -217,6 +218,7 @@ public class AuthApplicationConfig {
     // ============================================================
 
     @Bean
+    @Profile({ "dev", "demo" })
     public DevRegisterService devRegisterService(
             UserAccountGateway gateway,
             PasswordHasher hasher,
