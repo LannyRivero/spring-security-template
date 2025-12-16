@@ -2,106 +2,99 @@ package com.lanny.spring_security_template.infrastructure.aop;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
-import org.aspectj.lang.annotation.*;
-import org.aspectj.lang.reflect.MethodSignature;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
 import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * UseCaseLoggingMetricsAspect
  *
  * Cross-cutting logging + metrics for application-layer use cases.
  *
- * - Applies to public methods in package:
- * com.lanny.spring_security_template.application.auth.service..*
+ * Scope:
+ * - ONLY application use cases (application..service..*)
  *
- * - Logs start/end with correlationId and basic context.
- * - Records Prometheus/Micrometer metrics:
+ * Metrics:
  * - usecase_calls_total
- * - usecase_duration_ms
+ * - usecase_duration_seconds
+ *
+ * Logging:
+ * - DEBUG for success
+ * - WARN for failures
+ *
+ * Design notes:
+ * - No arguments logged (PII-safe)
+ * - Cardinality controlled (finite tag set)
+ * - Fully infrastructure-level (no app coupling)
  */
-@Slf4j
 @Aspect
 @Component
-@RequiredArgsConstructor
-@Order(100) // después de filtros web, antes de aspectos de auditoría si los hubiera
+@Order(100)
+@Slf4j
 public class UseCaseLoggingMetricsAspect {
 
-    private final MeterRegistry meterRegistry;
+        private final MeterRegistry meterRegistry;
 
-    /**
-     * Pointcut para todos los servicios de la capa de aplicación (auth).
-     * Puedes ampliarlo a otros módulos de aplicación si más adelante
-     * tienes otros contextos (billing, orders, etc).
-     */
-    @Pointcut("execution(public * com.lanny.spring_security_template.application.auth.service..*(..))")
-    public void authUseCaseOperation() {
-        // Pointcut marker
-    }
-
-    @Around("authUseCaseOperation()")
-    public Object logAndMeasure(ProceedingJoinPoint pjp) throws Throwable {
-
-        long startNs = System.nanoTime();
-
-        MethodSignature signature = (MethodSignature) pjp.getSignature();
-        String className = signature.getDeclaringType().getSimpleName();
-        String methodName = signature.getName();
-        String useCase = className + "." + methodName;
-
-        String correlationId = MDC.get("correlationId");
-        String user = MDC.get("user");
-
-        // IMPORTANTE: no loggeamos argumentos (pueden contener credenciales)
-        log.debug("▶️ [USECASE_START] useCase={} correlationId={} user={}",
-                useCase, correlationId, user);
-
-        try {
-            Object result = pjp.proceed();
-
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
-
-            // Métricas
-            meterRegistry.counter("usecase_calls_total",
-                    "usecase", useCase,
-                    "status", "SUCCESS")
-                    .increment();
-
-            Timer.builder("usecase_duration_ms")
-                    .tag("usecase", useCase)
-                    .tag("status", "SUCCESS")
-                    .register(meterRegistry)
-                    .record(durationMs, TimeUnit.MILLISECONDS);
-
-            log.info("✅ [USECASE_SUCCESS] useCase={} durationMs={} correlationId={} user={}",
-                    useCase, durationMs, correlationId, user);
-
-            return result;
-
-        } catch (Throwable ex) {
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
-
-            meterRegistry.counter("usecase_calls_total",
-                    "usecase", useCase,
-                    "status", "ERROR")
-                    .increment();
-
-            Timer.builder("usecase_duration_ms")
-                    .tag("usecase", useCase)
-                    .tag("status", "ERROR")
-                    .register(meterRegistry)
-                    .record(durationMs, TimeUnit.MILLISECONDS);
-
-            log.warn("❌ [USECASE_ERROR] useCase={} durationMs={} correlationId={} user={} error={}",
-                    useCase, durationMs, correlationId, user, ex.getMessage());
-
-            throw ex;
+        public UseCaseLoggingMetricsAspect(MeterRegistry meterRegistry) {
+                this.meterRegistry = meterRegistry;
         }
-    }
+
+        @Around("execution(public * com.lanny.spring_security_template.application..service..*(..))")
+        public Object measureUseCase(ProceedingJoinPoint pjp) throws Throwable {
+
+                String useCase = pjp.getSignature().getDeclaringType().getSimpleName();
+
+                String user = MDC.get("username");
+                if (user == null || user.isBlank()) {
+                        user = "anonymous";
+                }
+
+                String correlationId = MDC.get("correlationId");
+
+                Timer.Sample sample = Timer.start(meterRegistry);
+
+                try {
+                        Object result = pjp.proceed();
+
+                        sample.stop(
+                                        Timer.builder("usecase_duration_seconds")
+                                                        .tag("usecase", useCase)
+                                                        .tag("status", "SUCCESS")
+                                                        .register(meterRegistry));
+
+                        meterRegistry.counter(
+                                        "usecase_calls_total",
+                                        "usecase", useCase,
+                                        "status", "SUCCESS").increment();
+
+                        log.debug(
+                                        "[USECASE_SUCCESS] usecase={} user={} correlationId={}",
+                                        useCase, user, correlationId);
+
+                        return result;
+
+                } catch (Throwable ex) {
+
+                        sample.stop(
+                                        Timer.builder("usecase_duration_seconds")
+                                                        .tag("usecase", useCase)
+                                                        .tag("status", "ERROR")
+                                                        .register(meterRegistry));
+
+                        meterRegistry.counter(
+                                        "usecase_calls_total",
+                                        "usecase", useCase,
+                                        "status", "ERROR").increment();
+
+                        log.warn(
+                                        "[USECASE_FAILURE] usecase={} user={} correlationId={}",
+                                        useCase, user, correlationId);
+
+                        throw ex;
+                }
+        }
 }
