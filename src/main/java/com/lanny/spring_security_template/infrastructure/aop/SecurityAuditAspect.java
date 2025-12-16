@@ -1,148 +1,117 @@
 package com.lanny.spring_security_template.infrastructure.aop;
 
-import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
-import org.aspectj.lang.annotation.*;
+import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.AfterThrowing;
+import org.aspectj.lang.annotation.Aspect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
-import jakarta.servlet.http.HttpServletRequest;
+import com.lanny.spring_security_template.application.auth.audit.AuditEvent;
+import com.lanny.spring_security_template.application.auth.audit.AuditReason;
+import com.lanny.spring_security_template.application.auth.audit.Auditable;
 
 /**
  * SecurityAuditAspect
  *
- * Responsabilidad:
- * - Registrar eventos de auditoría para operaciones sensibles:
- * * login / login fallido
- * * refresh de token
- * * cambio de contraseña
- * * registro de usuario (dev)
+ * Banking-grade audit aspect.
  *
- * - Emite logs estructurados en un logger dedicado "SECURITY_AUDIT"
- * para facilitar integraciones SIEM / log shipping.
+ * Responsibilities:
+ * - Emit structured security audit events for explicitly annotated use cases
+ * - Never infer events from method names
+ * - Never log free-text exception messages
  *
- * Si en el futuro quieres usar un AuditEventPublisher (puerto),
- * este aspecto se puede adaptar fácilmente para delegar ahí.
+ * Scope:
+ * - Application-layer use cases annotated with @Auditable
+ * - HTTP-bound by design (relies on MDC population upstream)
  */
-@Slf4j
 @Aspect
 @Component
 public class SecurityAuditAspect {
 
     private static final Logger AUDIT_LOG = LoggerFactory.getLogger("SECURITY_AUDIT");
 
-    // Pointcut genérico: todos los métodos de servicios de auth
-    @Pointcut("execution(public * com.lanny.spring_security_template.application.auth.service..*(..))")
-    public void authServiceOperation() {
-        // marker
-    }
-
     // ==========
     // SUCCESS
     // ==========
 
-    @AfterReturning("authServiceOperation()")
-    public void auditSuccess(JoinPoint jp) {
-        String methodName = jp.getSignature().getName().toLowerCase();
-
-        String eventType = resolveEventType(methodName, true);
-        if (eventType == null) {
-            return; // otros métodos no se auditan
-        }
-
-        String username = resolveUsername();
-        String correlationId = MDC.get("correlationId");
-        String path = resolvePath();
-
-        AUDIT_LOG.info("event={} outcome=SUCCESS user={} path={} correlationId={}",
-                eventType, username, path, correlationId);
+    @AfterReturning(pointcut = "@annotation(auditable)")
+    public void auditSuccess(
+            JoinPoint joinPoint,
+            Auditable auditable) {
+        publish(
+                auditable.event(),
+                AuditReason.SUCCESS);
     }
 
     // ==========
     // FAILURE
     // ==========
 
-    @AfterThrowing(pointcut = "authServiceOperation()", throwing = "ex")
-    public void auditFailure(JoinPoint jp, Throwable ex) {
-        String methodName = jp.getSignature().getName().toLowerCase();
+    @AfterThrowing(pointcut = "@annotation(auditable)", throwing = "ex")
+    public void auditFailure(
+            JoinPoint joinPoint,
+            Auditable auditable,
+            Exception ex) {
+        publish(
+                auditable.event(),
+                mapExceptionToReason(ex));
+    }
 
-        String eventType = resolveEventType(methodName, false);
-        if (eventType == null) {
-            return; // otros métodos no se auditan
-        }
+    // ==========
+    // INTERNALS
+    // ==========
 
+    private void publish(
+            AuditEvent event,
+            AuditReason reason) {
         String username = resolveUsername();
         String correlationId = MDC.get("correlationId");
-        String path = resolvePath();
+        String path = MDC.get("requestPath");
 
-        AUDIT_LOG.warn("event={} outcome=FAILURE user={} path={} correlationId={} reason={}",
-                eventType, username, path, correlationId, ex.getMessage());
+        AUDIT_LOG.info(
+                "event={} reason={} user={} path={} correlationId={}",
+                event,
+                reason,
+                username,
+                path,
+                correlationId);
     }
 
-    // ==========
-    // HELPERS
-    // ==========
-
     /**
-     * Mapea nombres de métodos a tipos de evento de auditoría.
-     * Puedes ajustar estos nombres a tu gusto / estándar interno.
+     * Maps technical exceptions to controlled audit reasons.
+     *
+     * IMPORTANT:
+     * - Never log raw exception messages
+     * - Reasons must be finite and auditable
      */
-    private String resolveEventType(String methodName, boolean success) {
-
-        if (methodName.contains("login")) {
-            return "AUTH_LOGIN";
+    private AuditReason mapExceptionToReason(Exception ex) {
+        if (ex instanceof BadCredentialsException) {
+            return AuditReason.INVALID_CREDENTIALS;
         }
-        if (methodName.contains("refresh")) {
-            return "AUTH_TOKEN_REFRESH";
+        if (ex instanceof AccessDeniedException) {
+            return AuditReason.ACCESS_DENIED;
         }
-        if (methodName.contains("changepassword") || methodName.contains("password")) {
-            return "AUTH_PASSWORD_CHANGE";
-        }
-        if (methodName.contains("register") || methodName.contains("signup")) {
-            return "AUTH_USER_REGISTER";
-        }
-        // otros métodos de auth no se auditan por defecto
-        return null;
+        return AuditReason.UNKNOWN_FAILURE;
     }
 
     /**
-     * Resolver usuario:
-     * 1) Si hay Authentication en el SecurityContext → auth.getName()
-     * 2) Si no, se intenta obtener "username" de la request (útil para login)
-     * 3) Si falla, "anonymous"
+     * Resolves the audited username.
+     *
+     * Banking rule:
+     * - Security audit must never rely on request parameters
+     * - Username must be propagated explicitly (e.g. via MDC)
+     *
+     * If missing, "anonymous" is used.
      */
     private String resolveUsername() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getName() != null) {
-            return auth.getName();
-        }
-
-        HttpServletRequest req = currentRequest();
-        if (req != null) {
-            String username = req.getParameter("username");
-            if (username != null && !username.isBlank()) {
-                return username;
-            }
-        }
-        return "anonymous";
-    }
-
-    private String resolvePath() {
-        HttpServletRequest req = currentRequest();
-        return (req != null) ? req.getRequestURI() : "N/A";
-    }
-
-    private HttpServletRequest currentRequest() {
-        var attrs = RequestContextHolder.getRequestAttributes();
-        if (attrs instanceof ServletRequestAttributes servletAttrs) {
-            return servletAttrs.getRequest();
-        }
-        return null;
+        String username = MDC.get("username");
+        return (username != null && !username.isBlank())
+                ? username
+                : "anonymous";
     }
 }
