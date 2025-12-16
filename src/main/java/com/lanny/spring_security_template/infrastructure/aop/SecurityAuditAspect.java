@@ -69,17 +69,20 @@ public class SecurityAuditAspect {
     private void publish(
             AuditEvent event,
             AuditReason reason) {
+
         String username = resolveUsername();
         String correlationId = MDC.get("correlationId");
         String path = MDC.get("requestPath");
 
-        AUDIT_LOG.info(
-                "event={} reason={} user={} path={} correlationId={}",
-                event,
-                reason,
-                username,
-                path,
-                correlationId);
+        if (reason == AuditReason.SUCCESS) {
+            AUDIT_LOG.info(
+                    "event={} reason={} user={} path={} correlationId={}",
+                    event, reason, username, path, correlationId);
+        } else {
+            AUDIT_LOG.warn(
+                    "event={} reason={} user={} path={} correlationId={}",
+                    event, reason, username, path, correlationId);
+        }
     }
 
     /**
