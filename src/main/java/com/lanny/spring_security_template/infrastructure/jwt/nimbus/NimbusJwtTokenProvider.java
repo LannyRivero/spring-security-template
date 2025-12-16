@@ -8,8 +8,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Component
@@ -24,67 +24,112 @@ public class NimbusJwtTokenProvider implements TokenProvider {
         this.jwtValidator = jwtValidator;
     }
 
+    // ============================================================
+    // TOKEN GENERATION
+    // ============================================================
+
     @Override
-    public String generateAccessToken(String subject,
-            List<String> roles,
-            List<String> scopes,
-            Duration ttl) {
+    public String generateAccessToken(String subject, List<String> roles, List<String> scopes, Duration ttl) {
         return jwtUtils.generateToken(subject, roles, scopes, ttl, false);
     }
 
     @Override
     public String generateRefreshToken(String subject, Duration ttl) {
-        return jwtUtils.generateToken(subject, Collections.emptyList(), Collections.emptyList(), ttl, true);
+        return jwtUtils.generateToken(subject, List.of(), List.of(), ttl, true);
     }
+
+    // ============================================================
+    // VALIDATION (cryptographic + domain logic)
+    // ============================================================
 
     @Override
     public boolean validateToken(String token) {
-        return parseClaims(token).isPresent();
+        try {
+            // Validación completa: firma + claims + reglas de negocio
+            jwtValidator.validate(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
+
+    // ============================================================
+    // SUBJECT EXTRACTION
+    // ============================================================
 
     @Override
     public String extractSubject(String token) {
         return jwtUtils.validateAndParse(token).getSubject();
     }
 
+    // ============================================================
+    // CLAIM PARSING (safe version)
+    // ============================================================
+
     @Override
     public Optional<TokenClaims> parseClaims(String token) {
         try {
             JWTClaimsSet claims = jwtUtils.validateAndParse(token);
 
+            List<String> roles = extractStringListClaim(claims, "roles");
+            List<String> scopes = extractStringListClaim(claims, "scopes");
+            List<String> aud = claims.getAudience() != null ? claims.getAudience() : List.of();
+
             return Optional.of(new TokenClaims(
                     claims.getSubject(),
-                    claims.getStringListClaim("roles") != null ? claims.getStringListClaim("roles") : List.of(),
-                    claims.getStringListClaim("scopes") != null ? claims.getStringListClaim("scopes") : List.of(),
+                    roles,
+                    scopes,
                     claims.getIssueTime().toInstant().getEpochSecond(),
                     claims.getExpirationTime().toInstant().getEpochSecond(),
                     claims.getJWTID(),
                     claims.getIssuer(),
-                    claims.getStringListClaim("aud") != null ? claims.getStringListClaim("aud") : List.of()));
+                    aud));
 
         } catch (Exception e) {
             return Optional.empty();
         }
     }
+
+    // ============================================================
+    // FULL VALIDATION WITH DOMAIN CLAIMS DTO
+    // ============================================================
 
     @Override
     public Optional<JwtClaimsDTO> validateAndGetClaims(String token) {
         try {
-            JwtClaimsDTO dto = jwtValidator.validate(token);
-            return Optional.of(dto);
+            return Optional.of(jwtValidator.validate(token));
         } catch (Exception e) {
             return Optional.empty();
         }
     }
 
+    // ============================================================
+    // JTI EXTRACTION
+    // ============================================================
+
     @Override
     public String extractJti(String token) {
         try {
-            var claims = jwtUtils.validateAndParse(token);
-            return claims.getJWTID();
+            return jwtUtils.validateAndParse(token).getJWTID();
         } catch (Exception e) {
             throw new IllegalArgumentException("Cannot extract jti from token", e);
         }
     }
 
+    // ============================================================
+    // SAFE HELPERS (no ParseException)
+    // ============================================================
+
+    private List<String> extractStringListClaim(JWTClaimsSet claims, String name) {
+        Object raw = claims.getClaim(name);
+
+        if (raw instanceof List<?> list) {
+            return list.stream()
+                    .filter(Objects::nonNull)
+                    .map(Object::toString)
+                    .toList();
+        }
+
+        return List.of();
+    }
 }
