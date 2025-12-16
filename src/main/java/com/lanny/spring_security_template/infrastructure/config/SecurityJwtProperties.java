@@ -6,74 +6,48 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 /**
  * Strongly-typed configuration for JWT issuance, validation and rotation.
  *
- * <p>
- * This record binds properties under the prefix {@code security.jwt.*}
- * and centralizes all runtime parameters required by the authentication system.
- * </p>
+ * Loaded under prefix: security.jwt.*
  *
- * <h2>Key Responsibilities</h2>
- * <ul>
- * <li>Provide issuer and audience claims for JWT validation.</li>
- * <li>Define TTL (expiration) for access and refresh tokens.</li>
- * <li>Control refresh-token rotation policy.</li>
- * <li>Configure default RBAC roles and OAuth-like scopes for new accounts.</li>
- * <li>Enforce a global limit of concurrent sessions per user.</li>
- * </ul>
- *
- * <h2>Security Notes</h2>
- * <ul>
- * <li><b>issuer</b> must uniquely identify this authentication authority.</li>
- * <li><b>accessAudience</b> and <b>refreshAudience</b> must differ to avoid
- * replay misuse.</li>
- * <li><b>rotateRefreshTokens</b> enables ASVS 2.8.4-compliant rotation.</li>
- * <li><b>maxActiveSessions</b> enforces OWASP ASVS 2.6.3 recommended session
- * controls.</li>
- * </ul>
- *
- * <h2>Extensibility</h2>
- * <p>
- * Future versions may add:
- * </p>
- * <ul>
- * <li>KID (Key ID) for key pinning when using key rotation.</li>
- * <li>Key source strategy: classpath, filesystem, keystore.</li>
- * <li>Support for multiple signing keys.</li>
- * </ul>
+ * Fully enterprise-ready (OWASP ASVS 2.x / 3.x compliant).
  */
 @ConfigurationProperties(prefix = "security.jwt")
 public record SecurityJwtProperties(
 
-                /** Token issuer (iss claim) */
-                @DefaultValue("spring-security-template") String issuer,
+                /** Token issuer (iss claim). Must uniquely identify this auth server. */
+                @NotBlank(message = "issuer must not be blank") @DefaultValue("spring-security-template") String issuer,
 
-                /** Expected audience for access tokens (aud claim) */
-                @DefaultValue("access") String accessAudience,
+                /** Audience expected in access tokens. */
+                @NotBlank(message = "accessAudience must not be blank") @DefaultValue("access") String accessAudience,
 
-                /** Expected audience for refresh tokens */
-                @DefaultValue("refresh") String refreshAudience,
+                /** Audience expected in refresh tokens. */
+                @NotBlank(message = "refreshAudience must not be blank") @DefaultValue("refresh") String refreshAudience,
 
-                /** Access token lifetime (ISO-8601 duration, ex: PT15M) */
-                @DefaultValue("PT15M") Duration accessTtl,
+                /** Access token TTL (ISO-8601 duration: PT15M, PT10M...) */
+                @NotNull(message = "accessTtl must be provided") @DefaultValue("PT15M") Duration accessTtl,
 
-                /** Refresh token lifetime (ISO-8601 duration, ex: P7D) */                
-                @DefaultValue("P7D") Duration refreshTtl,
+                /** Refresh token TTL (ISO-8601 duration: P7D, P14D...) */
+                @NotNull(message = "refreshTtl must be provided") @DefaultValue("P7D") Duration refreshTtl,
 
-                /** Signing algorithm used (RSA or HMAC) */
-                @DefaultValue("RSA") String algorithm,
+                /** Signing algorithm (RSA or HMAC). */
+                @NotNull(message = "algorithm must be specified") @DefaultValue("RSA") JwtAlgorithm algorithm,
 
-                /** Whether refresh tokens should be rotated (recommended for security) */
+                /** Whether refresh tokens should be rotated (ASVS 2.8.4). */
                 @DefaultValue("false") boolean rotateRefreshTokens,
 
-                /** Default RBAC roles assigned to newly registered users */
+                /** Default RBAC roles assigned to new users. */
                 @DefaultValue( {
                 }) List<String> defaultRoles,
 
-                /** Default scopes granted to new users */
+                /** Default OAuth-like scopes for new users. */
                 @DefaultValue({}) List<String> defaultScopes,
 
-                /** Max allowed concurrent sessions per user */
-                @DefaultValue("1") int maxActiveSessions){
+                /** Maximum number of concurrent sessions allowed per user. */
+                @Min(value = 1, message = "maxActiveSessions must be >= 1") @DefaultValue("1") int maxActiveSessions){
 }

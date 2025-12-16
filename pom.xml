@@ -104,9 +104,11 @@
     <artifactId>micrometer-registry-prometheus</artifactId>
     <version>1.15.1</version>
 </dependency>
-
-
-
+<!-- 📊 AOP -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-aop</artifactId>
+</dependency>
     <!-- 🧠 MapStruct -->
     <dependency>
       <groupId>org.mapstruct</groupId>

@@ -1,6 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.config;
 
 import java.time.Duration;
+import java.util.Objects;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,57 +13,41 @@ import com.lanny.spring_security_template.application.auth.policy.TokenPolicyPro
 
 /**
  * =====================================================================
- * AuthPolicyConfig
+ * AuthPolicyConfig (Enterprise Version)
  * =====================================================================
  *
- * Infrastructure-level configuration that adapts {@link SecurityJwtProperties}
- * into strongly typed policy interfaces used by the Application Layer.
+ * Adapts {@link SecurityJwtProperties} into strongly typed policy
+ * interfaces consumed by the Application Layer.
  *
- * <p>
- * The goal is to isolate all JWT-related configuration (TTL, issuer, audiences,
- * rotation flags, session limits) from business logic.
- * Application services depend exclusively on:
- * </p>
+ * All validations here are fail-fast so that the application refuses
+ * to start if critical JWT configuration is missing or unsafe.
  *
- * <ul>
- * <li>{@link TokenPolicyProperties}</li>
- * <li>{@link RefreshTokenPolicy}</li>
- * <li>{@link SessionPolicy}</li>
- * <li>{@link RotationPolicy}</li>
- * </ul>
+ * SECURITY HARDENING:
+ * - issuer must be non-null
+ * - audiences must be non-null
+ * - TTL values already validated in SecurityJwtPropertiesValidator
  *
- * <h2>Architectural Role</h2>
- * <p>
- * These beans form the backbone of token lifecycle rules:
- * </p>
- *
- * <ul>
- * <li><b>TokenPolicyProperties</b> → TTLs, issuer, JWT audiences</li>
- * <li><b>RefreshTokenPolicy</b> → rules for validating refresh tokens</li>
- * <li><b>SessionPolicy</b> → concurrent session limits per user</li>
- * <li><b>RotationPolicy</b> → whether refresh token rotation is enabled</li>
- * </ul>
- *
- * <h2>Security Compliance</h2>
- * <ul>
- * <li>OWASP ASVS 2.8 — Token expiry, audience and issuer validation</li>
- * <li>OWASP ASVS 3.1 — Secure session lifetime and session limits</li>
- * </ul>
- *
- * <h2>Notes</h2>
- * <ul>
- * <li>This config must remain declarative—no business logic allowed.</li>
- * <li>Central location for multi-environment JWT/security behavior.</li>
- * </ul>
+ * These policies govern:
+ * - Access token TTL
+ * - Refresh token TTL & audience
+ * - Session concurrency limits
+ * - Refresh rotation strategy
  */
 @Configuration
 public class AuthPolicyConfig {
 
     /**
-     * Adapts {@link SecurityJwtProperties} to {@link TokenPolicyProperties}.
+     * Maps SecurityJwtProperties into TokenPolicyProperties.
+     * Ensures all JWT-critical fields are present.
      */
     @Bean
     TokenPolicyProperties tokenPolicyProperties(SecurityJwtProperties props) {
+
+        // Fail-fast validation (extra safety beyond validator)
+        Objects.requireNonNull(props.issuer(), "issuer must be present before wiring TokenPolicyProperties");
+        Objects.requireNonNull(props.accessAudience(), "accessAudience cannot be null");
+        Objects.requireNonNull(props.refreshAudience(), "refreshAudience cannot be null");
+
         return new TokenPolicyProperties() {
 
             @Override
@@ -93,23 +78,33 @@ public class AuthPolicyConfig {
     }
 
     /**
-     * Defines refresh token validation rules (audience enforcement).
+     * Refresh token audience enforcement.
+     * This ensures refresh tokens always contain the correct audience.
      */
     @Bean
     RefreshTokenPolicy refreshTokenPolicy(SecurityJwtProperties props) {
+        Objects.requireNonNull(props.refreshAudience(), "refreshAudience cannot be null");
         return props::refreshAudience;
     }
 
     /**
-     * Session management rules such as max concurrent sessions per user.
+     * Defines session concurrency restrictions.
      */
     @Bean
     SessionPolicy sessionPolicy(SecurityJwtProperties props) {
-        return props::maxActiveSessions;
+        int maxSessions = props.maxActiveSessions();
+
+        if (maxSessions < 1) {
+            throw new IllegalStateException(
+                    "Invalid maxActiveSessions configuration. " +
+                            "Value must be >= 1 for security reasons.");
+        }
+
+        return () -> maxSessions;
     }
 
     /**
-     * Configures whether refresh token rotation is enabled.
+     * Enables or disables refresh token rotation.
      */
     @Bean
     RotationPolicy rotationPolicy(SecurityJwtProperties props) {

@@ -8,21 +8,38 @@ import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsS
 import com.lanny.spring_security_template.infrastructure.metrics.AuthMetricsServiceNoOp;
 
 /**
- * Metrics configuration providing fallback No-Op implementation for tests
- * and enviroments where observability is disabled.
- * 
+ * =====================================================================
+ * AuthMetricsConfig — Metrics Strategy Configuration
+ * =====================================================================
+ *
+ * Provides a **No-Op fallback** for environments where observability
+ * (Micrometer + Prometheus) is not available or not required.
+ *
+ * Profiles covered:
+ * - test → unit tests
+ * - integration-test → Testcontainers / integration suites
+ * - local → developer laptop
+ * - demo → preview environments without Prometheus
+ *
+ * IMPORTANT:
+ * In "prod", a real AuthMetricsService **must** be provided,
+ * such as MicrometerPrometheusAuthMetricsService or a Kafka-based auditor.
+ *
+ * This ensures:
+ * - predictable behavior in low-observability environments
+ * - full metrics pipeline in production
+ * - clean separation of infrastructure concerns
  */
 @Configuration
 public class AuthMetricsConfig {
 
     /**
-     * Provides a no-Op metrics implementation for unit tests and enviroments
-     * wjthout Micrometer/Prometheus.
+     * Registers a no-op metrics service for environments where
+     * metrics should NOT be collected.
      */
     @Bean
-    @Profile({ "test", "local", "demo" })
+    @Profile({ "test", "local", "demo", "integration-test" })
     public AuthMetricsService authMetricsNoOp() {
         return AuthMetricsServiceNoOp.INSTANCE;
-
     }
 }

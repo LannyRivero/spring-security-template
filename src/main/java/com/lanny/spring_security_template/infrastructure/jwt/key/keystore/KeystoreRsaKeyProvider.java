@@ -1,31 +1,32 @@
 package com.lanny.spring_security_template.infrastructure.jwt.key.keystore;
 
-import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
-import org.springframework.stereotype.Component;
-
 import java.io.FileInputStream;
-import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.Key;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+
+import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
+
+import lombok.extern.slf4j.Slf4j;
+
 /**
- *  KeystoreRsaKeyProvider
+ * Secure RSA Key Provider for production environments.
  *
- * Loads RSA keypair from a secure PKCS12 / JKS keystore in production.
- * Supports file path or environment variable-based configuration.
+ * Loads RSA keys from a PKCS12 keystore and performs strict validation:
+ * - key existence
+ * - alias existence
+ * - RSA type enforcement
+ * - minimum key size (2048 bits)
  *
- * Example configuration:
- * security.jwt.kid=prod-rsa-1
- * security.jwt.keystore.path=/opt/keys/security-template.p12
- * security.jwt.keystore.password=${KEYSTORE_PASSWORD}
- * security.jwt.keystore.key-alias=jwt-signing-key
- * security.jwt.keystore.key-password=${KEY_PASSWORD}
+ * No sensitive file paths are logged to prevent leaking server structure.
  */
 @Slf4j
 @Component
@@ -37,19 +38,27 @@ public class KeystoreRsaKeyProvider implements RsaKeyProvider {
     private final RSAPrivateKey priv;
 
     public KeystoreRsaKeyProvider(
-            @Value("${security.jwt.kid:prod-rsa-1}") String kid,
+            @Value("${security.jwt.kid}") String kid,
             @Value("${security.jwt.keystore.path}") String keystorePath,
             @Value("${security.jwt.keystore.password}") String ksPassword,
             @Value("${security.jwt.keystore.key-alias}") String keyAlias,
             @Value("${security.jwt.keystore.key-password}") String keyPassword) {
+
+        if (kid == null || kid.isBlank()) {
+            throw new IllegalStateException("security.jwt.kid must be provided and non-blank.");
+        }
         this.kid = kid;
-        try (InputStream fis = new FileInputStream(keystorePath)) {
-            KeyStore ks = KeyStore.getInstance("PKCS12"); 
+
+        Path ksPath = Path.of(keystorePath);
+        validateKeystoreFile(ksPath);
+
+        try (FileInputStream fis = new FileInputStream(ksPath.toFile())) {
+            KeyStore ks = KeyStore.getInstance("PKCS12");
             ks.load(fis, ksPassword.toCharArray());
 
             Key key = ks.getKey(keyAlias, keyPassword.toCharArray());
             if (!(key instanceof RSAPrivateKey privKey)) {
-                throw new IllegalStateException("Key alias does not reference an RSA private key");
+                throw new IllegalStateException("Key alias does not reference an RSA private key: " + keyAlias);
             }
 
             X509Certificate cert = (X509Certificate) ks.getCertificate(keyAlias);
@@ -57,12 +66,45 @@ public class KeystoreRsaKeyProvider implements RsaKeyProvider {
                 throw new IllegalStateException("No certificate found for alias: " + keyAlias);
             }
 
-            this.priv = privKey;
-            this.pub = (RSAPublicKey) cert.getPublicKey();
+            RSAPublicKey publicKey = (RSAPublicKey) cert.getPublicKey();
 
-            log.info("✅ Loaded RSA keypair from keystore: {} (alias='{}')", keystorePath, keyAlias);
+            validateKeySize(privKey, keyAlias);
+            validateKeySize(publicKey, keyAlias);
+
+            this.priv = privKey;
+            this.pub = publicKey;
+
+            // Secure log – no file paths exposed
+            log.info("✓ Loaded RSA keypair for alias '{}'", keyAlias);
+
         } catch (Exception e) {
-            throw new IllegalStateException("❌ Cannot load RSA keys from keystore: " + keystorePath, e);
+            throw new IllegalStateException("Could not load RSA keypair from keystore.", e);
+        }
+    }
+
+    private static void validateKeystoreFile(Path ksPath) {
+        if (!Files.exists(ksPath)) {
+            throw new IllegalStateException("Keystore file does not exist: " + ksPath);
+        }
+        if (!Files.isRegularFile(ksPath)) {
+            throw new IllegalStateException("Keystore path is not a file: " + ksPath);
+        }
+        if (!Files.isReadable(ksPath)) {
+            throw new IllegalStateException("Keystore file is not readable: " + ksPath);
+        }
+    }
+
+    private static void validateKeySize(RSAPrivateKey key, String alias) {
+        if (key.getModulus().bitLength() < 2048) {
+            throw new IllegalStateException(
+                    "RSA private key for alias '" + alias + "' is too weak. Minimum size required: 2048 bits.");
+        }
+    }
+
+    private static void validateKeySize(RSAPublicKey key, String alias) {
+        if (key.getModulus().bitLength() < 2048) {
+            throw new IllegalStateException(
+                    "RSA public key for alias '" + alias + "' is too weak. Minimum size required: 2048 bits.");
         }
     }
 

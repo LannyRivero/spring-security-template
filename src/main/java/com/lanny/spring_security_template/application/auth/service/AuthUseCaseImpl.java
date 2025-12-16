@@ -4,13 +4,13 @@ import com.lanny.spring_security_template.application.auth.command.LoginCommand;
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
 import com.lanny.spring_security_template.application.auth.command.RegisterCommand;
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
+import com.lanny.spring_security_template.application.auth.port.out.ChangePasswordPort;
+import com.lanny.spring_security_template.application.auth.port.out.DevRegisterPort;
+import com.lanny.spring_security_template.application.auth.port.out.LoginPort;
+import com.lanny.spring_security_template.application.auth.port.out.RefreshPort;
 import com.lanny.spring_security_template.application.auth.query.MeQuery;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.ChangePasswordTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.DevRegisterTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.LoginTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.adapter.usecase.RefreshTransactionalAdapter;
 
 import lombok.RequiredArgsConstructor;
 
@@ -80,11 +80,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthUseCaseImpl implements AuthUseCase {
 
-    private final LoginTransactionalAdapter loginAdapter;
-    private final RefreshTransactionalAdapter refreshAdapter;
+    private final LoginPort loginAdapter;
+    private final RefreshPort refreshAdapter;
     private final MeService meService;
-    private final DevRegisterTransactionalAdapter devRegisterAdapter;
-    private final ChangePasswordTransactionalAdapter changePasswordAdapter;
+    private final DevRegisterPort devRegisterAdapter;
+    private final ChangePasswordPort changePasswordAdapter;
 
     @Override
     public JwtResult login(LoginCommand cmd) {
