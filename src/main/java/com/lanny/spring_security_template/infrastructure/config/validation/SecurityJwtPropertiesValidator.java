@@ -11,12 +11,10 @@ import java.util.regex.Pattern;
 @Component
 public class SecurityJwtPropertiesValidator {
 
-    private static final Pattern ROLE_PATTERN =
-            Pattern.compile("^ROLE_[A-Z0-9_]+$");
+    private static final Pattern ROLE_PATTERN = Pattern.compile("^ROLE_[A-Z0-9_]+$");
 
     // OAuth2 / Google IAM / AWS IAM compatible
-    private static final Pattern SCOPE_PATTERN =
-            Pattern.compile("^[a-zA-Z0-9._-]+(:[a-zA-Z0-9._-]+)+$");
+    private static final Pattern SCOPE_PATTERN = Pattern.compile("^[a-zA-Z0-9._-]+(:[a-zA-Z0-9._-]+)+$");
 
     private final SecurityJwtProperties props;
 
@@ -29,38 +27,38 @@ public class SecurityJwtPropertiesValidator {
 
         // ---------------- TTLs ----------------
         if (props.accessTtl() == null || props.accessTtl().toMinutes() < 5) {
-            throw new IllegalArgumentException("accessTtl must be >= 5 minutes.");
+            throw new InvalidSecurityConfigurationException("accessTtl must not exceed 1 hour");
         }
 
         if (props.refreshTtl().compareTo(props.accessTtl()) <= 0) {
-            throw new IllegalArgumentException("refreshTtl must be greater than accessTtl.");
+            throw new InvalidSecurityConfigurationException("refreshTtl must be greater than accessTtl");
         }
 
         // ---------------- Issuer ----------------
         if (!StringUtils.hasText(props.issuer())) {
-            throw new IllegalArgumentException("issuer cannot be blank.");
+            throw new InvalidSecurityConfigurationException("issuer cannot be blank.");
         }
 
         try {
             URI.create(props.issuer());
         } catch (Exception e) {
-            throw new IllegalArgumentException("issuer must be a valid URI.", e);
+            throw new InvalidSecurityConfigurationException("issuer must be a valid URI.", e);
         }
 
         // ---------------- Audience ----------------
         if (!StringUtils.hasText(props.accessAudience())) {
-            throw new IllegalArgumentException("accessAudience cannot be blank.");
+            throw new InvalidSecurityConfigurationException("accessAudience cannot be blank.");
         }
 
         if (!StringUtils.hasText(props.refreshAudience())) {
-            throw new IllegalArgumentException("refreshAudience cannot be blank.");
+            throw new InvalidSecurityConfigurationException("refreshAudience cannot be blank.");
         }
 
         // ---------------- Roles ----------------
         if (props.defaultRoles() != null) {
             for (String role : props.defaultRoles()) {
                 if (!ROLE_PATTERN.matcher(role).matches()) {
-                    throw new IllegalArgumentException(
+                    throw new InvalidSecurityConfigurationException(
                             "Invalid role: %s — expected format ROLE_XYZ".formatted(role));
                 }
             }
@@ -70,10 +68,10 @@ public class SecurityJwtPropertiesValidator {
         if (props.defaultScopes() != null) {
             for (String scope : props.defaultScopes()) {
                 if (!SCOPE_PATTERN.matcher(scope).matches()) {
-                    throw new IllegalArgumentException(
+                    throw new InvalidSecurityConfigurationException(
                             "Invalid scope: %s — expected format xxx:yyy or xxx:yyy:zzz".formatted(scope));
                 }
             }
-        }        
+        }
     }
 }
