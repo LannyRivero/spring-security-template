@@ -13,7 +13,20 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
  */
 @Configuration
 @EnableAspectJAutoProxy(proxyTargetClass = true)
+
+/**
+ * AOP configuration for cros-cutting concerns;
+ * 
+ * Scope(by desing):
+ * -Application layer use cases(logging, metrics, audit)
+ * -No interception of:
+ * -Domain layer
+ * -Infrastructure adapters
+ * -Controllers
+ * 
+ * This explicit limitation is critical for predictability
+ * and auditability in security-sensitive applications.
+ */
 public class AopConfig {
-    // no additional beans required for now
 
 }
