@@ -134,6 +134,15 @@ management:
         enabled: true
     tags:
       application: spring-security-template
+# =============================
+# 🌐 HTTP CLIENT (OUTBOUND)
+# =============================
+http:
+  client:
+    connect-timeout: 2000   # ms
+    request-timeout: 5000   # ms (>= connect-timeout)
+    read-timeout: 5000      # si lo tienes
+    max-connections: 50
 
 
 
