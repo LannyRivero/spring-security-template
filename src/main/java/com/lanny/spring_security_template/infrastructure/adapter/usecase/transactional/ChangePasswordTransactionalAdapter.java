@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.lanny.spring_security_template.application.auth.port.out.ChangePasswordPort;
 import com.lanny.spring_security_template.application.auth.service.ChangePasswordService;
 
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Service
 @RequiredArgsConstructor
-public class ChangePasswordTransactionalAdapter {
+public class ChangePasswordTransactionalAdapter implements ChangePasswordPort {
 
     private final ChangePasswordService delegate;
 

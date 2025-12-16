@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
+import com.lanny.spring_security_template.application.auth.port.out.RefreshPort;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.service.RefreshService;
 
@@ -20,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-public class RefreshTransactionalAdapter {
+public class RefreshTransactionalAdapter implements RefreshPort {
 
     private final RefreshService refreshService;
 

@@ -1,11 +1,14 @@
 package com.lanny.spring_security_template.infrastructure.config;
 
+import java.util.Optional;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
 import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
+import com.lanny.spring_security_template.application.auth.port.out.DevRegisterPort;
 import com.lanny.spring_security_template.application.auth.service.AuthUseCaseImpl;
 import com.lanny.spring_security_template.application.auth.service.AuthUseCaseLoggingDecorator;
 import com.lanny.spring_security_template.application.auth.service.MeService;
@@ -13,6 +16,7 @@ import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.ChangePasswordTransactionalAdapter;
 import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.DevRegisterTransactionalAdapter;
 import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.LoginTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.NoOpDevRegisterAdapter;
 import com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional.RefreshTransactionalAdapter;
 
 /**
@@ -44,19 +48,22 @@ public class AuthUseCaseConfig {
             LoginTransactionalAdapter loginAdapter,
             RefreshTransactionalAdapter refreshAdapter,
             MeService meService,
-            DevRegisterTransactionalAdapter devRegisterAdapter,
+            Optional<DevRegisterTransactionalAdapter> devRegisterAdapter,
             ChangePasswordTransactionalAdapter changePasswordAdapter) {
+
+        DevRegisterPort registerPort = devRegisterAdapter
+                .map(adapter -> (DevRegisterPort) adapter)
+                .orElseGet(NoOpDevRegisterAdapter::new);
 
         return new AuthUseCaseImpl(
                 loginAdapter,
                 refreshAdapter,
                 meService,
-                devRegisterAdapter,
+                registerPort,
                 changePasswordAdapter);
     }
 
     /**
-     * ------------------------------------------------------------------
      * DECORATED USE CASE (logging + auditing + MDC)
      * ------------------------------------------------------------------
      *
