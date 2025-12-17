@@ -10,6 +10,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -18,29 +19,27 @@ import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Secure RSA Key Provider for production environments.
+ * RSA Key Provider backed by a PKCS12 keystore.
  *
- * Loads RSA keys from a PKCS12 keystore and performs strict validation:
- * - key existence
- * - alias existence
- * - RSA type enforcement
- * - minimum key size (2048 bits)
- *
- * No sensitive file paths are logged to prevent leaking server structure.
+ * <p>
+ * This provider is intended for <b>production</b> environments and enforces
+ * strict cryptographic validation and fail-fast behavior.
+ * </p>
  */
 @Slf4j
 @Component
 @Profile("prod")
+@ConditionalOnProperty(name = "security.jwt.key-provider", havingValue = "keystore", matchIfMissing = false)
 public class KeystoreRsaKeyProvider implements RsaKeyProvider {
 
     private final String kid;
-    private final RSAPublicKey pub;
-    private final RSAPrivateKey priv;
+    private final RSAPublicKey publicKey;
+    private final RSAPrivateKey privateKey;
 
     public KeystoreRsaKeyProvider(
             @Value("${security.jwt.kid}") String kid,
             @Value("${security.jwt.keystore.path}") String keystorePath,
-            @Value("${security.jwt.keystore.password}") String ksPassword,
+            @Value("${security.jwt.keystore.password}") String keystorePassword,
             @Value("${security.jwt.keystore.key-alias}") String keyAlias,
             @Value("${security.jwt.keystore.key-password}") String keyPassword) {
 
@@ -53,58 +52,78 @@ public class KeystoreRsaKeyProvider implements RsaKeyProvider {
         validateKeystoreFile(ksPath);
 
         try (FileInputStream fis = new FileInputStream(ksPath.toFile())) {
+
             KeyStore ks = KeyStore.getInstance("PKCS12");
-            ks.load(fis, ksPassword.toCharArray());
+            ks.load(fis, keystorePassword.toCharArray());
 
             Key key = ks.getKey(keyAlias, keyPassword.toCharArray());
-            if (!(key instanceof RSAPrivateKey privKey)) {
-                throw new IllegalStateException("Key alias does not reference an RSA private key: " + keyAlias);
+            if (!(key instanceof RSAPrivateKey priv)) {
+                throw new IllegalStateException(
+                        "Key alias does not reference an RSA private key: " + keyAlias);
             }
 
             X509Certificate cert = (X509Certificate) ks.getCertificate(keyAlias);
             if (cert == null) {
-                throw new IllegalStateException("No certificate found for alias: " + keyAlias);
+                throw new IllegalStateException(
+                        "No certificate found for alias: " + keyAlias);
             }
 
-            RSAPublicKey publicKey = (RSAPublicKey) cert.getPublicKey();
+            if (!"RSA".equalsIgnoreCase(cert.getPublicKey().getAlgorithm())) {
+                throw new IllegalStateException(
+                        "Certificate public key is not RSA for alias: " + keyAlias);
+            }
 
-            validateKeySize(privKey, keyAlias);
-            validateKeySize(publicKey, keyAlias);
+            RSAPublicKey pub = (RSAPublicKey) cert.getPublicKey();
 
-            this.priv = privKey;
-            this.pub = publicKey;
+            validateKeySize(priv, keyAlias);
+            validateKeySize(pub, keyAlias);
+            validateKeyPair(pub, priv, keyAlias);
 
-            // Secure log – no file paths exposed
-            log.info("✓ Loaded RSA keypair for alias '{}'", keyAlias);
+            this.privateKey = priv;
+            this.publicKey = pub;
+
+            log.info("✓ Loaded RSA keypair from keystore using alias '{}'", keyAlias);
 
         } catch (Exception e) {
-            throw new IllegalStateException("Could not load RSA keypair from keystore.", e);
+            throw new IllegalStateException(
+                    "Could not load RSA keypair from keystore.", e);
         }
     }
 
-    private static void validateKeystoreFile(Path ksPath) {
-        if (!Files.exists(ksPath)) {
-            throw new IllegalStateException("Keystore file does not exist: " + ksPath);
+    private static void validateKeystoreFile(Path path) {
+        if (!Files.exists(path)) {
+            throw new IllegalStateException("Keystore file does not exist.");
         }
-        if (!Files.isRegularFile(ksPath)) {
-            throw new IllegalStateException("Keystore path is not a file: " + ksPath);
+        if (!Files.isRegularFile(path)) {
+            throw new IllegalStateException("Keystore path is not a file.");
         }
-        if (!Files.isReadable(ksPath)) {
-            throw new IllegalStateException("Keystore file is not readable: " + ksPath);
+        if (!Files.isReadable(path)) {
+            throw new IllegalStateException("Keystore file is not readable.");
         }
     }
 
     private static void validateKeySize(RSAPrivateKey key, String alias) {
         if (key.getModulus().bitLength() < 2048) {
             throw new IllegalStateException(
-                    "RSA private key for alias '" + alias + "' is too weak. Minimum size required: 2048 bits.");
+                    "RSA private key for alias '" + alias + "' is weaker than 2048 bits.");
         }
     }
 
     private static void validateKeySize(RSAPublicKey key, String alias) {
         if (key.getModulus().bitLength() < 2048) {
             throw new IllegalStateException(
-                    "RSA public key for alias '" + alias + "' is too weak. Minimum size required: 2048 bits.");
+                    "RSA public key for alias '" + alias + "' is weaker than 2048 bits.");
+        }
+    }
+
+    private static void validateKeyPair(
+            RSAPublicKey pub,
+            RSAPrivateKey priv,
+            String alias) {
+
+        if (!pub.getModulus().equals(priv.getModulus())) {
+            throw new IllegalStateException(
+                    "Public certificate does not match private key for alias '" + alias + "'.");
         }
     }
 
@@ -115,11 +134,11 @@ public class KeystoreRsaKeyProvider implements RsaKeyProvider {
 
     @Override
     public RSAPublicKey publicKey() {
-        return pub;
+        return publicKey;
     }
 
     @Override
     public RSAPrivateKey privateKey() {
-        return priv;
+        return privateKey;
     }
 }
