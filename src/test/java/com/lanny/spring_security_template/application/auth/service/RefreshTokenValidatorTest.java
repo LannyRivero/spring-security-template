@@ -34,7 +34,8 @@ class RefreshTokenValidatorTest {
                 1000L,
                 2000L,
                 List.of("ROLE_USER"),
-                List.of("simulation:read"));
+                List.of("simulation:read"),
+                "refresh");
     }
 
     @Test
@@ -102,7 +103,8 @@ class RefreshTokenValidatorTest {
     @Test
     @DisplayName(" should throw when audience is null")
     void testShouldThrowWhenAudienceNull() {
-        JwtClaimsDTO claims = new JwtClaimsDTO("user123", "jti-001", null, 1000L, 1000L, 2000L, List.of(), List.of());
+        JwtClaimsDTO claims = new JwtClaimsDTO("user123", "jti-001", null, 1000L, 1000L, 2000L, List.of(), List.of(),
+                "refresh");
         when(policy.expectedRefreshAudience()).thenReturn("refresh-service");
 
         assertThatThrownBy(() -> validator.validate(claims))

@@ -79,7 +79,8 @@ public class StrictJwtValidator implements JwtValidator {
                     nbf,
                     exp,
                     roles,
-                    scopes);
+                    scopes,
+                    claimsSet.getStringClaim("token_use"));
 
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid JWT: " + e.getMessage());

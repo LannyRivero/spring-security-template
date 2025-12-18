@@ -48,7 +48,8 @@ class RefreshServiceTimeTest {
                                 1000L,
                                 2000L,
                                 List.of("ROLE_USER"),
-                                List.of("profile:read"));
+                                List.of("profile:read"),
+                                "refresh");
 
                 // Simulamos validación correcta y no rotación
                 when(tokenProvider.validateAndGetClaims(refreshToken)).thenReturn(Optional.of(claims));

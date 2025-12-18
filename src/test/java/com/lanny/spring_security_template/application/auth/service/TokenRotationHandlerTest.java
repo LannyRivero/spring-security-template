@@ -66,7 +66,8 @@ class TokenRotationHandlerTest {
                                 Instant.now().getEpochSecond(),
                                 Instant.now().plusSeconds(3600).getEpochSecond(),
                                 List.of("ROLE_USER"),
-                                List.of("profile:read"));
+                                List.of("profile:read"),
+                                "refresh");
 
                 issuedTokens = new IssuedTokens(
                                 USERNAME,

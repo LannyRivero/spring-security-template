@@ -68,7 +68,8 @@ class TokenRefreshResultFactoryTest {
                                 now.getEpochSecond(),
                                 now.plusSeconds(3600).getEpochSecond(),
                                 List.of("ROLE_USER"),
-                                List.of("profile:read"));
+                                List.of("profile:read"),
+                                "refresh");
 
                 // Mock role and scope resolution
                 when(roleProvider.resolveRoles(USERNAME))
@@ -108,7 +109,8 @@ class TokenRefreshResultFactoryTest {
                                 now.getEpochSecond(),
                                 now.plusSeconds(3600).getEpochSecond(),
                                 List.of(),
-                                List.of());
+                                List.of(),
+                                "refresh");
 
                 when(roleProvider.resolveRoles(USERNAME)).thenReturn(Set.of());
                 when(scopePolicy.resolveScopes(any())).thenReturn(Set.of());
@@ -129,7 +131,8 @@ class TokenRefreshResultFactoryTest {
                                 USERNAME, "jti-456", List.of("auth-service"),
                                 now.getEpochSecond(), now.getEpochSecond(),
                                 now.plusSeconds(3600).getEpochSecond(),
-                                List.of(), List.of());
+                                List.of(), List.of(),
+                                "refresh");
 
                 when(roleProvider.resolveRoles(USERNAME)).thenReturn(Set.of());
                 when(scopePolicy.resolveScopes(any())).thenReturn(Set.of());
