@@ -122,6 +122,18 @@ public class SecurityConfig {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
+    /**
+     * Defines the main Spring Security filter chain.
+     *
+     * <p>
+     * Configures stateless security, exception handling, authorization rules
+     * and the explicit order of custom security filters.
+     * </p>
+     *
+     * @param http the {@link HttpSecurity} builder
+     * @return the configured {@link SecurityFilterChain}
+     * @throws Exception if the security configuration cannot be built
+     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -161,6 +173,18 @@ public class SecurityConfig {
 
         return http.build();
     }
+
+    /**
+     * Configures Cross-Origin Resource Sharing (CORS) for the application.
+     *
+     * <p>
+     * Configuration values are provided via {@link SecurityCorsProperties}
+     * and allow fine-grained control over origins, headers and credentials.
+     * </p>
+     *
+     * @param props the CORS security properties
+     * @return a {@link CorsConfigurationSource} instance
+     */
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource(SecurityCorsProperties props) {
