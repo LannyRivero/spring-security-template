@@ -29,13 +29,18 @@ public class NimbusJwtTokenProvider implements TokenProvider {
     // ============================================================
 
     @Override
-    public String generateAccessToken(String subject, List<String> roles, List<String> scopes, Duration ttl) {
-        return jwtUtils.generateToken(subject, roles, scopes, ttl, false);
+    public String generateAccessToken(
+            String subject,
+            List<String> roles,
+            List<String> scopes,
+            Duration ttl) {
+
+        return jwtUtils.generateAccessToken(subject, roles, scopes, ttl);
     }
 
     @Override
     public String generateRefreshToken(String subject, Duration ttl) {
-        return jwtUtils.generateToken(subject, List.of(), List.of(), ttl, true);
+        return jwtUtils.generateRefreshToken(subject, ttl);
     }
 
     // ============================================================

@@ -35,7 +35,7 @@ class NimbusJwtTokenProviderTest {
     }
 
     // ------------------------------------------------------------
-    //  GROUP 1: Token Validation
+    // GROUP 1: Token Validation
     // ------------------------------------------------------------
     @Nested
     @DisplayName(" validateToken()")
@@ -72,7 +72,7 @@ class NimbusJwtTokenProviderTest {
     }
 
     // ------------------------------------------------------------
-    //  GROUP 2: Subject Extraction
+    // GROUP 2: Subject Extraction
     // ------------------------------------------------------------
     @Nested
     @DisplayName(" extractSubject()")
@@ -91,7 +91,7 @@ class NimbusJwtTokenProviderTest {
     }
 
     // ------------------------------------------------------------
-    //  GROUP 3: Claim Parsing
+    // GROUP 3: Claim Parsing
     // ------------------------------------------------------------
     @Nested
     @DisplayName(" parseClaims()")
@@ -133,7 +133,7 @@ class NimbusJwtTokenProviderTest {
     }
 
     // ------------------------------------------------------------
-    //  GROUP 4: Token Generation
+    // GROUP 4: Token Generation
     // ------------------------------------------------------------
     @Nested
     @DisplayName(" Token generation methods")
@@ -142,10 +142,10 @@ class NimbusJwtTokenProviderTest {
         @Test
         @DisplayName(" should generate access and refresh tokens successfully")
         void shouldGenerateAccessAndRefreshTokens() {
-            when(jwtUtils.generateToken("alice", List.of("ROLE_USER"), List.of("profile:read"), Duration.ofMinutes(5),
-                    false))
+            when(jwtUtils.generateAccessToken("alice", List.of("ROLE_USER"), List.of("profile:read"),
+                    Duration.ofMinutes(5)))
                     .thenReturn("access.token");
-            when(jwtUtils.generateToken("alice", List.of(), List.of(), Duration.ofDays(7), true))
+            when(jwtUtils.generateRefreshToken("alice", Duration.ofDays(7)))
                     .thenReturn("refresh.token");
 
             String access = provider.generateAccessToken("alice", List.of("ROLE_USER"), List.of("profile:read"),

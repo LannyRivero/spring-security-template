@@ -10,6 +10,7 @@ import com.lanny.spring_security_template.application.auth.port.out.AuditEventPu
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 import org.junit.jupiter.api.DisplayName;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -29,7 +30,7 @@ class AuthUseCaseConfigTest {
         ChangePasswordTransactionalAdapter changePwd = Mockito.mock(ChangePasswordTransactionalAdapter.class);
 
         AuthUseCase core = config.authUseCaseCore(
-                loginAdapter, refreshAdapter, meService, devRegister, changePwd);
+                loginAdapter, refreshAdapter, meService, Optional.of(devRegister), changePwd);
 
         assertThat(core)
                 .isInstanceOf(AuthUseCaseImpl.class)

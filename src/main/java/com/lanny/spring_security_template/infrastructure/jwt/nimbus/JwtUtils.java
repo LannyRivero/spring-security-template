@@ -22,6 +22,16 @@ import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 
+/**
+ * Nimbus-based JWT generator and validator.
+ *
+ * Responsible for:
+ * - Access & Refresh token generation
+ * - RSA (RS256) signing
+ * - Strict JWT validation (header, signature, claims)
+ *
+ * Infrastructure-only component.
+ */
 @Component
 public class JwtUtils {
 
@@ -29,43 +39,52 @@ public class JwtUtils {
     private final SecurityJwtProperties props;
     private final ClockProvider clockProvider;
 
-    public JwtUtils(RsaKeyProvider keyProvider,
+    public JwtUtils(
+            RsaKeyProvider keyProvider,
             SecurityJwtProperties props,
             ClockProvider clockProvider) {
+
         this.keyProvider = keyProvider;
         this.props = props;
         this.clockProvider = clockProvider;
     }
 
     // ======================================================
-    // GENERACIÓN DE TOKENS
+    // TOKEN GENERATION
     // ======================================================
 
-    public String generateAccessToken(String subject, List<String> roles, List<String> scopes) {
-        return generateToken(subject, roles, scopes, null, false);
+    public String generateAccessToken(
+            String subject,
+            List<String> roles,
+            List<String> scopes,
+            Duration ttl) {
+
+        return generateToken(subject, roles, scopes, ttl, false);
     }
 
-    public String generateRefreshToken(String subject) {
-        return generateToken(subject, List.of(), List.of(), null, true);
+    public String generateRefreshToken(String subject, Duration ttl) {
+        return generateToken(subject, List.of(), List.of(), ttl, true);
     }
 
-    public String generateToken(String subject,
+    private String generateToken(
+            String subject,
             List<String> roles,
             List<String> scopes,
             Duration ttl,
-            boolean isRefresh) {
+            boolean refresh) {
+
         try {
             Instant now = clockProvider.now();
-            Instant exp = (ttl != null)
-                    ? now.plus(ttl)
-                    : now.plus(isRefresh ? props.refreshTtl() : props.accessTtl());
 
-            // audience correcta
-            String audience = isRefresh
-                    ? Optional.ofNullable(props.refreshAudience()).orElse(props.accessAudience())
+            Instant exp = ttl != null
+                    ? now.plus(ttl)
+                    : now.plus(refresh ? props.refreshTtl() : props.accessTtl());
+
+            String audience = refresh
+                    ? Optional.ofNullable(props.refreshAudience())
+                            .orElse(props.accessAudience())
                     : props.accessAudience();
 
-            // Claims
             JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
                     .subject(subject)
                     .issuer(props.issuer())
@@ -74,7 +93,7 @@ public class JwtUtils {
                     .expirationTime(Date.from(exp))
                     .jwtID(UUID.randomUUID().toString());
 
-            if (isRefresh) {
+            if (refresh) {
                 claims.claim("type", "refresh");
             } else {
                 claims.claim("roles", roles);
@@ -92,61 +111,56 @@ public class JwtUtils {
             return jwt.serialize();
 
         } catch (Exception e) {
-            throw new IllegalStateException("Error generating JWT: " + e.getMessage(), e);
+            throw new IllegalStateException("Failed to generate JWT token", e);
         }
     }
 
     // ======================================================
-    // VALIDACIÓN COMPLETA
+    // VALIDATION
     // ======================================================
 
     public JWTClaimsSet validateAndParse(String token) {
         try {
-            // 1. Parseo
             SignedJWT jwt = SignedJWT.parse(token);
 
-            // 2. Validar header
             validateHeader(jwt);
+            validateSignature(jwt);
 
-            // 3. Validar firma
-            JWSVerifier verifier = new RSASSAVerifier((RSAPublicKey) keyProvider.publicKey());
-            if (!jwt.verify(verifier)) {
-                throw new JOSEException("Invalid signature");
-            }
-
-            // 4. Claims
             JWTClaimsSet claims = jwt.getJWTClaimsSet();
             validateClaims(claims);
 
             return claims;
 
-        } catch (java.text.ParseException e) {
-            throw new RuntimeException("Malformed JWT: " + e.getMessage(), e);
-
         } catch (Exception e) {
-            throw new RuntimeException("Invalid token: " + e.getMessage(), e);
+            throw new SecurityException("Invalid JWT token", e);
+        }
+    }
+
+    private void validateSignature(SignedJWT jwt) throws JOSEException {
+        JWSVerifier verifier = new RSASSAVerifier((RSAPublicKey) keyProvider.publicKey());
+
+        if (!jwt.verify(verifier)) {
+            throw new JOSEException("Invalid JWT signature");
         }
     }
 
     // ======================================================
     // HEADER VALIDATION
     // ======================================================
+
     private void validateHeader(SignedJWT jwt) throws JOSEException {
 
-        // Algoritmo correcto
         if (!JWSAlgorithm.RS256.equals(jwt.getHeader().getAlgorithm())) {
-            throw new JOSEException("Invalid alg");
+            throw new JOSEException("Invalid JWT algorithm");
         }
 
-        // Tipo correcto
         if (!JOSEObjectType.JWT.equals(jwt.getHeader().getType())) {
-            throw new JOSEException("Invalid typ");
+            throw new JOSEException("Invalid JWT type");
         }
 
-        // Validar KID
         String kid = jwt.getHeader().getKeyID();
-        if (kid != null && !kid.equals(keyProvider.keyId())) {
-            throw new JOSEException("Unknown kid");
+        if (kid == null || !kid.equals(keyProvider.keyId())) {
+            throw new JOSEException("Invalid or missing JWT key ID (kid)");
         }
     }
 
@@ -155,57 +169,63 @@ public class JwtUtils {
     // ======================================================
 
     private void validateClaims(JWTClaimsSet claims) throws JOSEException {
+
         Instant now = clockProvider.now();
+        long skew = props.allowedClockSkewSeconds();
 
         // Expiration
         if (claims.getExpirationTime() == null ||
-                claims.getExpirationTime().toInstant().isBefore(now)) {
-            throw new JOSEException("Token expired");
+                claims.getExpirationTime().toInstant()
+                        .isBefore(now.minusSeconds(skew))) {
+            throw new JOSEException("JWT token expired");
         }
 
-        // nbf (optional)
+        // Issued At (iat)
+        if (claims.getIssueTime() != null) {
+            Instant iat = claims.getIssueTime().toInstant();
+            if (iat.isAfter(now.plusSeconds(skew))) {
+                throw new JOSEException("JWT issued in the future");
+            }
+        }
+
+        // Not Before (nbf)
         if (claims.getNotBeforeTime() != null &&
-                claims.getNotBeforeTime().toInstant().isAfter(now)) {
-            throw new JOSEException("Token not valid yet");
+                claims.getNotBeforeTime().toInstant()
+                        .isAfter(now.plusSeconds(skew))) {
+            throw new JOSEException("JWT not valid yet");
         }
 
         // Issuer
         if (!Objects.equals(claims.getIssuer(), props.issuer())) {
-            throw new JOSEException("Invalid issuer");
+            throw new JOSEException("Invalid JWT issuer");
         }
 
-        // Audience correcta según tipo
-        String expectedAud = isRefreshClaim(claims)
-                ? Optional.ofNullable(props.refreshAudience()).orElse(props.accessAudience())
+        // Audience
+        String expectedAudience = isRefresh(claims)
+                ? Optional.ofNullable(props.refreshAudience())
+                        .orElse(props.accessAudience())
                 : props.accessAudience();
 
         List<String> aud = claims.getAudience();
-        if (aud == null || !aud.contains(expectedAud)) {
-            throw new JOSEException("Invalid audience");
+        if (aud == null || !aud.contains(expectedAudience)) {
+            throw new JOSEException("Invalid JWT audience");
         }
 
-        // Validar coherencia refresh/access
         validateTokenType(claims);
     }
 
-    @SuppressWarnings("unchecked")
     private void validateTokenType(JWTClaimsSet claims) throws JOSEException {
-        boolean refresh = isRefreshClaim(claims);
 
-        if (refresh) {
-            List<String> roles = (List<String>) claims.getClaim("roles");
-            List<String> scopes = (List<String>) claims.getClaim("scopes");
-
-            if (roles != null) {
-                throw new JOSEException("Refresh token must not contain roles");
-            }
-            if (scopes != null) {
-                throw new JOSEException("Refresh token must not contain scopes");
+        if (isRefresh(claims)) {
+            if (claims.getClaim("roles") != null ||
+                    claims.getClaim("scopes") != null) {
+                throw new JOSEException(
+                        "Refresh token must not contain roles or scopes");
             }
         }
     }
 
-    private boolean isRefreshClaim(JWTClaimsSet claims) {
+    private boolean isRefresh(JWTClaimsSet claims) {
         try {
             return "refresh".equals(claims.getStringClaim("type"));
         } catch (Exception e) {
