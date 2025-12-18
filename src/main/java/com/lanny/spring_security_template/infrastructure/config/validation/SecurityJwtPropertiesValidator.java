@@ -1,5 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.config.validation;
 
+import com.lanny.spring_security_template.infrastructure.config.JwtAlgorithm;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
@@ -27,7 +28,7 @@ public class SecurityJwtPropertiesValidator {
 
         // ---------------- TTLs ----------------
         if (props.accessTtl() == null || props.accessTtl().toMinutes() < 5) {
-            throw new InvalidSecurityConfigurationException("accessTtl must not exceed 1 hour");
+            throw new InvalidSecurityConfigurationException("accessTtl must be at least 5 minutes");
         }
 
         if (props.refreshTtl().compareTo(props.accessTtl()) <= 0) {
@@ -73,5 +74,14 @@ public class SecurityJwtPropertiesValidator {
                 }
             }
         }
+
+        // ---------------- Algorithm-specific ----------------
+        if (props.algorithm() == JwtAlgorithm.HMAC) {
+            if (props.hmac() == null || !StringUtils.hasText(props.hmac().secretBase64())) {
+                throw new InvalidSecurityConfigurationException(
+                        "JWT algorithm is HMAC but hmac.secret-base64 is missing or blank");
+            }
+        }
+
     }
 }

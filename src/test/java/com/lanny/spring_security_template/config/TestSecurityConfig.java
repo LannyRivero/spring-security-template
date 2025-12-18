@@ -64,7 +64,8 @@ public class TestSecurityConfig {
                         1000L,
                         2000L,
                         List.of("ROLE_USER"),
-                        List.of("profile:read")));
+                        List.of("profile:read"),
+                        "access"));
             }
 
             @Override

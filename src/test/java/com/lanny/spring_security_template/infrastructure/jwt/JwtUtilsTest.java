@@ -21,19 +21,16 @@ class JwtUtilsTest {
 
     public JwtUtilsTest() {
 
-        ClasspathRsaKeyProvider keyProvider = new ClasspathRsaKeyProvider();
+        ClasspathRsaKeyProvider keyProvider = new ClasspathRsaKeyProvider(
+                "keys/private_key.pem",
+                "keys/public_key.pem");
 
         SecurityJwtProperties props = new SecurityJwtProperties(
                 "test-issuer",
                 "test-access-audience",
                 "test-refresh-audience",
                 Duration.ofHours(1),
-                Duration.ofDays(1),
-                "RSA",
-                false,
-                List.of(),
-                List.of(),
-                1);
+                Duration.ofDays(1));
 
         ClockProvider clockProvider = new SystemClockProvider();
 
@@ -47,7 +44,8 @@ class JwtUtilsTest {
         String token = jwtUtils.generateAccessToken(
                 "user@example.com",
                 List.of("ROLE_USER"),
-                List.of("profile:read"));
+                List.of("profile:read"),
+                Duration.ofHours(1));
 
         assertNotNull(token);
         assertEquals(3, token.split("\\.").length);
@@ -66,7 +64,8 @@ class JwtUtilsTest {
         String token = jwtUtils.generateAccessToken(
                 "expired@example.com",
                 List.of("ROLE_USER"),
-                List.of());
+                List.of(),
+                Duration.ofHours(1));
 
         assertDoesNotThrow(() -> jwtUtils.validateAndParse(token));
 

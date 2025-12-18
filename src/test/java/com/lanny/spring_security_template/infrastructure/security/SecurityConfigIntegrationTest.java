@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
 
+import java.time.Duration;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,7 +39,8 @@ class SecurityConfigIntegrationTest {
         String jwt = jwtUtils.generateAccessToken(
                 "user@example.com",
                 List.of("ROLE_USER"),
-                List.of("profile:read")
+                List.of("profile:read"),
+                Duration.ofMinutes(15)
         );
 
         mvc.perform(get("/api/v1/secure/ping")
@@ -53,7 +55,8 @@ class SecurityConfigIntegrationTest {
         String jwt = jwtUtils.generateAccessToken(
                 "user@example.com",
                 List.of("ROLE_USER"),
-                List.of("other:scope")
+                List.of("other:scope"),
+                Duration.ofMinutes(15)
         );
 
         mvc.perform(get("/api/v1/secure/ping")

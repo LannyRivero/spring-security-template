@@ -20,12 +20,8 @@ class LoggingAuditEventPublisherTest {
     void setup() {
         mockLogger = mock(Logger.class);
 
-        publisher = new LoggingAuditEventPublisher() {
-            @Override
-            protected Logger getLogger() {
-                return mockLogger;
-            }
-        };
+        publisher = spy(LoggingAuditEventPublisher.class);
+        doReturn(mockLogger).when(publisher).getLogger();
 
         MDC.clear();
     }

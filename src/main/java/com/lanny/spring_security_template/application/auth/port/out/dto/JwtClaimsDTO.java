@@ -10,6 +10,15 @@ public record JwtClaimsDTO(
         long nbf,
         long exp,
         List<String> roles,
-        List<String> scopes
-) {}
+        List<String> scopes,
+        String tokenUse
+) {
+        public boolean isAccessToken() {
+        return "access".equalsIgnoreCase(tokenUse);
+    }
+
+    public boolean isRefreshToken() {
+        return "refresh".equalsIgnoreCase(tokenUse);
+    }
+}
 

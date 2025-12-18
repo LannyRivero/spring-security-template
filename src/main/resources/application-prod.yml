@@ -38,10 +38,13 @@ server:
 security:
   jwt:
     provider: nimbus          # o jjwt si usas el otro
+    key-provider: keystore     # keystore | filesystem
+
     kid: prod-rsa-1
     issuer: security-template
     audience: security-template-app
     max-active-sessions: 1
+
     algorithm: RSA
     expiration-seconds: 3600
     service-expiration-seconds: 300
@@ -55,9 +58,9 @@ security:
     # --- Option B: Keystore (Enterprise) ---
     keystore:
       path: ${KEYSTORE_PATH:/opt/keys/security-template.p12}
-      password: ${KEYSTORE_PASSWORD:changeit}
+      password: ${KEYSTORE_PASSWORD}
       key-alias: ${KEY_ALIAS:jwt-signing-key}
-      key-password: ${KEY_PASSWORD:changeit}
+      key-password: ${KEY_PASSWORD}
 
 # =============================
 # 🚦 RATE LIMITING (Strict)

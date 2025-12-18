@@ -14,9 +14,9 @@ import java.security.interfaces.RSAPublicKey;
  * RSA key provider that loads public/private keys from the classpath.
  *
  * <p>
- * This implementation is intended exclusively for <b>dev</b> and <b>test</b>
- * environments. For production, use a secure provider (e.g., keystore,
- * Hashicorp Vault, AWS KMS, Azure KeyVault, GCP KMS).
+ * Intended exclusively for <b>dev</b> and <b>test</b> profiles.
+ * Production environments must use a secure provider
+ * (Keystore, Vault, KMS, etc.).
  * </p>
  */
 @Component
@@ -27,41 +27,55 @@ public class ClasspathRsaKeyProvider implements RsaKeyProvider {
   private final RSAPublicKey publicKey;
   private final RSAPrivateKey privateKey;
 
-  /**
-   * Constructor loading RSA keys from classpath locations provided in
-   * configuration properties.
-   */
   public ClasspathRsaKeyProvider(
       @Value("${security.jwt.kid:dev-rsa-1}") String kid,
       @Value("${security.jwt.public-key-path:keys/rsa-public.pem}") String pubPath,
       @Value("${security.jwt.private-key-path:keys/rsa-private.pem}") String privPath) {
+
     if (kid == null || kid.isBlank()) {
       throw new IllegalArgumentException("KID (key ID) cannot be null or blank.");
     }
 
     this.kid = kid;
 
-    try (InputStream pubIs = loadResource(pubPath);
-        InputStream privIs = loadResource(privPath)) {
+    try (InputStream pubIs = loadClasspathResource(pubPath);
+        InputStream privIs = loadClasspathResource(privPath)) {
 
       this.publicKey = PemUtils.readPublicKey(pubIs);
       this.privateKey = PemUtils.readPrivateKey(privIs);
 
+      validateKeyPair(publicKey, privateKey);
+
     } catch (Exception e) {
-      throw new IllegalStateException("Failed to load RSA keys from classpath.", e);
+      throw new IllegalStateException(
+          "Failed to load RSA key pair from classpath (profile: dev/test).", e);
     }
   }
 
-  /** Loads a classpath resource or fails fast. */
-  private InputStream loadResource(String path) {
-    InputStream is = Thread.currentThread()
-        .getContextClassLoader()
-        .getResourceAsStream(path);
+  /**
+   * Loads a resource from classpath using a normalized absolute path.
+   */
+  private InputStream loadClasspathResource(String path) {
+    String normalized = path.startsWith("/") ? path : "/" + path;
+
+    InputStream is = ClasspathRsaKeyProvider.class
+        .getResourceAsStream(normalized);
 
     if (is == null) {
-      throw new IllegalStateException("RSA key file not found in classpath: " + path);
+      throw new IllegalStateException(
+          "RSA key file not found in classpath: " + normalized + " (dev/test profile)");
     }
     return is;
+  }
+
+  /**
+   * Validates that public and private RSA keys belong to the same key pair.
+   */
+  private void validateKeyPair(RSAPublicKey publicKey, RSAPrivateKey privateKey) {
+    if (!publicKey.getModulus().equals(privateKey.getModulus())) {
+      throw new IllegalStateException(
+          "Public and private RSA keys do not match (modulus mismatch).");
+    }
   }
 
   @Override

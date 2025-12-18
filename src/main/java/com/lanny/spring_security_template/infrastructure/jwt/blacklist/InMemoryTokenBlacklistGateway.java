@@ -1,6 +1,8 @@
 package com.lanny.spring_security_template.infrastructure.jwt.blacklist;
 
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
+
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -12,14 +14,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * In-memory blacklist for revoked JWTs.
  *
  * <p>
- * This implementation is intended exclusively for <b>dev</b> and <b>test</b>
- * profiles. It stores revoked JWT IDs (jti) in a thread-safe map, together
- * with their expiration timestamps.
+ * Intended exclusively for <b>dev</b> and <b>test</b> profiles.
+ * Stores revoked JWT IDs (jti) together with their expiration timestamp.
  * </p>
  *
  * <p>
- * <b>NOT FOR PRODUCTION</b> — in real deployments, use Redis or another
- * distributed storage to ensure consistency across instances.
+ * <b>NOT FOR PRODUCTION</b> — production deployments must use a
+ * distributed store such as Redis.
  * </p>
  */
 @Component
@@ -31,13 +32,19 @@ public class InMemoryTokenBlacklistGateway implements TokenBlacklistGateway {
      */
     private final Map<String, Instant> revoked = new ConcurrentHashMap<>();
 
+    private final ClockProvider clock;
+
+    public InMemoryTokenBlacklistGateway(ClockProvider clock) {
+        this.clock = clock;
+    }
+
     @Override
     public boolean isRevoked(String jti) {
 
         purgeExpired();
 
         Instant exp = revoked.get(jti);
-        return exp != null && Instant.now().isBefore(exp);
+        return exp != null && clock.now().isBefore(exp);
     }
 
     @Override
@@ -46,11 +53,11 @@ public class InMemoryTokenBlacklistGateway implements TokenBlacklistGateway {
     }
 
     /**
-     * Removes entries whose expiration time has already passed.
-     * Prevents unbounded growth during long-running dev/test sessions.
+     * Removes expired entries to avoid unbounded memory growth
+     * during long-running dev/test sessions.
      */
     private void purgeExpired() {
-        Instant now = Instant.now();
+        Instant now = clock.now();
         revoked.entrySet().removeIf(e -> now.isAfter(e.getValue()));
     }
 }
