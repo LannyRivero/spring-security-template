@@ -9,20 +9,46 @@ import org.springframework.stereotype.Component;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Set;
 
 /**
- * RSA Key Provider that loads keys directly from the filesystem.
+ * {@code FileSystemRsaKeyProvider}
  *
  * <p>
- * Intended for <b>production</b> deployments where keys are mounted
- * from secure external volumes (e.g. Kubernetes secrets, Docker volumes).
+ * Production-grade {@link RsaKeyProvider} that loads RSA public/private keys
+ * directly from the filesystem.
+ * </p>
+ *
+ * <h3>Intended usage</h3>
+ * <ul>
+ * <li>Production environments</li>
+ * <li>Docker / Docker Compose (mounted volumes)</li>
+ * <li>Kubernetes Secrets mounted as files</li>
+ * <li>VMs with protected filesystem paths</li>
+ * </ul>
+ *
+ * <p>
+ * This provider enforces <b>fail-fast</b> behaviour: the application
+ * will not start if keys are missing, unreadable, invalid, or inconsistent.
  * </p>
  *
  * <p>
- * Fail-fast behaviour is enforced: the application will not start if
- * keys are missing, unreadable, invalid, or inconsistent.
+ * <b>Security guarantees:</b>
+ * <ul>
+ * <li>Only absolute filesystem paths are accepted</li>
+ * <li>Paths are normalized to prevent traversal attacks</li>
+ * <li>Basic file permissions are validated</li>
+ * <li>RSA public/private key pair consistency is enforced</li>
+ * </ul>
+ * </p>
+ *
+ * <p>
+ * <b>NOTE:</b> This provider is intentionally limited to filesystem-based
+ * secrets. For higher security requirements, prefer a dedicated
+ * KMS/Vault-based implementation.
  * </p>
  */
 @Component
@@ -44,11 +70,14 @@ public class FileSystemRsaKeyProvider implements RsaKeyProvider {
         }
         this.kid = kid;
 
-        Path privPath = Path.of(privateKeyPath);
-        Path pubPath = Path.of(publicKeyPath);
+        Path privPath = normalizeAndValidatePath(privateKeyPath, "private");
+        Path pubPath = normalizeAndValidatePath(publicKeyPath, "public");
 
         validateFile(privPath, "private");
         validateFile(pubPath, "public");
+
+        validatePermissions(privPath, "private");
+        validatePermissions(pubPath, "public");
 
         try (InputStream privIs = Files.newInputStream(privPath);
                 InputStream pubIs = Files.newInputStream(pubPath)) {
@@ -60,10 +89,33 @@ public class FileSystemRsaKeyProvider implements RsaKeyProvider {
 
         } catch (Exception e) {
             throw new IllegalStateException(
-                    "Failed to load RSA key pair from filesystem.", e);
+                    "Failed to load RSA key pair from filesystem (prod profile). " +
+                            "Check file paths, permissions and key format.",
+                    e);
         }
     }
 
+    /**
+     * Normalizes and validates that the provided path is absolute.
+     */
+    private static Path normalizeAndValidatePath(String rawPath, String type) {
+        if (rawPath == null || rawPath.isBlank()) {
+            throw new IllegalStateException(
+                    "RSA " + type + " key path must not be null or blank.");
+        }
+
+        Path path = Path.of(rawPath).normalize();
+
+        if (!path.isAbsolute()) {
+            throw new IllegalStateException(
+                    "RSA " + type + " key path must be absolute in production: " + path);
+        }
+        return path;
+    }
+
+    /**
+     * Validates existence, type and readability of the key file.
+     */
     private static void validateFile(Path path, String type) {
         if (!Files.exists(path)) {
             throw new IllegalStateException(
@@ -71,7 +123,7 @@ public class FileSystemRsaKeyProvider implements RsaKeyProvider {
         }
         if (!Files.isRegularFile(path)) {
             throw new IllegalStateException(
-                    "RSA " + type + " key path is not a file: " + path);
+                    "RSA " + type + " key path is not a regular file: " + path);
         }
         if (!Files.isReadable(path)) {
             throw new IllegalStateException(
@@ -80,7 +132,30 @@ public class FileSystemRsaKeyProvider implements RsaKeyProvider {
     }
 
     /**
-     * Ensures that the public and private keys belong to the same RSA key pair.
+     * Performs basic POSIX permission hardening.
+     *
+     * <p>
+     * Rejects keys that are world-readable when running on
+     * POSIX-compliant filesystems.
+     * </p>
+     */
+    private static void validatePermissions(Path path, String type) {
+        try {
+            Set<PosixFilePermission> perms = Files.getPosixFilePermissions(path);
+            if (perms.contains(PosixFilePermission.OTHERS_READ)) {
+                throw new IllegalStateException(
+                        "RSA " + type + " key must not be world-readable: " + path);
+            }
+        } catch (UnsupportedOperationException ignored) {
+            // Non-POSIX filesystem (e.g. Windows) → skip permission validation
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Failed to validate permissions for RSA " + type + " key: " + path, e);
+        }
+    }
+
+    /**
+     * Ensures that the public and private RSA keys belong to the same key pair.
      */
     private static void validateKeyPair(
             RSAPublicKey publicKey,
