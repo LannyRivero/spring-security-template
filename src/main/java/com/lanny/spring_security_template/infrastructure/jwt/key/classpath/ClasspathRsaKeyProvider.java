@@ -63,7 +63,7 @@ public class ClasspathRsaKeyProvider implements RsaKeyProvider {
 
     if (is == null) {
       throw new IllegalStateException(
-          "RSA key file not found in classpath: " + normalized);
+          "RSA key file not found in classpath: " + normalized + " (dev/test profile)");
     }
     return is;
   }
