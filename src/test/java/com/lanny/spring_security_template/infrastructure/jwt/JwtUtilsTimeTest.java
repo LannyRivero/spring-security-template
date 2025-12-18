@@ -26,10 +26,7 @@ class JwtUtilsTimeTest {
                 Duration.ofMinutes(15),
                 Duration.ofDays(7),
                 "RSA",
-                false,
-                List.of(),
-                List.of(),
-                1);
+                false);
 
         return new JwtUtils(keys, props, clock);
     }
@@ -44,13 +41,12 @@ class JwtUtilsTimeTest {
         RsaKeyProvider keys = TestRsaKeys.generate();
         JwtUtils utils = newUtils(keys, clock);
 
-        // TTL manual usando el overload generateToken()
-        String token = utils.generateToken(
+        // Use the public generateAccessToken method instead
+        String token = utils.generateAccessToken(
                 "user123",
                 List.of("ROLE_USER"),
                 List.of("profile:read"),
-                Duration.ofMinutes(5),
-                false);
+                Duration.ofMinutes(15));
 
         JWTClaimsSet claims = utils.validateAndParse(token);
         assertThat(claims.getSubject()).isEqualTo("user123");
@@ -66,15 +62,15 @@ class JwtUtilsTimeTest {
         RsaKeyProvider keys = TestRsaKeys.generate();
         JwtUtils utils = newUtils(keys, clock);
 
-        String token = utils.generateToken(
+        // Use generateAccessToken (it will use the default 15min TTL from props)
+        String token = utils.generateAccessToken(
                 "user123",
                 List.of(),
                 List.of(),
-                Duration.ofSeconds(60),
-                false);
+                Duration.ofMinutes(15));
 
-        // superamos la expiración
-        clock.advanceSeconds(61);
+        // Advance past the default 15 minutes expiration
+        clock.advanceSeconds(901); // 15min + 1sec
 
         assertThatThrownBy(() -> utils.validateAndParse(token))
                 .isInstanceOf(RuntimeException.class)
@@ -91,14 +87,10 @@ class JwtUtilsTimeTest {
         RsaKeyProvider keys = TestRsaKeys.generate();
         JwtUtils utils = newUtils(keys, clock);
 
-        String refresh = utils.generateToken(
-                "userABC",
-                List.of(),
-                List.of(),
-                Duration.ofHours(1),
-                true);
+        // Use generateRefreshToken
+        String refresh = utils.generateRefreshToken("userABC", Duration.ofDays(7));
 
-        // avanzar 30 min (pero aún no expira)
+        // Advance 30 min (but default refresh TTL is 7 days, so still valid)
         clock.advanceSeconds(1800);
 
         JWTClaimsSet claims = utils.validateAndParse(refresh);
