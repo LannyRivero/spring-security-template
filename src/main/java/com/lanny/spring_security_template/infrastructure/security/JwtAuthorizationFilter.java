@@ -3,11 +3,12 @@ package com.lanny.spring_security_template.infrastructure.security;
 import com.lanny.spring_security_template.application.auth.port.out.JwtValidator;
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
+import com.lanny.spring_security_template.infrastructure.security.jwt.JwtAuthFailureReason;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -26,60 +27,48 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.lanny.spring_security_template.infrastructure.observability.MdcKeys.*;
+
 /**
- * Spring Security filter responsible for JWT-based authorization.
+ * {@code JwtAuthorizationFilter}
  *
  * <p>
- * This filter validates <b>JWT access tokens</b> provided via the
- * {@code Authorization: Bearer <token>} header and populates the
- * {@link org.springframework.security.core.context.SecurityContext}
- * when authorization is successful.
+ * Spring Security filter responsible for <b>JWT-based authorization</b>
+ * using <b>access tokens only</b>.
  * </p>
  *
- * <h2>Responsibilities</h2>
+ * <p>
+ * This filter:
+ * </p>
  * <ul>
- * <li>Extract and validate JWT tokens using {@link JwtValidator}.</li>
- * <li>Reject refresh tokens explicitly (only access tokens are allowed).</li>
- * <li>Check token revocation status via {@link TokenBlacklistGateway}
- * (anti-replay protection).</li>
- * <li>Map roles and scopes to Spring Security authorities
- * ({@code ROLE_*} and {@code SCOPE_*}).</li>
- * <li>Populate the
- * {@link org.springframework.security.core.context.SecurityContext}
- * with an authenticated principal.</li>
+ * <li>Extracts and validates JWT access tokens from the
+ * {@code Authorization: Bearer <token>} header</li>
+ * <li>Rejects refresh tokens explicitly</li>
+ * <li>Prevents token replay via blacklist checks</li>
+ * <li>Maps roles and scopes to Spring Security authorities</li>
+ * <li>Populates the {@link SecurityContextHolder} for authorized requests</li>
  * </ul>
  *
  * <h2>Security guarantees</h2>
  * <ul>
- * <li>Refresh tokens can <b>never</b> be used to access protected
- * resources.</li>
- * <li>Tokens without any granted authorities are rejected.</li>
- * <li>Revoked tokens are rejected before authentication.</li>
+ * <li>Only cryptographically valid access tokens are accepted</li>
+ * <li>Refresh tokens can never be used for authorization</li>
+ * <li>Revoked tokens are rejected before authentication</li>
+ * <li>Tokens without granted authorities are rejected</li>
  * </ul>
  *
  * <h2>Observability</h2>
- * <p>
- * The authenticated username is added to the logging
- * {@link org.slf4j.MDC} for request tracing and audit purposes.
- * No sensitive data (such as tokens) is logged.
- * </p>
- *
- * <h2>Excluded endpoints</h2>
- * <p>
- * This filter is bypassed for public system endpoints such as:
- * </p>
  * <ul>
- * <li>{@code /actuator/**}</li>
- * <li>{@code /v3/api-docs/**}</li>
- * <li>{@code /swagger-ui/**}</li>
+ * <li>Authenticated username is propagated via MDC</li>
+ * <li>Security logs contain only controlled failure reasons</li>
+ * <li>No sensitive data (tokens, secrets) is logged</li>
  * </ul>
  *
  * <p>
  * This filter is designed for <b>stateless, production-grade APIs</b>
- * and follows enterprise security best practices.
+ * and complies with enterprise security standards (OWASP ASVS, ENS).
  * </p>
  */
-
 @Component
 @Order(80)
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
@@ -97,17 +86,29 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Performs JWT authorization for incoming HTTP requests.
+   * Performs JWT authorization for an incoming HTTP request.
    *
    * <p>
-   * If a valid JWT access token is present, the security context is populated
-   * with an authenticated principal. Otherwise, the request continues without
-   * authentication.
+   * Processing steps:
+   * </p>
+   * <ol>
+   * <li>Skip public and system endpoints</li>
+   * <li>Extract Bearer token from Authorization header</li>
+   * <li>Validate token cryptographically and semantically</li>
+   * <li>Reject revoked or non-access tokens</li>
+   * <li>Map roles and scopes to granted authorities</li>
+   * <li>Populate the security context</li>
+   * </ol>
+   *
+   * <p>
+   * If validation fails, the request continues without authentication
+   * and a controlled security event is logged.
    * </p>
    *
-   * @param request  the incoming HTTP request
-   * @param response the HTTP response
-   * @param chain    the filter chain
+   * @param request  incoming HTTP request
+   * @param response HTTP response
+   * @param chain    filter chain
+   *
    * @throws ServletException in case of servlet errors
    * @throws IOException      in case of I/O errors
    */
@@ -115,10 +116,12 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       @NonNull HttpServletRequest request,
       @NonNull HttpServletResponse response,
-      @NonNull FilterChain chain) throws ServletException, IOException {
+      @NonNull FilterChain chain)
+      throws ServletException, IOException {
 
     String path = request.getRequestURI();
 
+    // Public endpoints
     if (path.startsWith("/actuator")
         || path.startsWith("/v3/api-docs")
         || path.startsWith("/swagger-ui")) {
@@ -139,21 +142,23 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
       JwtClaimsDTO claims = jwtValidator.validate(token);
 
       if (!claims.isAccessToken()) {
-        throw new BadCredentialsException("Refresh tokens cannot be used for authorization");
+        throw new BadCredentialsException("TOKEN_TYPE_INVALID");
       }
 
       if (tokenBlacklistGateway.isRevoked(claims.jti())) {
-        throw new BadCredentialsException("Token has been revoked");
+        throw new BadCredentialsException("TOKEN_REVOKED");
       }
 
       Set<SimpleGrantedAuthority> authorities = new HashSet<>();
 
-      claims.roles().forEach(role -> authorities.add(new SimpleGrantedAuthority(role)));
+      claims.roles()
+          .forEach(role -> authorities.add(new SimpleGrantedAuthority(role)));
 
-      claims.scopes().forEach(scope -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope)));
+      claims.scopes()
+          .forEach(scope -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope)));
 
       if (authorities.isEmpty()) {
-        throw new BadCredentialsException("Token does not grant any authority");
+        throw new BadCredentialsException("NO_AUTHORITIES");
       }
 
       var authentication = new UsernamePasswordAuthenticationToken(
@@ -162,21 +167,53 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
           authorities);
 
       SecurityContextHolder.getContext().setAuthentication(authentication);
+      MDC.put(USERNAME, claims.sub());
 
-      MDC.put("username", claims.sub());
-
-    } catch (BadCredentialsException ex) {
-      log.debug("JWT authorization failed: {}", ex.getMessage());
-      SecurityContextHolder.clearContext();
     } catch (Exception ex) {
-      log.warn("Unexpected JWT authorization error", ex);
+
+      JwtAuthFailureReason reason = mapFailureReason(ex);
+
+      log.warn(
+          "JWT authorization failed reason={} path={} correlationId={}",
+          reason,
+          MDC.get(REQUEST_PATH),
+          MDC.get(CORRELATION_ID));
+
       SecurityContextHolder.clearContext();
     }
 
     try {
       chain.doFilter(request, response);
     } finally {
-      MDC.remove("username");
+      MDC.remove(USERNAME);
     }
+  }
+
+  /**
+   * Maps JWT authorization exceptions to controlled failure reasons.
+   *
+   * <p>
+   * This method ensures:
+   * </p>
+   * <ul>
+   * <li>No raw exception messages are logged</li>
+   * <li>Failure reasons are finite and auditable</li>
+   * <li>Logs are safe for production environments</li>
+   * </ul>
+   *
+   * @param ex exception thrown during JWT validation or authorization
+   * @return mapped authorization failure reason
+   */
+  private JwtAuthFailureReason mapFailureReason(Exception ex) {
+
+    if (ex instanceof BadCredentialsException) {
+      return JwtAuthFailureReason.INVALID_CREDENTIALS;
+    }
+
+    if (ex instanceof IllegalArgumentException) {
+      return JwtAuthFailureReason.INVALID_CLAIMS;
+    }
+
+    return JwtAuthFailureReason.UNKNOWN;
   }
 }
