@@ -1,28 +1,22 @@
 # ================================================================
-# 🚀 SPRING SECURITY TEMPLATE - PRODUCTION CONFIGURATION
+# 🧪 TEST PROFILE — ISOLATED SECURITY CONTEXT
 # ================================================================
 
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
 
   jpa:
     hibernate:
-      ddl-auto: validate
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
-    properties:
-      hibernate:
-        format_sql: false
+      ddl-auto: create-drop
     show-sql: false
+    database-platform: org.hibernate.dialect.H2Dialect
 
   flyway:
-    enabled: true
-    validate-on-migrate: true
-    clean-disabled: true
-    locations: classpath:db/migration
+    enabled: false   # 🔥 CLAVE: mata Flyway en tests
 
   sql:
     init:
@@ -30,29 +24,11 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT:6379}
-      timeout: 2s
+      host: localhost
+      port: 6379
 
 # =============================
-# SERVER CONFIG
-# =============================
-server:
-  port: ${PORT:8080}
-  forward-headers-strategy: framework
-  error:
-    include-message: never
-
-# =============================
-# OUTBOUND HTTP CLIENT
-# =============================
-http:
-  client:
-    connect-timeout: 2s
-    request-timeout: 5s
-
-# =============================
-# JWT CONFIGURATION (RSA)
+# JWT CONFIG (TEST KEYS)
 # =============================
 security:
   jwt:
@@ -60,51 +36,26 @@ security:
     audience: security-template-app
     access-audience: access-service
     refresh-audience: refresh-service
-    max-active-sessions: 1
     algorithm: RSA
-    access-ttl: PT15M
-    refresh-ttl: P7D
-    rotate-refresh-tokens: true
-    kid: prod-rsa-1
+    kid: test-rsa-1
+    access-ttl: PT5M
+    refresh-ttl: PT30M
 
     rsa:
-      private-key-location: ${JWT_PRIVATE_PATH:file:/opt/keys/rsa-private.pem}
-      public-key-location: ${JWT_PUBLIC_PATH:file:/opt/keys/rsa-public.pem}
-
-    keystore:
-      path: ${KEYSTORE_PATH:/opt/keys/security-template.p12}
-      password: ${KEYSTORE_PASSWORD}
-      key-alias: ${KEY_ALIAS:jwt-signing-key}
-      key-password: ${KEY_PASSWORD}
+      private-key-location: classpath:keys/test-private.pem
+      public-key-location: classpath:keys/test-public.pem
 
 # =============================
-# RATE LIMITING
+# RATE LIMITING (DISABLED)
 # =============================
 rate-limiting:
-  enabled: true
-  strategy: IP_USER
-  max-attempts: 3
-  window: 60
-  block-seconds: 600
-  retry-after: 60
-  login-path: /api/v1/auth/login
+  enabled: false
 
 # =============================
-# CORS
+# CORS (DISABLED)
 # =============================
 cors:
-  enabled: true
-  allow-credentials: false
-  allowed-origins:
-    - https://app.security-template.com
-  allowed-methods: [ "GET", "POST", "PUT", "DELETE" ]
-  allowed-headers:
-    - Content-Type
-    - Authorization
-    - X-Requested-With
-  exposed-headers:
-    - Authorization
-  max-age-seconds: 3600
+  enabled: false
 
 # =============================
 # LOGGING
@@ -112,17 +63,7 @@ cors:
 logging:
   level:
     root: WARN
-    org.springframework.security: INFO
-    org.hibernate.SQL: WARN
-    com.lanny.spring_security_template: INFO
+    com.lanny.spring_security_template: DEBUG
 
-# =============================
-# ACTUATOR
-# =============================
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
 
 
