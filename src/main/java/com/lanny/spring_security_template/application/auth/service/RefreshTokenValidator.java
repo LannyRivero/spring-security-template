@@ -1,25 +1,44 @@
 package com.lanny.spring_security_template.application.auth.service;
 
 import com.lanny.spring_security_template.application.auth.policy.RefreshTokenPolicy;
-import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
-import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * Core validator that enforces the security rules governing refresh tokens.
- * 
+ * Core validator that enforces domain-level security rules
+ * governing refresh tokens.
+ *
  * <p>
- * Performs audience verification, existence validation in the token store, and
- * blacklist checks. Any failure results in {@link IllegalArgumentException}.
+ * This validator performs <strong>pure semantic validation</strong>
+ * of refresh token claims, such as audience verification.
  * </p>
+ *
+ * <p>
+ * <strong>Important:</strong>
+ * This class intentionally performs <em>no persistence checks</em>
+ * and <em>no token consumption</em>.
+ * All stateful and concurrency-sensitive operations are delegated
+ * to the refresh use case and persistence layer.
+ * </p>
+ *
+ * <h2>Responsibilities</h2>
+ * <ul>
+ * <li>Validate refresh-token audience</li>
+ * <li>Enforce refresh-token policy constraints</li>
+ * </ul>
+ *
+ * <h2>Non-responsibilities</h2>
+ * <ul>
+ * <li>No database access</li>
+ * <li>No blacklist checks</li>
+ * <li>No token revocation or rotation</li>
+ * </ul>
  */
+
 @RequiredArgsConstructor
 public class RefreshTokenValidator {
 
-    private final RefreshTokenStore refreshTokenStore;
-    private final TokenBlacklistGateway blacklist;
     private final RefreshTokenPolicy policy;
 
     /**
@@ -33,16 +52,6 @@ public class RefreshTokenValidator {
         // 1 — Validate audience
         if (claims.aud() == null || !claims.aud().contains(policy.expectedRefreshAudience())) {
             throw new IllegalArgumentException("Invalid refresh token audience");
-        }
-
-        // 2 — Validate token exists in store
-        if (!refreshTokenStore.exists(claims.jti())) {
-            throw new IllegalArgumentException("Refresh token not found (revoked or expired)");
-        }
-
-        // 3 — Validate token not revoked (blacklist)
-        if (blacklist.isRevoked(claims.jti())) {
-            throw new IllegalArgumentException("Refresh token revoked or re-used");
         }
     }
 }

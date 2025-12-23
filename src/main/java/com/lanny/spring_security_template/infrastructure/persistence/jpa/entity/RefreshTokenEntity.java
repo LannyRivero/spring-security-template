@@ -6,7 +6,9 @@ import lombok.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "refresh_tokens")
+@Table(name = "refresh_tokens", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_refresh_token_jti_hash", columnNames = "jti_hash")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,8 +23,11 @@ public class RefreshTokenEntity {
     @Column(nullable = false)
     private String username;
 
-    @Column(nullable = false, unique = true)
-    private String jti;
+    @Column(name = "jti_hash", nullable = false, length = 64)
+    private String jtiHash;
+
+    @Column(nullable = false)
+    private boolean revoked;
 
     @Column(nullable = false)
     private Instant issuedAt;
@@ -30,7 +35,3 @@ public class RefreshTokenEntity {
     @Column(nullable = false)
     private Instant expiresAt;
 }
-
-
-
-

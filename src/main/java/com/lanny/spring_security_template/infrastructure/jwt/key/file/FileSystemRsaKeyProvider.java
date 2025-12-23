@@ -12,92 +12,117 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
- * {@code FileSystemRsaKeyProvider}
+ * Filesystem-based RSA key provider with full multi-kid support.
  *
  * <p>
- * Production-grade {@link RsaKeyProvider} that loads RSA public/private keys
- * directly from the filesystem.
- * </p>
- *
- * <h3>Intended usage</h3>
+ * Supports zero-downtime key rotation by allowing:
  * <ul>
- * <li>Production environments</li>
- * <li>Docker / Docker Compose (mounted volumes)</li>
- * <li>Kubernetes Secrets mounted as files</li>
- * <li>VMs with protected filesystem paths</li>
+ * <li>One active signing key</li>
+ * <li>Multiple verification keys (by kid)</li>
  * </ul>
- *
- * <p>
- * This provider enforces <b>fail-fast</b> behaviour: the application
- * will not start if keys are missing, unreadable, invalid, or inconsistent.
- * </p>
- *
- * <p>
- * <b>Security guarantees:</b>
- * <ul>
- * <li>Only absolute filesystem paths are accepted</li>
- * <li>Paths are normalized to prevent traversal attacks</li>
- * <li>Basic file permissions are validated</li>
- * <li>RSA public/private key pair consistency is enforced</li>
- * </ul>
- * </p>
- *
- * <p>
- * <b>NOTE:</b> This provider is intentionally limited to filesystem-based
- * secrets. For higher security requirements, prefer a dedicated
- * KMS/Vault-based implementation.
  * </p>
  */
 @Component
 @Profile("prod")
 public class FileSystemRsaKeyProvider implements RsaKeyProvider {
 
-    private final String kid;
+    private final String activeKid;
     private final RSAPrivateKey privateKey;
-    private final RSAPublicKey publicKey;
+    private final Map<String, RSAPublicKey> verificationKeys;
 
     public FileSystemRsaKeyProvider(
-            @Value("${security.jwt.kid}") String kid,
+            @Value("${security.jwt.active-kid}") String activeKid,
+            @Value("${security.jwt.verification-kids}") List<String> verificationKids,
             @Value("${security.jwt.rsa.private-key-location}") String privateKeyPath,
-            @Value("${security.jwt.rsa.public-key-location}") String publicKeyPath) {
+            @Value("#{${security.jwt.rsa.public-keys}}") Map<String, String> publicKeyLocations) {
 
-        if (kid == null || kid.isBlank()) {
-            throw new IllegalArgumentException(
-                    "security.jwt.kid cannot be null or blank.");
+        this.activeKid = requireText(activeKid, "security.jwt.active-kid");
+
+        if (verificationKids == null || verificationKids.isEmpty()) {
+            throw new IllegalStateException("security.jwt.verification-kids must not be empty");
         }
-        this.kid = kid;
 
-        Path privPath = normalizeAndValidatePath(privateKeyPath, "private");
-        Path pubPath = normalizeAndValidatePath(publicKeyPath, "public");
+        if (!verificationKids.contains(this.activeKid)) {
+            throw new IllegalStateException(
+                    "active-kid must be included in verification-kids");
+        }
+
+        // ============================
+        // Load private key (ACTIVE)
+        // ============================
+
+        Path privPath = normalizeAndValidatePath(
+                privateKeyPath, "private");
 
         validateFile(privPath, "private");
-        validateFile(pubPath, "public");
-
         validatePermissions(privPath, "private");
-        validatePermissions(pubPath, "public");
 
-        try (InputStream privIs = Files.newInputStream(privPath);
-                InputStream pubIs = Files.newInputStream(pubPath)) {
-
-            this.privateKey = PemUtils.readPrivateKey(privIs);
-            this.publicKey = PemUtils.readPublicKey(pubIs);
-
-            validateKeyPair(publicKey, privateKey);
-
+        try (InputStream is = Files.newInputStream(privPath)) {
+            this.privateKey = PemUtils.readPrivateKey(is);
         } catch (Exception e) {
             throw new IllegalStateException(
-                    "Failed to load RSA key pair from filesystem (prod profile). " +
-                            "Check file paths, permissions and key format.",
-                    e);
+                    "Failed to load RSA private key for active-kid=" + activeKid, e);
         }
+
+        // ============================
+        // Load verification public keys
+        // ============================
+
+        Map<String, RSAPublicKey> pubs = new HashMap<>();
+
+        for (String kid : verificationKids) {
+            String location = publicKeyLocations.get(kid);
+            if (location == null || location.isBlank()) {
+                throw new IllegalStateException(
+                        "Missing public key location for kid: " + kid);
+            }
+
+            Path pubPath = normalizeAndValidatePath(location, "public");
+            validateFile(pubPath, "public");
+            validatePermissions(pubPath, "public");
+
+            try (InputStream is = Files.newInputStream(pubPath)) {
+                RSAPublicKey pub = PemUtils.readPublicKey(is);
+                validateKeySize(pub, kid);
+                pubs.put(kid, pub);
+            } catch (Exception e) {
+                throw new IllegalStateException(
+                        "Failed to load RSA public key for kid=" + kid, e);
+            }
+        }
+
+        this.verificationKeys = Map.copyOf(pubs);
     }
 
-    /**
-     * Normalizes and validates that the provided path is absolute.
-     */
+    // ======================================================
+    // RsaKeyProvider
+    // ======================================================
+
+    @Override
+    public String activeKid() {
+        return activeKid;
+    }
+
+    @Override
+    public RSAPrivateKey privateKey() {
+        return privateKey;
+    }
+
+    @Override
+    public Map<String, RSAPublicKey> verificationKeys() {
+        return verificationKeys;
+    }
+
+    // ======================================================
+    // Internals
+    // ======================================================
+
     private static Path normalizeAndValidatePath(String rawPath, String type) {
         if (rawPath == null || rawPath.isBlank()) {
             throw new IllegalStateException(
@@ -105,17 +130,13 @@ public class FileSystemRsaKeyProvider implements RsaKeyProvider {
         }
 
         Path path = Path.of(rawPath).normalize();
-
         if (!path.isAbsolute()) {
             throw new IllegalStateException(
-                    "RSA " + type + " key path must be absolute in production: " + path);
+                    "RSA " + type + " key path must be absolute: " + path);
         }
         return path;
     }
 
-    /**
-     * Validates existence, type and readability of the key file.
-     */
     private static void validateFile(Path path, String type) {
         if (!Files.exists(path)) {
             throw new IllegalStateException(
@@ -123,7 +144,7 @@ public class FileSystemRsaKeyProvider implements RsaKeyProvider {
         }
         if (!Files.isRegularFile(path)) {
             throw new IllegalStateException(
-                    "RSA " + type + " key path is not a regular file: " + path);
+                    "RSA " + type + " key path is not a file: " + path);
         }
         if (!Files.isReadable(path)) {
             throw new IllegalStateException(
@@ -131,54 +152,33 @@ public class FileSystemRsaKeyProvider implements RsaKeyProvider {
         }
     }
 
-    /**
-     * Performs basic POSIX permission hardening.
-     *
-     * <p>
-     * Rejects keys that are world-readable when running on
-     * POSIX-compliant filesystems.
-     * </p>
-     */
     private static void validatePermissions(Path path, String type) {
         try {
             Set<PosixFilePermission> perms = Files.getPosixFilePermissions(path);
+
             if (perms.contains(PosixFilePermission.OTHERS_READ)) {
                 throw new IllegalStateException(
                         "RSA " + type + " key must not be world-readable: " + path);
             }
         } catch (UnsupportedOperationException ignored) {
-            // Non-POSIX filesystem (e.g. Windows) → skip permission validation
+            // Non-POSIX filesystem
         } catch (Exception e) {
             throw new IllegalStateException(
                     "Failed to validate permissions for RSA " + type + " key: " + path, e);
         }
     }
 
-    /**
-     * Ensures that the public and private RSA keys belong to the same key pair.
-     */
-    private static void validateKeyPair(
-            RSAPublicKey publicKey,
-            RSAPrivateKey privateKey) {
-
-        if (!publicKey.getModulus().equals(privateKey.getModulus())) {
+    private static void validateKeySize(RSAPublicKey key, String kid) {
+        if (key.getModulus().bitLength() < 2048) {
             throw new IllegalStateException(
-                    "Public and private RSA keys do not match (modulus mismatch).");
+                    "RSA public key for kid '" + kid + "' is weaker than 2048 bits");
         }
     }
 
-    @Override
-    public String keyId() {
-        return kid;
-    }
-
-    @Override
-    public RSAPublicKey publicKey() {
-        return publicKey;
-    }
-
-    @Override
-    public RSAPrivateKey privateKey() {
-        return privateKey;
+    private static String requireText(String value, String property) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(property + " must not be null or blank.");
+        }
+        return value;
     }
 }

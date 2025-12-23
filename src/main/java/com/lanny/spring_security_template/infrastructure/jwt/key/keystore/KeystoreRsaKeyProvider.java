@@ -15,38 +15,20 @@ import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.*;
 
 /**
  * {@code KeystoreRsaKeyProvider}
  *
  * <p>
- * Production-grade {@link RsaKeyProvider} that loads an RSA key pair
- * from a Java {@link KeyStore} (PKCS12 or JKS).
+ * Production-grade {@link RsaKeyProvider} supporting RSA key rotation
+ * (multi-kid).
  * </p>
  *
- * <h3>Security guarantees</h3>
- * <ul>
- * <li>Alias is mandatory and explicit</li>
- * <li>Keystore password and key password are separated</li>
- * <li>Supports PKCS12 and JKS formats</li>
- * <li>Minimum RSA key size of 2048 bits enforced</li>
- * <li>Public certificate must match private key</li>
- * <li>Fail-fast on any misconfiguration</li>
- * </ul>
- *
- * <h3>Typical usage</h3>
- * <ul>
- * <li>Enterprise production environments</li>
- * <li>Kubernetes Secrets / Vault exports</li>
- * <li>Key rotation via alias + kid</li>
- * </ul>
- *
  * <p>
- * This provider is activated only when:
- * <ul>
- * <li>{@code profile=prod}</li>
- * <li>{@code security.jwt.key-provider=keystore}</li>
- * </ul>
+ * Keys are loaded eagerly at startup and cached for the lifetime of the
+ * application.
+ * Any misconfiguration fails fast during boot.
  * </p>
  */
 @Slf4j
@@ -57,20 +39,42 @@ public class KeystoreRsaKeyProvider implements RsaKeyProvider {
 
     private static final int MIN_RSA_KEY_SIZE = 2048;
 
-    private final String kid;
-    private final RSAPublicKey publicKey;
+    private final String activeKid;
     private final RSAPrivateKey privateKey;
+    private final Map<String, RSAPublicKey> verificationKeys;
 
     public KeystoreRsaKeyProvider(
-            @Value("${security.jwt.kid}") String kid,
+            @Value("${security.jwt.active-kid}") String activeKid,
+            @Value("${security.jwt.verification-kids}") List<String> verificationKids,
+            @Value("#{${security.jwt.keystore.kid-alias}}") Map<String, String> kidAliasMap,
             @Value("${security.jwt.keystore.path}") String keystorePath,
             @Value("${security.jwt.keystore.type:PKCS12}") String keystoreType,
             @Value("${security.jwt.keystore.password}") String keystorePassword,
-            @Value("${security.jwt.keystore.key-alias}") String keyAlias,
             @Value("${security.jwt.keystore.key-password}") String keyPassword) {
 
-        this.kid = requireText(kid, "security.jwt.kid");
-        requireText(keyAlias, "security.jwt.keystore.key-alias");
+        this.activeKid = requireText(activeKid, "security.jwt.active-kid");
+
+        if (verificationKids == null || verificationKids.isEmpty()) {
+            throw new IllegalStateException("security.jwt.verification-kids must not be empty.");
+        }
+
+        // Detect duplicate kids early
+        Set<String> uniqueKids = new HashSet<>(verificationKids);
+        if (uniqueKids.size() != verificationKids.size()) {
+            throw new IllegalStateException(
+                    "Duplicate kid detected in security.jwt.verification-kids");
+        }
+
+        if (!uniqueKids.contains(this.activeKid)) {
+            throw new IllegalStateException(
+                    "active-kid must be included in verification-kids.");
+        }
+
+        // Ensure alias coverage
+        if (kidAliasMap == null || !kidAliasMap.keySet().containsAll(uniqueKids)) {
+            throw new IllegalStateException(
+                    "security.jwt.keystore.kid-alias must define aliases for all verification-kids");
+        }
 
         Path ksPath = normalizeAndValidatePath(keystorePath);
         validateKeystoreFile(ksPath);
@@ -80,39 +84,100 @@ public class KeystoreRsaKeyProvider implements RsaKeyProvider {
             KeyStore keyStore = KeyStore.getInstance(keystoreType);
             keyStore.load(is, keystorePassword.toCharArray());
 
-            Key key = keyStore.getKey(keyAlias, keyPassword.toCharArray());
-            if (!(key instanceof RSAPrivateKey priv)) {
-                throw new IllegalStateException(
-                        "Alias does not reference an RSA private key: " + keyAlias);
+            // --------------------------------------------------
+            // Load ACTIVE signing key
+            // --------------------------------------------------
+            String activeAlias = requireText(
+                    kidAliasMap.get(this.activeKid),
+                    "security.jwt.keystore.kid-alias[" + this.activeKid + "]");
+
+            this.privateKey = loadPrivateKey(
+                    keyStore,
+                    activeAlias,
+                    keyPassword.toCharArray());
+
+            // --------------------------------------------------
+            // Load verification public keys (active + old)
+            // --------------------------------------------------
+            Map<String, RSAPublicKey> pubs = new HashMap<>();
+
+            for (String kid : uniqueKids) {
+                String alias = requireText(
+                        kidAliasMap.get(kid),
+                        "security.jwt.keystore.kid-alias[" + kid + "]");
+
+                RSAPublicKey pub = loadPublicKey(keyStore, alias);
+                validateKeySize(pub, alias);
+                pubs.put(kid, pub);
             }
 
-            X509Certificate cert = (X509Certificate) keyStore.getCertificate(keyAlias);
-            if (cert == null) {
-                throw new IllegalStateException(
-                        "No X509 certificate found for alias: " + keyAlias);
-            }
+            this.verificationKeys = Map.copyOf(pubs);
 
-            if (!(cert.getPublicKey() instanceof RSAPublicKey pub)) {
-                throw new IllegalStateException(
-                        "Certificate public key is not RSA for alias: " + keyAlias);
-            }
-
-            validateKeySize(priv, keyAlias);
-            validateKeySize(pub, keyAlias);
-            validateKeyPair(pub, priv, keyAlias);
-
-            this.privateKey = priv;
-            this.publicKey = pub;
-
-            log.info("✓ Loaded RSA keypair from keystore [type={}, alias={}, kid={}]",
-                    keystoreType, keyAlias, kid);
+            log.info(
+                    "✓ Loaded RSA keys from keystore [type={}, activeKid={}, verificationKids={}]",
+                    keystoreType,
+                    this.activeKid,
+                    this.verificationKeys.keySet());
 
         } catch (Exception e) {
             throw new IllegalStateException(
-                    "Failed to load RSA keypair from keystore. " +
-                            "Check keystore path, passwords, alias and key format.",
+                    "Failed to load RSA keys from keystore. " +
+                            "Check path, passwords, aliases and key formats.",
                     e);
         }
+    }
+
+    // --------------------------------------------------
+    // RsaKeyProvider
+    // --------------------------------------------------
+
+    @Override
+    public String activeKid() {
+        return activeKid;
+    }
+
+    @Override
+    public RSAPrivateKey privateKey() {
+        return privateKey;
+    }
+
+    @Override
+    public Map<String, RSAPublicKey> verificationKeys() {
+        return verificationKeys;
+    }
+
+    // --------------------------------------------------
+    // Key loading helpers
+    // --------------------------------------------------
+
+    private RSAPrivateKey loadPrivateKey(
+            KeyStore ks,
+            String alias,
+            char[] keyPassword) throws Exception {
+
+        Key key = ks.getKey(alias, keyPassword);
+        if (!(key instanceof RSAPrivateKey priv)) {
+            throw new IllegalStateException(
+                    "Alias does not reference an RSA private key: " + alias);
+        }
+        validateKeySize(priv, alias);
+        return priv;
+    }
+
+    private RSAPublicKey loadPublicKey(
+            KeyStore ks,
+            String alias) throws Exception {
+
+        X509Certificate cert = (X509Certificate) ks.getCertificate(alias);
+        if (cert == null) {
+            throw new IllegalStateException(
+                    "No X509 certificate found for alias: " + alias);
+        }
+        if (!(cert.getPublicKey() instanceof RSAPublicKey pub)) {
+            throw new IllegalStateException(
+                    "Certificate public key is not RSA for alias: " + alias);
+        }
+        return pub;
     }
 
     // --------------------------------------------------
@@ -161,35 +226,5 @@ public class KeystoreRsaKeyProvider implements RsaKeyProvider {
                     "RSA public key for alias '" + alias + "' is weaker than "
                             + MIN_RSA_KEY_SIZE + " bits.");
         }
-    }
-
-    private static void validateKeyPair(
-            RSAPublicKey pub,
-            RSAPrivateKey priv,
-            String alias) {
-
-        if (!pub.getModulus().equals(priv.getModulus())) {
-            throw new IllegalStateException(
-                    "Public certificate does not match private key for alias '" + alias + "'.");
-        }
-    }
-
-    // --------------------------------------------------
-    // RsaKeyProvider
-    // --------------------------------------------------
-
-    @Override
-    public String keyId() {
-        return kid;
-    }
-
-    @Override
-    public RSAPublicKey publicKey() {
-        return publicKey;
-    }
-
-    @Override
-    public RSAPrivateKey privateKey() {
-        return privateKey;
     }
 }

@@ -9,6 +9,7 @@ import com.lanny.spring_security_template.application.auth.port.out.SessionRegis
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
+import com.lanny.spring_security_template.domain.exception.RefreshTokenReuseDetectedException;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 
 import lombok.RequiredArgsConstructor;
@@ -110,8 +111,12 @@ public class TokenRotationHandler {
         // 2. Revoke the old refresh token
         blacklist.revoke(claims.jti(), Instant.ofEpochSecond(claims.exp()));
 
-        // 3. Delete old metadata
-        refreshTokenStore.delete(claims.jti());
+        // 3. Atomically consume old refresh token metadata
+        boolean consumed = refreshTokenStore.consume(claims.jti());
+
+        if (!consumed) {
+            throw new RefreshTokenReuseDetectedException("Refresh token reuse detected");
+        }
         sessionRegistry.removeSession(username, claims.jti());
 
         // 4. Issue new access & refresh pair

@@ -58,22 +58,7 @@ public interface RefreshTokenStore {
      * @param issuedAt  timestamp when token was issued
      * @param expiresAt timestamp when token expires
      */
-    void save(String username, String jti, Instant issuedAt, Instant expiresAt);
-
-    /**
-     * Checks whether a refresh token with the given JTI still exists.
-     *
-     * @param jti refresh token identifier
-     * @return true if stored and not revoked
-     */
-    boolean exists(String jti);
-
-    /**
-     * Deletes a specific refresh token (typically after rotation or logout).
-     *
-     * @param jti unique identifier of the refresh token
-     */
-    void delete(String jti);
+    void save(String username, String jti, Instant issuedAt, Instant expiresAt);  
 
     /**
      * Deletes all refresh tokens for a user.
@@ -91,4 +76,6 @@ public interface RefreshTokenStore {
      * @return list of active refresh token IDs
      */
     List<String> findAllForUser(String username);
+
+    boolean consume(String jti);
 }

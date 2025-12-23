@@ -30,15 +30,11 @@ import com.nimbusds.jwt.SignedJWT;
 /**
  * Nimbus-based JWT generator and validator.
  *
- * <p>
  * Supports Access and Refresh tokens with strict validation of:
  * algorithm, kid, signature, issuer, audience, temporal claims and token type.
- * </p>
  *
- * <p>
  * Token type is expressed via the {@code token_use} claim:
  * {@code access} or {@code refresh}.
- * </p>
  */
 @Component
 public class JwtUtils {
@@ -120,7 +116,7 @@ public class JwtUtils {
             JWSAlgorithm alg = resolveJwsAlgorithm();
             JWSHeader header = new JWSHeader.Builder(alg)
                     .type(JOSEObjectType.JWT)
-                    .keyID(keyProvider.keyId())
+                    .keyID(keyProvider.activeKid()) // multi-kid: active kid only for issuing
                     .build();
 
             SignedJWT jwt = new SignedJWT(header, claims.build());
@@ -162,7 +158,6 @@ public class JwtUtils {
         JWTClaimsSet claims = validateAndParse(token);
         validateTokenUse(claims, TOKEN_USE_ACCESS);
 
-
         Object roles = claims.getClaim(CLAIM_ROLES);
         Object scopes = claims.getClaim(CLAIM_SCOPES);
         if (roles == null && scopes == null) {
@@ -198,7 +193,9 @@ public class JwtUtils {
     // ======================================================
 
     private void validateSignature(SignedJWT jwt) throws JOSEException {
-        JWSVerifier verifier = resolveVerifier();
+
+        String kid = jwt.getHeader().getKeyID();
+        JWSVerifier verifier = resolveVerifier(kid);
 
         if (!jwt.verify(verifier)) {
             throw new JOSEException("Invalid JWT signature");
@@ -220,9 +217,10 @@ public class JwtUtils {
             throw new JOSEException("Invalid JWT type");
         }
 
+        // multi-kid: only require presence
         String kid = jwt.getHeader().getKeyID();
-        if (kid == null || !kid.equals(keyProvider.keyId())) {
-            throw new JOSEException("Invalid or missing JWT key ID (kid)");
+        if (kid == null || kid.isBlank()) {
+            throw new JOSEException("Missing JWT key ID (kid)");
         }
     }
 
@@ -308,27 +306,20 @@ public class JwtUtils {
         return new RSASSASigner((RSAPrivateKey) keyProvider.privateKey());
     }
 
-    private JWSVerifier resolveVerifier() throws JOSEException {
+    // multi-kid: verifier resolved by kid
+    private JWSVerifier resolveVerifier(String kid) throws JOSEException {
         if (props.algorithm() == JwtAlgorithm.HMAC) {
             return new MACVerifier(resolveHmacSecretBytes());
         }
-        return new RSASSAVerifier((RSAPublicKey) keyProvider.publicKey());
+
+        RSAPublicKey pub = keyProvider.findPublicKey(kid)
+                .orElseThrow(() -> new JOSEException("Unknown JWT key id (kid)"));
+
+        return new RSASSAVerifier(pub);
     }
 
-    /**
-     * Resolves HMAC secret bytes (Base64) from configuration.
-     *
-     * <p>
-     * Adjust this method to match your exact properties structure
-     * (e.g. props.hmac().secretBase64()).
-     * </p>
-     */
     private byte[] resolveHmacSecretBytes() {
-        // ✅ Ajusta esta línea según tu record/properties real:
-        // Example expected: props.hmac().secretBase64()
         String base64 = props.hmac().secretBase64();
-
-        // Nimbus requires enough key length (>= 256 bits for HS256)
         return Base64.getDecoder().decode(base64.getBytes(StandardCharsets.UTF_8));
     }
 
