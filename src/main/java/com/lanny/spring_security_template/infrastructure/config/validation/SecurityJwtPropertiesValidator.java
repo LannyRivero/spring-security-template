@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.net.URI;
+import java.util.Base64;
 import java.util.regex.Pattern;
 
 @Component
@@ -28,11 +29,13 @@ public class SecurityJwtPropertiesValidator {
 
         // ---------------- TTLs ----------------
         if (props.accessTtl() == null || props.accessTtl().toMinutes() < 5) {
-            throw new InvalidSecurityConfigurationException("accessTtl must be at least 5 minutes");
+            throw new InvalidSecurityConfigurationException(
+                    "accessTtl must be at least 5 minutes");
         }
 
         if (props.refreshTtl().compareTo(props.accessTtl()) <= 0) {
-            throw new InvalidSecurityConfigurationException("refreshTtl must be greater than accessTtl");
+            throw new InvalidSecurityConfigurationException(
+                    "refreshTtl must be greater than accessTtl");
         }
 
         // ---------------- Issuer ----------------
@@ -43,16 +46,19 @@ public class SecurityJwtPropertiesValidator {
         try {
             URI.create(props.issuer());
         } catch (Exception e) {
-            throw new InvalidSecurityConfigurationException("issuer must be a valid URI.", e);
+            throw new InvalidSecurityConfigurationException(
+                    "issuer must be a valid URI.", e);
         }
 
         // ---------------- Audience ----------------
         if (!StringUtils.hasText(props.accessAudience())) {
-            throw new InvalidSecurityConfigurationException("accessAudience cannot be blank.");
+            throw new InvalidSecurityConfigurationException(
+                    "accessAudience cannot be blank.");
         }
 
         if (!StringUtils.hasText(props.refreshAudience())) {
-            throw new InvalidSecurityConfigurationException("refreshAudience cannot be blank.");
+            throw new InvalidSecurityConfigurationException(
+                    "refreshAudience cannot be blank.");
         }
 
         // ---------------- Roles ----------------
@@ -60,7 +66,8 @@ public class SecurityJwtPropertiesValidator {
             for (String role : props.defaultRoles()) {
                 if (!ROLE_PATTERN.matcher(role).matches()) {
                     throw new InvalidSecurityConfigurationException(
-                            "Invalid role: %s — expected format ROLE_XYZ".formatted(role));
+                            "Invalid role: %s — expected format ROLE_XYZ"
+                                    .formatted(role));
                 }
             }
         }
@@ -70,18 +77,47 @@ public class SecurityJwtPropertiesValidator {
             for (String scope : props.defaultScopes()) {
                 if (!SCOPE_PATTERN.matcher(scope).matches()) {
                     throw new InvalidSecurityConfigurationException(
-                            "Invalid scope: %s — expected format xxx:yyy or xxx:yyy:zzz".formatted(scope));
+                            "Invalid scope: %s — expected format xxx:yyy or xxx:yyy:zzz"
+                                    .formatted(scope));
                 }
             }
         }
 
         // ---------------- Algorithm-specific ----------------
         if (props.algorithm() == JwtAlgorithm.HMAC) {
-            if (props.hmac() == null || !StringUtils.hasText(props.hmac().secretBase64())) {
-                throw new InvalidSecurityConfigurationException(
-                        "JWT algorithm is HMAC but hmac.secret-base64 is missing or blank");
-            }
+            validateHmacConfiguration();
+        }
+    }
+
+    // ======================================================
+    // HMAC validation (enterprise-grade)
+    // ======================================================
+
+    private void validateHmacConfiguration() {
+
+        if (props.hmac() == null ||
+                !StringUtils.hasText(props.hmac().secretBase64())) {
+
+            throw new InvalidSecurityConfigurationException(
+                    "JWT algorithm is HMAC but hmac.secret-base64 is missing or blank");
         }
 
+        byte[] decodedSecret;
+        try {
+            decodedSecret = Base64.getDecoder()
+                    .decode(props.hmac().secretBase64());
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidSecurityConfigurationException(
+                    "hmac.secret-base64 must be valid Base64", ex);
+        }
+
+        // Enterprise rule: HS512-equivalent strength
+        final int MIN_HMAC_BYTES = 64;
+
+        if (decodedSecret.length < MIN_HMAC_BYTES) {
+            throw new InvalidSecurityConfigurationException(
+                    "HMAC secret is too weak: minimum %d bytes required"
+                            .formatted(MIN_HMAC_BYTES));
+        }
     }
 }
