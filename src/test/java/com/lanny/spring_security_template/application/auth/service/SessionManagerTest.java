@@ -92,8 +92,6 @@ class SessionManagerTest {
         verify(sessionRegistry).removeSession(USERNAME, "old1");
         verify(sessionRegistry).removeSession(USERNAME, "old2");
 
-        verify(refreshTokenStore).delete("old1");
-        verify(refreshTokenStore).delete("old2");
     }
 
     @Test
@@ -106,6 +104,5 @@ class SessionManagerTest {
 
         verify(blacklist).revoke("old1", tokens.refreshExp());
         verify(sessionRegistry).removeSession(USERNAME, "old1");
-        verify(refreshTokenStore).delete("old1");
     }
 }

@@ -1,9 +1,11 @@
 package com.lanny.spring_security_template.application.auth.service;
 
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
+import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
+import com.lanny.spring_security_template.domain.exception.RefreshTokenReuseDetectedException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -43,6 +45,7 @@ public class RefreshService {
 
     private final TokenProvider tokenProvider;
     private final RefreshTokenValidator validator;
+    private final RefreshTokenStore refreshTokenStore;
     private final TokenRotationHandler rotationHandler;
     private final TokenRefreshResultFactory resultFactory;
 
@@ -83,6 +86,13 @@ public class RefreshService {
     private JwtResult handleRefresh(JwtClaimsDTO claims, RefreshCommand cmd) {
         // Validate token signature, expiration, JTI, and security rules
         validator.validate(claims);
+
+        boolean consumed = refreshTokenStore.consume(claims.jti());
+
+        if (!consumed) {
+            throw new RefreshTokenReuseDetectedException("Refresh token reuse detected");
+
+        }
 
         // Determine if refresh token rotation is required
         if (rotationHandler.shouldRotate()) {

@@ -101,7 +101,6 @@ class TokenRotationHandlerTest {
                 assertThat(result.refreshToken()).isEqualTo("refresh-new");
 
                 verify(blacklist).revoke(eq(OLD_JTI), any());
-                verify(refreshTokenStore).delete(OLD_JTI);
                 verify(sessionRegistry).removeSession(USERNAME, OLD_JTI);
 
                 verify(tokenIssuer).issueTokens(eq(USERNAME), any());

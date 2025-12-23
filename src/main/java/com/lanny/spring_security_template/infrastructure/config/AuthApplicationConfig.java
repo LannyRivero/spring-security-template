@@ -145,11 +145,9 @@ public class AuthApplicationConfig {
 
     @Bean
     public RefreshTokenValidator refreshTokenValidator(
-            RefreshTokenStore store,
-            TokenBlacklistGateway blacklist,
             RefreshTokenPolicy policy) {
 
-        return new RefreshTokenValidator(store, blacklist, policy);
+        return new RefreshTokenValidator(policy);
     }
 
     @Bean
@@ -180,10 +178,11 @@ public class AuthApplicationConfig {
     public RefreshService refreshService(
             TokenProvider tokenProvider,
             RefreshTokenValidator validator,
+            RefreshTokenStore refreshTokenStore,
             TokenRotationHandler rotationHandler,
             TokenRefreshResultFactory resultFactory) {
 
-        return new RefreshService(tokenProvider, validator, rotationHandler, resultFactory);
+        return new RefreshService(tokenProvider, validator, refreshTokenStore, rotationHandler, resultFactory);
     }
 
     // ============================================================
