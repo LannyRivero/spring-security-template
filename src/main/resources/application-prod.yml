@@ -11,59 +11,92 @@ spring:
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 15
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+
   jpa:
     hibernate:
       ddl-auto: validate
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
-    show-sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+
   sql:
     init:
       mode: never
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    locations:
+      - classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      timeout: 2000
+
 # =============================
-# ⚙️ SERVER CONFIG
+# ⚙️ SERVER
 # =============================
 server:
   port: ${PORT:8080}
   forward-headers-strategy: framework
   error:
     include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
 
 # =============================
-# 🔐 JWT CONFIGURATION (RSA)
+# 🔐 JWT / SECURITY (RSA · MULTI-KID)
 # =============================
 security:
   jwt:
-    provider: nimbus          # o jjwt si usas el otro
-    key-provider: keystore     # keystore | filesystem
-
-    kid: prod-rsa-1
-    issuer: security-template
-    audience: security-template-app
-    max-active-sessions: 1
-
+    provider: nimbus
+    key-provider: keystore
     algorithm: RSA
-    expiration-seconds: 3600
-    service-expiration-seconds: 300
+
+    issuer: security-template
+    access-audience: access-service
+    refresh-audience: refresh-service
+
+    access-ttl: PT1H
+    refresh-ttl: P7D
     allowed-clock-skew-seconds: 60
 
-    # --- Option A: PEM (default RSA files) ---
-    rsa:
-      private-key-location: ${JWT_PRIVATE_PATH:file:/opt/keys/rsa-private.pem}
-      public-key-location: ${JWT_PUBLIC_PATH:file:/opt/keys/rsa-public.pem}
+    rotate-refresh-tokens: true
+    max-active-sessions: 1
 
-    # --- Option B: Keystore (Enterprise) ---
+    # ------------------------------------------------
+    # 🔑 KEY ROTATION (ENTERPRISE)
+    # ------------------------------------------------
+    active-kid: prod-rsa-2024
+    verification-kids:
+      - prod-rsa-2023
+      - prod-rsa-2024
+
     keystore:
       path: ${KEYSTORE_PATH:/opt/keys/security-template.p12}
+      type: ${KEYSTORE_TYPE:PKCS12}
       password: ${KEYSTORE_PASSWORD}
-      key-alias: ${KEY_ALIAS:jwt-signing-key}
       key-password: ${KEY_PASSWORD}
 
+      # kid → alias mapping
+      kid-alias:
+        prod-rsa-2023: jwt-key-2023
+        prod-rsa-2024: jwt-key-2024
+
 # =============================
-# 🚦 RATE LIMITING (Strict)
+# 🚦 RATE LIMITING (STRICT)
 # =============================
 rate-limiting:
   enabled: true
@@ -75,20 +108,26 @@ rate-limiting:
   login-path: /api/v1/auth/login
 
 # =============================
-# 🌐 CORS (Restricted)
+# 🌐 CORS (RESTRICTED)
 # =============================
 cors:
   enabled: true
   allow-credentials: true
   allowed-origins:
     - https://app.security-template.com
-  allowed-methods: [ "GET", "POST", "PUT", "DELETE" ]
+  allowed-methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
   allowed-headers:
     - Content-Type
     - Authorization
     - X-Requested-With
+    - X-Correlation-Id
   exposed-headers:
     - Authorization
+    - X-Correlation-Id
   max-age-seconds: 3600
 
 # =============================
@@ -102,15 +141,23 @@ logging:
     com.lanny.spring_security_template: INFO
 
 # =============================
-# 📈 ACTUATOR
+# 📈 ACTUATOR / METRICS
 # =============================
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
-data:
-    redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
-      enabled: true
+        include:
+          - health
+          - info
+          - prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: spring-security-template
+
