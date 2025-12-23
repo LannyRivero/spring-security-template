@@ -2,24 +2,25 @@ package com.lanny.spring_security_template.infrastructure.jwt.key;
 
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Map;
+import java.util.Optional;
 
 /**
- * RSA Key Provider abstraction.
- *
- * Provides RSA key pairs for JWT signing and verification.
- * 
- * Each provider defines its own key source (classpath, file system, cloud KMS,
- * etc.)
- * and may expose a key ID (kid) for token header identification and rotation.
+ * RSA Key Provider abstraction supporting key rotation (multi-kid).
  */
 public interface RsaKeyProvider {
 
-    /** Unique key identifier (useful for rotation / header kid). */
-    String keyId();
+    /** Kid of the active signing key (used to issue new tokens). */
+    String activeKid();
 
-    /** Public key used for signature verification. */
-    RSAPublicKey publicKey();
-
-    /** Private key used for token signing. */
+    /** Private key used to sign new tokens (active). */
     RSAPrivateKey privateKey();
+
+    /** Public keys accepted for verification. Key = kid. */
+    Map<String, RSAPublicKey> verificationKeys();
+
+    default Optional<RSAPublicKey> findPublicKey(String kid) {
+        return Optional.ofNullable(verificationKeys().get(kid));
+    }
 }
+
