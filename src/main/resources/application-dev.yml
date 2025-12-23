@@ -61,14 +61,20 @@ security:
     access-ttl: PT1H
     refresh-ttl: P7D
     rotate-refresh-tokens: true
+
     default-roles:
       - ROLE_USER
     default-scopes:
       - profile:read
 
+    # ✅ Multi-kid contract (aunque sea 1 solo)
+    active-kid: dev-rsa-1
+    verification-kids: [ dev-rsa-1 ]
+
     rsa:
       private-key-location: keys/rsa-private.pem
-      public-key-location: keys/rsa-public.pem
+      public-key-location: 
+        dev-rsa-1: keys/rsa-public.pem
 
     hmac:
       secret-base64: ${JWT_SECRET_BASE64:dev-secret-12345}
