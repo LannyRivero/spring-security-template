@@ -62,14 +62,40 @@ public record SecurityJwtProperties(
                  * The secret must be Base64-encoded and at least 256 bits for HS256.
                  * </p>
                  */
-                @Valid @DefaultValue HmacProperties hmac){
+                @Valid @DefaultValue HmacProperties hmac,
+                @Valid RsaProperties rsa){
+
         public SecurityJwtProperties {
                 // Ensure non-null nested config to avoid NPE in dev when RSA is used.
                 if (hmac == null) {
                         hmac = new HmacProperties("");
                 }
+                if (rsa == null) {
+                        rsa = new RsaProperties(null, List.of(), null, java.util.Map.of());
+                }
         }
 
+        // =========================
+        // RSA CONFIG (MULTI-KID)
+        // =========================
+        public record RsaProperties(
+
+                        /** Kid used to SIGN new tokens */
+                        @NotBlank String activeKid,
+
+                        /** All kids accepted for verification (active + old) */
+                        @NotNull List<String> verificationKids,
+
+                        /** Private key used for signing (only activeKid) */
+                        @NotBlank String privateKeyLocation,
+
+                        /** Map kid -> public key path */
+                        @NotNull java.util.Map<String, String> publicKeys) {
+        }
+
+        // =========================
+        // HMAC CONFIG
+        // =========================
         public record HmacProperties(
                         /**
                          * Base64-encoded secret used for HS256 signing/verification.
