@@ -9,7 +9,6 @@ import com.lanny.spring_security_template.application.auth.port.out.SessionRegis
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
-import com.lanny.spring_security_template.domain.exception.RefreshTokenReuseDetectedException;
 import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 
 import lombok.RequiredArgsConstructor;
@@ -97,33 +96,64 @@ public class TokenRotationHandler {
      * <li>Security invariants — metadata and lifecycle remain synchronized.</li>
      * </ul>
      *
-     * @param claims JWT claims extracted from the old refresh token
+    /**
+     * Performs secure refresh-token rotation with family tracking using a six-step process:
+     *
+     * <ol>
+     * <li><strong>Resolve user roles & scopes</strong> used in the new JWT.</li>
+     * <li><strong>Revoke old refresh token</strong> via blacklist to prevent reuse.</li>
+     * <li><strong>Mark old token as revoked</strong> in persistent storage.</li>
+     * <li><strong>Issue new access + refresh tokens</strong> with same familyId.</li>
+     * <li><strong>Persist new token</strong> with link to previous token (chain tracking).</li>
+     * <li><strong>Update session</strong> in the session registry.</li>
+     * </ol>
+     *
+     * <p>
+     * This ensures:
+     * </p>
+     * <ul>
+     * <li>Replay protection — old refresh tokens cannot be reused.</li>
+     * <li>Family tracking — all rotated tokens share the same familyId.</li>
+     * <li>Reuse detection — attempting to use a revoked token triggers family revocation.</li>
+     * <li>Audit trail — token chain preserved via previousTokenJti links.</li>
+     * </ul>
+     *
+     * @param claims   JWT claims extracted from the old refresh token
+     * @param familyId family identifier to maintain across rotation
      * @return {@link JwtResult} containing the newly issued access & refresh tokens
      * @throws IllegalArgumentException if any step of the rotation fails
      */
-    public JwtResult rotate(JwtClaimsDTO claims) {
+    public JwtResult rotate(JwtClaimsDTO claims, String familyId) {
 
         String username = claims.sub();
+        String oldJti = claims.jti();
 
         // 1. Resolve roles + scopes for token issuance
         RoleScopeResult rs = RoleScopeResolver.resolve(username, roleProvider, scopePolicy);
 
-        // 2. Revoke the old refresh token
-        blacklist.revoke(claims.jti(), Instant.ofEpochSecond(claims.exp()));
+        // 2. Revoke the old refresh token in blacklist (fast revocation)
+        blacklist.revoke(oldJti, Instant.ofEpochSecond(claims.exp()));
 
-        // 3. Atomically consume old refresh token metadata
-        boolean consumed = refreshTokenStore.consume(claims.jti());
-
-        if (!consumed) {
-            throw new RefreshTokenReuseDetectedException("Refresh token reuse detected");
-        }
-        sessionRegistry.removeSession(username, claims.jti());
+        // 3. Mark old token as revoked in database (for reuse detection)
+        refreshTokenStore.revoke(oldJti);
+        sessionRegistry.removeSession(username, oldJti);
 
         // 4. Issue new access & refresh pair
         IssuedTokens tokens = tokenIssuer.issueTokens(username, rs);
 
-        // 5. Persist new session
-        refreshTokenStore.save(username, tokens.refreshJti(), tokens.issuedAt(), tokens.refreshExp());
+        // 5. Persist new token with family tracking
+        // - Same familyId as the rotated token
+        // - Link to previous token via previousTokenJti
+        refreshTokenStore.save(
+                username,
+                tokens.refreshJti(),
+                familyId,               // Inherit family from rotated token
+                oldJti,                 // Link to previous token in chain
+                tokens.issuedAt(),
+                tokens.refreshExp()
+        );
+
+        // 6. Update session registry with new JTI
         sessionRegistry.registerSession(username, tokens.refreshJti(), tokens.refreshExp());
 
         return tokens.toJwtResult();

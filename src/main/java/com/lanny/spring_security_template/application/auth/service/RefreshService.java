@@ -58,7 +58,8 @@ public class RefreshService {
      * <ol>
      * <li>Extract and validate JWT claims from the refresh token</li>
      * <li>Perform domain-level refresh-token validation</li>
-     * <li>Either rotate the refresh token or reuse it</li>
+     * <li>Check for reuse detection (revoked token = attack)</li>
+     * <li>Rotate the refresh token with family tracking</li>
      * <li>Return a {@link JwtResult} for the client</li>
      * </ol>
      *
@@ -68,6 +69,8 @@ public class RefreshService {
      * @throws IllegalArgumentException
      *                                  if the refresh token is invalid, expired,
      *                                  revoked, or malformed
+     * @throws RefreshTokenReuseDetectedException
+     *                                  if token reuse is detected (security breach)
      */
     public JwtResult refresh(RefreshCommand cmd) {
 
@@ -77,26 +80,53 @@ public class RefreshService {
     }
 
     /**
-     * Applies validation and rotation rules to the extracted JWT claims.
+     * Applies validation, reuse detection, and rotation rules to the extracted JWT claims.
+     *
+     * <p>
+     * <b>Reuse Detection Flow:</b>
+     * <ol>
+     * <li>Lookup token in database by JTI</li>
+     * <li>If token is revoked → REUSE DETECTED → Revoke entire family</li>
+     * <li>If token is valid → Revoke it (normal rotation)</li>
+     * <li>Issue new token with same familyId</li>
+     * </ol>
+     * </p>
      *
      * @param claims validated JWT claims obtained from the provider
      * @param cmd    the refresh command containing the original refresh token
      * @return a new {@link JwtResult}
+     * @throws RefreshTokenReuseDetectedException if token reuse is detected
      */
     private JwtResult handleRefresh(JwtClaimsDTO claims, RefreshCommand cmd) {
         // Validate token signature, expiration, JTI, and security rules
         validator.validate(claims);
 
-        boolean consumed = refreshTokenStore.consume(claims.jti());
+        // Lookup token in database
+        var tokenData = refreshTokenStore.findByJti(claims.jti())
+                .orElseThrow(() -> new IllegalArgumentException("Refresh token not found"));
 
-        if (!consumed) {
-            throw new RefreshTokenReuseDetectedException("Refresh token reuse detected");
-
+        // REUSE DETECTION: If token is already revoked, attacker is trying to reuse it
+        if (tokenData.revoked()) {
+            // Revoke entire family (all tokens in the rotation chain)
+            refreshTokenStore.revokeFamily(tokenData.familyId());
+            
+            throw new RefreshTokenReuseDetectedException(
+                    "Refresh token reuse detected for family: " + tokenData.familyId() + 
+                    ". All tokens in this family have been revoked.");
         }
+
+        // Check if token is expired
+        if (tokenData.isExpired(java.time.Instant.now())) {
+            throw new IllegalArgumentException("Refresh token expired");
+        }
+
+        // Normal flow: revoke current token and issue new one
+        refreshTokenStore.revoke(claims.jti());
 
         // Determine if refresh token rotation is required
         if (rotationHandler.shouldRotate()) {
-            return rotationHandler.rotate(claims);
+            // Rotate with family tracking (new token inherits same familyId)
+            return rotationHandler.rotate(claims, tokenData.familyId());
         }
 
         // Otherwise return only a new access token, reusing the same refresh token
