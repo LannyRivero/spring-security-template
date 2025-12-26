@@ -3,6 +3,7 @@ package com.lanny.spring_security_template.infrastructure.security;
 import com.lanny.spring_security_template.application.auth.port.out.JwtValidator;
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
+import com.lanny.spring_security_template.infrastructure.jwt.JwtAuthoritiesMapper;
 import com.lanny.spring_security_template.infrastructure.security.jwt.JwtAuthFailureReason;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidTokenTypeException;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.NoAuthoritiesException;
@@ -12,6 +13,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.var;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -19,15 +22,12 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 
 import static com.lanny.spring_security_template.infrastructure.observability.MdcKeys.*;
 
@@ -79,12 +79,15 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
   private final JwtValidator jwtValidator;
   private final TokenBlacklistGateway tokenBlacklistGateway;
+  private final JwtAuthoritiesMapper authoritiesMapper;
 
   public JwtAuthorizationFilter(
       JwtValidator jwtValidator,
-      TokenBlacklistGateway tokenBlacklistGateway) {
+      TokenBlacklistGateway tokenBlacklistGateway,
+      JwtAuthoritiesMapper authoritiesMapper) {
     this.jwtValidator = jwtValidator;
     this.tokenBlacklistGateway = tokenBlacklistGateway;
+    this.authoritiesMapper = authoritiesMapper;
   }
 
   /**
@@ -141,24 +144,16 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
         throw new TokenRevokedException();
       }
 
-      Set<SimpleGrantedAuthority> authorities = new HashSet<>();
-
-      claims.roles()
-          .forEach(role -> authorities.add(new SimpleGrantedAuthority(role)));
-
-      claims.scopes()
-          .forEach(scope -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope)));
-
-      if (authorities.isEmpty()) {
-        throw new NoAuthoritiesException();
-      }
+      var authorities = authoritiesMapper.map(claims);
 
       var authentication = new UsernamePasswordAuthenticationToken(
           claims.sub(),
           null,
           authorities);
 
-      SecurityContextHolder.getContext().setAuthentication(authentication);
+      SecurityContextHolder.getContext()
+          .setAuthentication(authentication);
+
       MDC.put(USERNAME, claims.sub());
 
     } catch (Exception ex) {
@@ -181,27 +176,11 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
     }
   }
 
-  /**
-   * Maps JWT authorization exceptions to controlled failure reasons.
-   *
-   * <p>
-   * This method ensures:
-   * </p>
-   * <ul>
-   * <li>No raw exception messages are logged</li>
-   * <li>Failure reasons are finite and auditable</li>
-   * <li>Logs are safe for production environments</li>
-   * </ul>
-   *
-   * @param ex exception thrown during JWT validation or authorization
-   * @return mapped authorization failure reason
-   */
   private JwtAuthFailureReason mapFailureReason(Exception ex) {
 
     if (ex instanceof TokenRevokedException) {
       return JwtAuthFailureReason.TOKEN_REVOKED;
     }
-
     if (ex instanceof InvalidTokenTypeException) {
       return JwtAuthFailureReason.INVALID_TYPE;
     }
@@ -211,7 +190,6 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
     if (ex instanceof IllegalArgumentException) {
       return JwtAuthFailureReason.INVALID_CLAIMS;
     }
-
     return JwtAuthFailureReason.UNKNOWN;
   }
 }
