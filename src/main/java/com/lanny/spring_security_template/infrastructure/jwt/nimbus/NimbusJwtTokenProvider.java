@@ -125,10 +125,7 @@ public class NimbusJwtTokenProvider implements TokenProvider {
             }
             return jti;
         } catch (Exception ex) {
-            if (ex instanceof IllegalArgumentException) {
-                throw (IllegalArgumentException) ex;
-            }
-            throw new IllegalArgumentException("Invalid JWT token", ex);
+                throw new IllegalArgumentException("Invalid JWT token", ex);
         }
     }
 
