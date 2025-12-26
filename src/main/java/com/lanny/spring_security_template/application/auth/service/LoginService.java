@@ -81,30 +81,32 @@ public class LoginService {
         String username = cmd.username();
 
         try {
-            // Validate credentials using domain rules
+            // Validate credentials (pure domain rule)
             var user = validator.validate(cmd);
 
+            // Successful login → reset policy state
             loginAttemptPolicy.resetAttempts(username);
 
-            // 3. Generate and persist session tokens
+            // Issue tokens
             JwtResult result = tokenCreator.create(user.username().value());
-            // 5. Record success metric
+
+            // Record success
             metrics.recordSuccess(username);
 
             return result;
 
-        } catch (InvalidCredentialsException | UserNotFoundException e) {
+        } catch (InvalidCredentialsException | UserNotFoundException ex) {
 
-            LoginAttemptResult result = loginAttemptPolicy.registerAttempt(username);
+            // Register failed attempt (policy decides outcome)
+            LoginAttemptResult attempt = loginAttemptPolicy.registerAttempt(username);
 
-            if (result.blocked()) {
+            if (!attempt.allowed()) {
                 metrics.recordFailure(username, "User locked");
                 throw new UserLockedException(username);
             }
 
             metrics.recordFailure(username, "Invalid credentials");
-
-            throw e;
+            throw ex;
         }
     }
 }
