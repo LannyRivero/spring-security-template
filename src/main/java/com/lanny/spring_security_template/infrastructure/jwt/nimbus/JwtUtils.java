@@ -40,13 +40,12 @@ import com.nimbusds.jwt.SignedJWT;
  * </ul>
  *
  * <p>
- * This class performs NO authorization decisions.
- * Semantic meaning is handled by higher layers.
- * 
+ * This class performs NO authorization decisions; it only handles token generation
+ * and validation.
+ *
  * IMPORTANT:
- * This class must not be used directly for authorization decisions.
- * Use JwtValidator / StrictJwtValidator instead.
- * </p>
+ * Do not use this class directly for authorization decisions; use
+ * JwtValidator or StrictJwtValidator instead.
  */
 @Component
 public final class JwtUtils {

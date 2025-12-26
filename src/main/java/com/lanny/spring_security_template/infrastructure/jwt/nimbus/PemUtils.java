@@ -239,6 +239,6 @@ public final class PemUtils {
             return Files.readString(path, StandardCharsets.UTF_8);
         }
 
-        throw new JwtKeyLoadingException("rsa.key.not_found");
+        throw new JwtKeyLoadingException("rsa.key.not_found: " + location);
     }
 }

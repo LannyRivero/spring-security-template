@@ -16,6 +16,6 @@ package com.lanny.spring_security_template.infrastructure.security.jwt.exception
 public class InvalidJwtIssuerException extends RuntimeException {
 
     public InvalidJwtIssuerException() {
-        super("Invalid JWT issuer");
+        super();
     }
 }

@@ -132,7 +132,9 @@ public class StrictJwtValidator implements JwtValidator {
     private List<String> safeList(JWTClaimsSet claims, String name) {
         try {
             List<String> values = claims.getStringListClaim(name);
-            return values != null ? List.copyOf(values) : List.of();
+
+            // Create an unmodifiable defensive copy of the claim values.
+            return values != null ? List.copyOf(values) : List.of();           
         } catch (Exception ex) {
             return List.of();
         }
