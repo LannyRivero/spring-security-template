@@ -4,6 +4,9 @@ import com.lanny.spring_security_template.application.auth.port.out.JwtValidator
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.infrastructure.security.jwt.JwtAuthFailureReason;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidTokenTypeException;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.NoAuthoritiesException;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.TokenRevokedException;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,7 +18,6 @@ import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -119,16 +121,6 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
       @NonNull FilterChain chain)
       throws ServletException, IOException {
 
-    String path = request.getRequestURI();
-
-    // Public endpoints
-    if (path.startsWith("/actuator")
-        || path.startsWith("/v3/api-docs")
-        || path.startsWith("/swagger-ui")) {
-      chain.doFilter(request, response);
-      return;
-    }
-
     String header = request.getHeader(HttpHeaders.AUTHORIZATION);
 
     if (!StringUtils.hasText(header) || !header.startsWith("Bearer ")) {
@@ -142,11 +134,11 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
       JwtClaimsDTO claims = jwtValidator.validate(token);
 
       if (!claims.isAccessToken()) {
-        throw new BadCredentialsException("TOKEN_TYPE_INVALID");
+        throw new InvalidTokenTypeException();
       }
 
       if (tokenBlacklistGateway.isRevoked(claims.jti())) {
-        throw new BadCredentialsException("TOKEN_REVOKED");
+        throw new TokenRevokedException();
       }
 
       Set<SimpleGrantedAuthority> authorities = new HashSet<>();
@@ -158,7 +150,7 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
           .forEach(scope -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope)));
 
       if (authorities.isEmpty()) {
-        throw new BadCredentialsException("NO_AUTHORITIES");
+        throw new NoAuthoritiesException();
       }
 
       var authentication = new UsernamePasswordAuthenticationToken(
@@ -206,10 +198,16 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
    */
   private JwtAuthFailureReason mapFailureReason(Exception ex) {
 
-    if (ex instanceof BadCredentialsException) {
-      return JwtAuthFailureReason.INVALID_CREDENTIALS;
+    if (ex instanceof TokenRevokedException) {
+      return JwtAuthFailureReason.TOKEN_REVOKED;
     }
 
+    if (ex instanceof InvalidTokenTypeException) {
+      return JwtAuthFailureReason.INVALID_TYPE;
+    }
+    if (ex instanceof NoAuthoritiesException) {
+      return JwtAuthFailureReason.NO_AUTHORITIES;
+    }
     if (ex instanceof IllegalArgumentException) {
       return JwtAuthFailureReason.INVALID_CLAIMS;
     }
