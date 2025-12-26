@@ -1,6 +1,8 @@
 package com.lanny.spring_security_template.infrastructure.jwt;
 
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.NoAuthoritiesException;
+
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
@@ -50,8 +52,7 @@ public class JwtAuthoritiesMapper {
         claims.scopes().forEach(scope -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope)));
 
         if (authorities.isEmpty()) {
-            throw new IllegalStateException(
-                    "Validated JWT contains no authorities");
+            throw new NoAuthoritiesException();
         }
 
         return Set.copyOf(authorities);
