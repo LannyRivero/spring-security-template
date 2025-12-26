@@ -4,6 +4,7 @@ import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.model.UserStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 
 import java.util.Optional;
 
@@ -85,5 +86,5 @@ public interface UserAccountGateway {
      * @param pageable pagination and sorting information
      * @return paginated list of {@link User} aggregates
      */
-    Page<User> findAll(Pageable pageable);
+    Page<User> findAll(@NonNull Pageable pageable);
 }

@@ -7,6 +7,9 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.model.UserStatus;
@@ -138,4 +141,11 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
         // Roles y scopes NO se setean aquí (se gestionan por repos dedicados)
         return entity;
     }
+
+    @Override
+    public Page<User> findAll(@NonNull Pageable pageable) {
+        return userRepository.findAll(pageable)
+                .map(this::toDomain);
+    }
+
 }
