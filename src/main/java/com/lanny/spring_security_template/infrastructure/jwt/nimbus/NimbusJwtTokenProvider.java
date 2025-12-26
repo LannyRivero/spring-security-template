@@ -100,16 +100,22 @@ public class NimbusJwtTokenProvider implements TokenProvider {
 
     @Override
     public String extractSubject(String token) {
-        return validateAndGetClaims(token)
-                .map(JwtClaimsDTO::sub)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid JWT token"));
+        try {
+            JWTClaimsSet claims = jwtUtils.validateAndParse(token);
+            return claims.getSubject();
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Invalid JWT token", ex);
+        }
     }
 
     @Override
     public String extractJti(String token) {
-        return validateAndGetClaims(token)
-                .map(JwtClaimsDTO::jti)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid JWT token"));
+        try {
+            JWTClaimsSet claims = jwtUtils.validateAndParse(token);
+            return claims.getJWTID();
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Invalid JWT token", ex);
+        }
     }
 
     // ============================================================
