@@ -41,7 +41,7 @@ import com.nimbusds.jwt.SignedJWT;
  *
  * <p>
  * This class performs NO authorization decisions; it only handles token generation
- * Do not use this class directly for authorization decisions; use by higher layers.
+ * and validation.
  *
  * IMPORTANT:
  * Do not use this class directly for authorization decisions; use
