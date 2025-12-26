@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.lanny.spring_security_template.application.auth.command.LoginCommand;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
+import com.lanny.spring_security_template.application.auth.policy.LoginAttemptResult;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.exception.UserLockedException;
@@ -58,9 +59,9 @@ class LoginServiceTest {
 
     // ==============================================================================
     @Test
-    @DisplayName("testShouldLoginSuccessfullyWhenCredentialsAreValid")
-    void testShouldLoginSuccessfullyWhenCredentialsAreValid() {
-        when(loginAttemptPolicy.isUserLocked(USERNAME)).thenReturn(false);
+    @DisplayName("Should login successfully when credentials are valid")
+    void shouldLoginSuccessfully() {
+
         when(validator.validate(cmd)).thenReturn(mockUser);
         when(mockUser.username()).thenReturn(Username.of(USERNAME));
         when(tokenCreator.create(USERNAME)).thenReturn(jwtResult);
@@ -69,67 +70,79 @@ class LoginServiceTest {
 
         assertThat(result).isEqualTo(jwtResult);
 
-        verify(loginAttemptPolicy).isUserLocked(USERNAME);
         verify(validator).validate(cmd);
         verify(tokenCreator).create(USERNAME);
         verify(loginAttemptPolicy).resetAttempts(USERNAME);
         verify(metrics).recordSuccess(USERNAME);
 
+        verify(loginAttemptPolicy, never()).registerAttempt(any());
         verify(metrics, never()).recordFailure(any(), any());
     }
 
     // ==============================================================================
     @Test
-    @DisplayName("testShouldThrowUserLockedExceptionWhenUserIsLocked")
-    void testShouldThrowUserLockedExceptionWhenUserIsLocked() {
-        when(loginAttemptPolicy.isUserLocked(USERNAME)).thenReturn(true);
+    @DisplayName("Should throw UserLockedException when policy blocks after failed attempt")
+    void shouldThrowUserLockedExceptionWhenBlocked() {
+
+        when(validator.validate(cmd))
+                .thenThrow(new InvalidCredentialsException("bad creds"));
+
+        when(loginAttemptPolicy.registerAttempt(USERNAME))
+                .thenReturn(new LoginAttemptResult(true, 60));
 
         assertThatThrownBy(() -> loginService.login(cmd))
                 .isInstanceOf(UserLockedException.class);
 
+        verify(loginAttemptPolicy).registerAttempt(USERNAME);
         verify(metrics).recordFailure(eq(USERNAME), contains("User locked"));
-        verifyNoInteractions(validator, tokenCreator);
+        verify(tokenCreator, never()).create(any());
     }
 
     // ==============================================================================
     @Test
-    @DisplayName("testShouldRecordFailureAndThrowInvalidCredentialsException")
-    void testShouldRecordFailureAndThrowInvalidCredentialsException() {
-        when(loginAttemptPolicy.isUserLocked(USERNAME)).thenReturn(false);
+    @DisplayName("Should record failed attempt and throw InvalidCredentialsException when not blocked")
+    void shouldRecordFailedAttemptWhenInvalidCredentials() {
+
         when(validator.validate(cmd))
                 .thenThrow(new InvalidCredentialsException("bad creds"));
+
+        when(loginAttemptPolicy.registerAttempt(USERNAME))
+                .thenReturn(new LoginAttemptResult(false, 0));
 
         assertThatThrownBy(() -> loginService.login(cmd))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(loginAttemptPolicy).recordFailedAttempt(USERNAME);
-        verify(metrics).recordFailure(eq(USERNAME), contains("bad"));
+        verify(loginAttemptPolicy).registerAttempt(USERNAME);
+        verify(metrics).recordFailure(eq(USERNAME), contains("Invalid"));
         verify(metrics, never()).recordSuccess(any());
-        verifyNoInteractions(tokenCreator);
+        verify(tokenCreator, never()).create(any());
     }
 
     // ==============================================================================
     @Test
-    @DisplayName("testShouldRecordFailureAndThrowUserNotFoundException")
-    void testShouldRecordFailureAndThrowUserNotFoundException() {
-        when(loginAttemptPolicy.isUserLocked(USERNAME)).thenReturn(false);
+    @DisplayName("Should record failed attempt and throw UserNotFoundException when not blocked")
+    void shouldRecordFailedAttemptWhenUserNotFound() {
+
         when(validator.validate(cmd))
                 .thenThrow(new UserNotFoundException(USERNAME));
+
+        when(loginAttemptPolicy.registerAttempt(USERNAME))
+                .thenReturn(new LoginAttemptResult(false, 0));
 
         assertThatThrownBy(() -> loginService.login(cmd))
                 .isInstanceOf(UserNotFoundException.class);
 
-        verify(loginAttemptPolicy).recordFailedAttempt(USERNAME);
-        verify(metrics).recordFailure(eq(USERNAME), contains(USERNAME));
+        verify(loginAttemptPolicy).registerAttempt(USERNAME);
+        verify(metrics).recordFailure(eq(USERNAME), contains("Invalid"));
         verify(metrics, never()).recordSuccess(any());
-        verifyNoInteractions(tokenCreator);
+        verify(tokenCreator, never()).create(any());
     }
 
     // ==============================================================================
     @Test
-    @DisplayName("testShouldPropagateUnexpectedExceptionWithoutRecordingMetrics")
-    void testShouldPropagateUnexpectedExceptionWithoutRecordingMetrics() {
-        when(loginAttemptPolicy.isUserLocked(USERNAME)).thenReturn(false);
+    @DisplayName("Should propagate unexpected exception without recording attempts or metrics")
+    void shouldPropagateUnexpectedException() {
+
         when(validator.validate(cmd))
                 .thenThrow(new IllegalStateException("DB issue"));
 
@@ -137,9 +150,10 @@ class LoginServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("DB issue");
 
+        verify(loginAttemptPolicy, never()).registerAttempt(any());
+        verify(loginAttemptPolicy, never()).resetAttempts(any());
         verify(metrics, never()).recordSuccess(any());
         verify(metrics, never()).recordFailure(any(), any());
-        verify(loginAttemptPolicy, never()).recordFailedAttempt(any());
         verifyNoInteractions(tokenCreator);
     }
 }

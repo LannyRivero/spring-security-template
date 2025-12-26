@@ -2,6 +2,7 @@ package com.lanny.spring_security_template.application.auth.service;
 
 import com.lanny.spring_security_template.application.auth.command.LoginCommand;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
+import com.lanny.spring_security_template.application.auth.policy.LoginAttemptResult;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.domain.exception.InvalidCredentialsException;
 import com.lanny.spring_security_template.domain.exception.UserLockedException;
@@ -79,22 +80,14 @@ public class LoginService {
     public JwtResult login(LoginCommand cmd) {
         String username = cmd.username();
 
-        // 1. Check lockout policy
-        if (loginAttemptPolicy.isUserLocked(username)) {
-            metrics.recordFailure(username, "User locked");
-            throw new UserLockedException(username);
-        }
-
         try {
-            // 2. Validate credentials using domain rules
+            // Validate credentials using domain rules
             var user = validator.validate(cmd);
+
+            loginAttemptPolicy.resetAttempts(username);
 
             // 3. Generate and persist session tokens
             JwtResult result = tokenCreator.create(user.username().value());
-
-            // 4. Reset failed attempts after success
-            loginAttemptPolicy.resetAttempts(username);
-
             // 5. Record success metric
             metrics.recordSuccess(username);
 
@@ -102,9 +95,14 @@ public class LoginService {
 
         } catch (InvalidCredentialsException | UserNotFoundException e) {
 
-            // Record failure for login analytics
-            loginAttemptPolicy.recordFailedAttempt(username);
-            metrics.recordFailure(username, e.getMessage());
+            LoginAttemptResult result = loginAttemptPolicy.registerAttempt(username);
+
+            if (result.blocked()) {
+                metrics.recordFailure(username, "User locked");
+                throw new UserLockedException(username);
+            }
+
+            metrics.recordFailure(username, "Invalid credentials");
 
             throw e;
         }
