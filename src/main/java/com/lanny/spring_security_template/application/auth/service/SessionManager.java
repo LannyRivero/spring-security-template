@@ -120,7 +120,7 @@ public class SessionManager {
             blacklist.revoke(jtiToRemove, refreshExp);
 
             // Atomicall consume rfresh token metadata
-            refreshTokenStore.consume(jtiToRemove);
+            refreshTokenStore.revoke(jtiToRemove);
 
             // Remove from session registry
             sessionRegistry.removeSession(username, jtiToRemove);

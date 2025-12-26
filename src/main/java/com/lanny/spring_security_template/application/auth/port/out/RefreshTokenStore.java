@@ -90,7 +90,7 @@ public interface RefreshTokenStore {
      *
      * @param jti unique token identifier to revoke
      */
-    void revoke(String jti);
+    void revoke(String refreshJti);
 
     /**
      * Revokes all tokens in a family.
@@ -125,8 +125,8 @@ public interface RefreshTokenStore {
      * @return true if token was consumed successfully, false if already revoked
      * @deprecated Use {@link #findByJti(String)} + {@link #revoke(String)} for clearer semantics
      */
-    @Deprecated
-    boolean consume(String jti);
+    @Deprecated(since = "1.2", forRemoval = true)
+    void consume(String refreshJti);
 
     /**
      * Deletes all expired refresh tokens.
