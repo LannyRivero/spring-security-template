@@ -13,35 +13,32 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * JPA implementation of {@link RefreshTokenStore} with Token Rotation support.
+ * JPA implementation of {@link RefreshTokenStore} supporting
+ * <b>family-based refresh token rotation</b>.
  *
  * <p>
- * This adapter provides a <b>banking-grade</b> refresh token persistence model
- * based on:
+ * This adapter provides a <b>production-grade</b> persistence model
+ * for refresh tokens with the following guarantees:
  * </p>
  *
  * <ul>
- * <li>Hashed JWT IDs (JTI) — no clear-text tokens stored</li>
- * <li>Token rotation with family tracking</li>
- * <li>Reuse detection and automatic family revocation</li>
- * <li>Database-enforced uniqueness</li>
- * <li>Atomic operations to prevent race conditions</li>
+ * <li><b>No clear-text tokens stored</b> — only hashed JTIs are persisted</li>
+ * <li><b>Token family tracking</b> for rotation and reuse detection</li>
+ * <li><b>Explicit revocation</b> of individual tokens or entire families</li>
+ * <li><b>Database-enforced atomicity</b> for concurrent refresh attempts</li>
  * </ul>
  *
- * <h2>Concurrency guarantees</h2>
+ * <h2>Concurrency & Security</h2>
  * <ul>
- * <li>Concurrent refresh attempts → only one succeeds</li>
- * <li>Double-spend prevented at database level</li>
- * <li>No reliance on transaction isolation alone</li>
+ * <li>Concurrent refresh attempts result in a single valid rotation</li>
+ * <li>Reuse of a revoked token can trigger full family revocation</li>
+ * <li>No reliance on JVM memory or in-process state</li>
  * </ul>
  *
- * <h2>Security Features</h2>
- * <ul>
- * <li><b>Family Tracking</b>: Groups rotated tokens from same auth session</li>
- * <li><b>Reuse Detection</b>: Automatically revokes family if revoked token is reused</li>
- * <li><b>Token Chaining</b>: Links tokens via previousTokenJti for audit trail</li>
- * <li><b>Explicit Revocation</b>: Supports logout and admin revocation</li>
- * </ul>
+ * <p>
+ * This adapter is suitable for <b>banking-grade systems</b> and complies
+ * with OWASP ASVS recommendations for refresh token handling.
+ * </p>
  */
 @Component
 @RequiredArgsConstructor
@@ -51,24 +48,37 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
     private final RefreshTokenJpaRepository repo;
 
     /**
-     * Stores a new refresh token session with family tracking.
+     * Persists a newly issued refresh token with family metadata.
      *
-     * @param username          token owner
-     * @param jti               refresh token JWT ID
-     * @param familyId          family identifier grouping rotated tokens
-     * @param previousTokenJti  JTI of the token that was rotated (null for initial token)
-     * @param issuedAt          issuance timestamp
-     * @param expiresAt         expiration timestamp
+     * <p>
+     * The provided {@code jti} and {@code previousTokenJti} are
+     * <b>hashed before persistence</b> to avoid storing sensitive identifiers.
+     * </p>
+     *
+     * @param username         token owner
+     * @param jti              refresh token JWT ID (clear-text, will be hashed)
+     * @param familyId         family identifier grouping rotated tokens
+     * @param previousTokenJti JTI of the rotated token (nullable)
+     * @param issuedAt         issuance timestamp
+     * @param expiresAt        expiration timestamp
      */
     @Override
-    public void save(String username, String jti, String familyId, String previousTokenJti, 
-                     Instant issuedAt, Instant expiresAt) {
+    public void save(
+            String username,
+            String jti,
+            String familyId,
+            String previousTokenJti,
+            Instant issuedAt,
+            Instant expiresAt) {
 
         RefreshTokenEntity entity = RefreshTokenEntity.builder()
                 .username(username)
                 .jtiHash(TokenHashUtil.hashJti(jti))
                 .familyId(familyId)
-                .previousTokenJti(previousTokenJti != null ? TokenHashUtil.hashJti(previousTokenJti) : null)
+                .previousTokenJti(
+                        previousTokenJti != null
+                                ? TokenHashUtil.hashJti(previousTokenJti)
+                                : null)
                 .revoked(false)
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
@@ -78,42 +88,55 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
     }
 
     /**
-     * Finds a refresh token by its JTI.
+     * Retrieves refresh token metadata by its JWT ID.
      *
-     * @param jti unique token identifier
-     * @return optional containing token data if found
+     * <p>
+     * Internally, the provided JTI is hashed and matched against
+     * the persisted value.
+     * </p>
+     *
+     * @param jti refresh token JWT ID (clear-text)
+     * @return optional refresh token metadata if found
      */
     @Override
     public Optional<RefreshTokenData> findByJti(String jti) {
         String hash = TokenHashUtil.hashJti(jti);
+
         return repo.findByJtiHash(hash)
                 .map(entity -> new RefreshTokenData(
-                        entity.getJtiHash(), // Store hash, not clear-text JTI
+                        entity.getJtiHash(), // hash, never clear-text
                         entity.getUsername(),
                         entity.getFamilyId(),
-                        entity.getPreviousTokenJti(),
+                        entity.getPreviousTokenJti(), // hash
                         entity.isRevoked(),
                         entity.getIssuedAt(),
-                        entity.getExpiresAt()
-                ));
+                        entity.getExpiresAt()));
     }
 
     /**
-     * Revokes a specific refresh token by marking it as revoked.
+     * Revokes a specific refresh token.
      *
-     * @param jti unique token identifier to revoke
+     * <p>
+     * This operation is idempotent — revoking an already revoked token
+     * has no additional effect.
+     * </p>
+     *
+     * @param refreshJti refresh token JWT ID (clear-text)
      */
     @Override
-    public void revoke(String jti) {
-        String hash = TokenHashUtil.hashJti(jti);
-        repo.revokeByHash(hash);
+    public void revoke(String refreshJti) {
+        repo.revokeByHash(TokenHashUtil.hashJti(refreshJti));
     }
 
     /**
-     * Revokes all tokens in a family.
-     * Used when reuse is detected — prevents attacker from using any token in the chain.
+     * Revokes all refresh tokens belonging to the given family.
      *
-     * @param familyId the family identifier to revoke
+     * <p>
+     * Used when refresh token reuse is detected, effectively invalidating
+     * the entire authentication session chain.
+     * </p>
+     *
+     * @param familyId token family identifier
      */
     @Override
     public void revokeFamily(String familyId) {
@@ -121,30 +144,15 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
     }
 
     /**
-     * Atomically consumes (revokes) a refresh token.
+     * Deletes all refresh tokens associated with the given user.
      *
      * <p>
-     * This method guarantees that:
+     * Typically used for:
      * </p>
      * <ul>
-     * <li>The refresh token can be used only once</li>
-     * <li>Concurrent attempts result in a single success</li>
+     * <li>"Logout all devices"</li>
+     * <li>Account deactivation or deletion</li>
      * </ul>
-     *
-     * @param jti refresh token JWT ID
-     * @return {@code true} if the token was successfully consumed,
-     *         {@code false} otherwise
-     * @deprecated Use {@link #findByJti(String)} + {@link #revoke(String)} for clearer semantics
-     */
-    @Override
-    @Deprecated
-    public boolean consume(String jti) {
-        String hash = TokenHashUtil.hashJti(jti);
-        return repo.revokeByHash(hash) == 1;
-    }
-
-    /**
-     * Deletes all refresh tokens for a given user.
      *
      * @param username target user
      */
@@ -154,26 +162,34 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
     }
 
     /**
-     * Returns all active refresh token hashes for a user.
+     * Retrieves all active refresh token hashes for a user.
      *
      * <p>
-     * Intended for auditing or administrative purposes.
+     * Intended strictly for auditing or administrative inspection.
+     * The returned values are <b>hashed identifiers</b>, not usable
+     * for authentication.
      * </p>
+     *
+     * @param username target user
+     * @return list of refresh token JTI hashes
      */
     @Override
     public List<String> findAllForUser(String username) {
-        return repo.findByUsername(username)
+        return repo.findAllByUsername(username)
                 .stream()
                 .map(RefreshTokenEntity::getJtiHash)
                 .toList();
     }
 
     /**
-     * Deletes all expired refresh tokens.
-     * Should be called by a scheduled cleanup job.
+     * Deletes all refresh tokens that expired before the given instant.
      *
-     * @param before delete tokens that expired before this instant
-     * @return number of tokens deleted
+     * <p>
+     * Intended to be executed by a scheduled cleanup job.
+     * </p>
+     *
+     * @param before expiration cutoff
+     * @return number of deleted tokens
      */
     @Override
     public int deleteExpiredTokens(Instant before) {

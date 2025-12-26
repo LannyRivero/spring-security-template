@@ -5,7 +5,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Outbound port for storing and managing Refresh Tokens with Family-Based Rotation.
+ * Outbound port for storing and managing Refresh Tokens with Family-Based
+ * Rotation.
  *
  * <p>
  * This interface abstracts the underlying persistence mechanism
@@ -17,10 +18,14 @@ import java.util.Optional;
  * <p>
  * Implements OWASP-recommended token rotation with reuse detection:
  * <ul>
- * <li><b>Family Tracking</b>: All tokens from the same auth session share a familyId</li>
- * <li><b>Token Chaining</b>: Each rotated token links to its predecessor via previousTokenJti</li>
- * <li><b>Reuse Detection</b>: Attempting to use a revoked token triggers family revocation</li>
- * <li><b>Automatic Mitigation</b>: Entire token family revoked on detected compromise</li>
+ * <li><b>Family Tracking</b>: All tokens from the same auth session share a
+ * familyId</li>
+ * <li><b>Token Chaining</b>: Each rotated token links to its predecessor via
+ * previousTokenJti</li>
+ * <li><b>Reuse Detection</b>: Attempting to use a revoked token triggers family
+ * revocation</li>
+ * <li><b>Automatic Mitigation</b>: Entire token family revoked on detected
+ * compromise</li>
  * </ul>
  * </p>
  *
@@ -43,7 +48,8 @@ import java.util.Optional;
  *
  * <h2>Recommended Implementations</h2>
  * <ul>
- * <li><b>Redis</b>: ideal for production — fast TTL eviction, perfect for sessions</li>
+ * <li><b>Redis</b>: ideal for production — fast TTL eviction, perfect for
+ * sessions</li>
  * <li><b>JPA</b>: valid but heavier — for audit purposes and compliance</li>
  * <li><b>InMemory</b>: for test or demo profiles</li>
  * </ul>
@@ -66,18 +72,21 @@ public interface RefreshTokenStore {
     /**
      * Stores a new refresh token session for the user.
      *
-     * @param username          the owner of the session
-     * @param jti               the unique identifier of the refresh token (JWT ID)
-     * @param familyId          the family identifier grouping rotated tokens
-     * @param previousTokenJti  JTI of the token that was rotated (null for initial token)
-     * @param issuedAt          timestamp when token was issued
-     * @param expiresAt         timestamp when token expires
+     * @param username         the owner of the session
+     * @param jti              the unique identifier of the refresh token (JWT ID)
+     * @param familyId         the family identifier grouping rotated tokens
+     * @param previousTokenJti JTI of the token that was rotated (null for initial
+     *                         token)
+     * @param issuedAt         timestamp when token was issued
+     * @param expiresAt        timestamp when token expires
      */
-    void save(String username, String jti, String familyId, String previousTokenJti, Instant issuedAt, Instant expiresAt);
+    void save(String username, String jti, String familyId, String previousTokenJti, Instant issuedAt,
+            Instant expiresAt);
 
     /**
      * Finds a refresh token by its JTI.
-     * Used to check if token exists and retrieve its metadata (familyId, revoked status, etc.).
+     * Used to check if token exists and retrieve its metadata (familyId, revoked
+     * status, etc.).
      *
      * @param jti unique token identifier
      * @return optional containing token data if found
@@ -90,11 +99,12 @@ public interface RefreshTokenStore {
      *
      * @param jti unique token identifier to revoke
      */
-    void revoke(String jti);
+    void revoke(String refreshJti);
 
     /**
      * Revokes all tokens in a family.
-     * Used when reuse is detected — prevents attacker from using any token in the chain.
+     * Used when reuse is detected — prevents attacker from using any token in the
+     * chain.
      *
      * @param familyId the family identifier to revoke
      */
@@ -118,17 +128,6 @@ public interface RefreshTokenStore {
     List<String> findAllForUser(String username);
 
     /**
-     * Atomically consumes a refresh token (marks as revoked and returns previous state).
-     * Returns true if token was valid (not revoked), false if already revoked (reuse detected).
-     *
-     * @param jti unique token identifier
-     * @return true if token was consumed successfully, false if already revoked
-     * @deprecated Use {@link #findByJti(String)} + {@link #revoke(String)} for clearer semantics
-     */
-    @Deprecated
-    boolean consume(String jti);
-
-    /**
      * Deletes all expired refresh tokens.
      * Should be called by a scheduled cleanup job.
      *
@@ -148,8 +147,7 @@ public interface RefreshTokenStore {
             String previousTokenJti,
             boolean revoked,
             Instant issuedAt,
-            Instant expiresAt
-    ) {
+            Instant expiresAt) {
         /**
          * Checks if token is expired at the given instant.
          */

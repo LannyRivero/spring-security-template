@@ -9,8 +9,4 @@ public final class EmailAlreadyExistsException extends DomainException {
     public EmailAlreadyExistsException(String message) {
         super("ERR-USER-002", "user.email.alreadyExists", message);
     }
-
-    public EmailAlreadyExistsException(String message, Throwable cause) {
-        super("ERR-USER-002", "user.email.alreadyExists", message, cause);
-    }
 }

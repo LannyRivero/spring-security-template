@@ -10,6 +10,10 @@ import com.lanny.spring_security_template.domain.valueobject.Username;
 import com.lanny.spring_security_template.infrastructure.mapper.DomainModelMapper;
 
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -84,4 +88,27 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
                 oldUser.roles(),
                 oldUser.scopes()));
     }
+
+    @Override
+    public Page<User> findAll(Pageable pageable) {
+
+        List<User> users = new ArrayList<>(demoUsers.values());
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), users.size());
+
+        final List<User> pageContent;
+
+        if (start >= users.size()) {
+            pageContent = List.of();
+        } else {
+            pageContent = new ArrayList<>(users.subList(start, end));
+        }
+
+        return new PageImpl<>(
+                Objects.requireNonNull(pageContent),
+                pageable,
+                users.size());
+    }
+
 }
