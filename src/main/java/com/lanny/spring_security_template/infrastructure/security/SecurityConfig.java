@@ -154,7 +154,9 @@ public class SecurityConfig {
         http.addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterAfter(securityHeadersFilter, CorrelationIdFilter.class);
 
-        // Rate limit ONLY auth endpoints
+        // IMPORTANT:
+        // LoginRateLimitingFilter MUST internally restrict itself to AUTH_ENDPOINTS.
+        // This configuration assumes that behavior by contract.
         http.addFilterAfter(loginRateLimitingFilter, SecurityHeadersFilter.class);
 
         // --JWT auth
