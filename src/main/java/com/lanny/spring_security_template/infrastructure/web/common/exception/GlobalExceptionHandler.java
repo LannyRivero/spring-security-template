@@ -1,5 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.web.common.exception;
 
+import com.lanny.spring_security_template.domain.exception.EmailAlreadyExistsException;
+import com.lanny.spring_security_template.domain.exception.UserNotFoundException;
 import com.lanny.spring_security_template.infrastructure.web.common.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -151,5 +153,49 @@ public class GlobalExceptionHandler {
         log.warn("Invalid argument on {}: {}", request.getRequestURI(), ex.getMessage());
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Handles user not found exceptions (404 Not Found).
+     *
+     * @param ex      the exception
+     * @param request the HTTP request
+     * @return 404 Not Found error response
+     */
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFound(
+        UserNotFoundException ex,
+        HttpServletRequest request
+    ) {
+        ErrorResponse response = ErrorResponse.notFound(
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+
+        log.warn("User not found on {}: {}", request.getRequestURI(), ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
+     * Handles email already exists exceptions (409 Conflict).
+     *
+     * @param ex      the exception
+     * @param request the HTTP request
+     * @return 409 Conflict error response
+     */
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleEmailAlreadyExists(
+        EmailAlreadyExistsException ex,
+        HttpServletRequest request
+    ) {
+        ErrorResponse response = ErrorResponse.conflict(
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+
+        log.warn("Email conflict on {}: {}", request.getRequestURI(), ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 }

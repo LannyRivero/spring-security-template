@@ -125,9 +125,9 @@ curl -X GET http://localhost:8080/api/v1/auth/me \
 
 All endpoints are versioned:
 ```
-/api/v1/auth/*    - Authentication endpoints
-/api/v1/users/*   - User management (future)
-/api/v1/profile/* - Profile management (future)
+/api/v1/auth/*      - Authentication endpoints
+/api/v1/users/*     - User management endpoints (admin)
+/api/v1/profile/*   - Profile self-service endpoints
 ```
 
 ### Security Model
@@ -138,39 +138,66 @@ Endpoints are protected by **scopes** (not just roles):
 
 | Scope | Description | Required For |
 |-------|-------------|--------------|
-| `profile:read` | View user profiles | GET /api/v1/auth/me |
-| `profile:write` | Update user profiles | PUT /api/v1/profile |
-| `user:read` | View users | GET /api/v1/users |
-| `user:write` | Create/update users | POST /api/v1/users |
-| `user:delete` | Delete users | DELETE /api/v1/users/{id} |
-| `user:manage` | Full user management | All user operations |
+| `SCOPE_profile:read` | View own profile | GET /api/v1/profile, GET /api/v1/auth/me |
+| `SCOPE_profile:write` | Update own profile | PUT /api/v1/profile |
+| `SCOPE_users:read` | View all users | GET /api/v1/users, GET /api/v1/users/{id} |
+| `SCOPE_users:write` | Manage users | PUT /api/v1/users/{id}/status, DELETE /api/v1/users/{id} |
+| `SCOPE_notifications:read` | Read notifications | Future endpoints |
+| `SCOPE_notifications:write` | Manage notifications | Future endpoints |
 
 #### Roles → Scopes Mapping
 
 Roles contain scopes:
 
 **ROLE_ADMIN**:
-- `user:read`
-- `user:write`
-- `user:delete`
-- `user:manage`
-- `profile:read`
-- `profile:write`
+- `SCOPE_users:read`
+- `SCOPE_users:write`
+- `SCOPE_profile:read`
+- `SCOPE_profile:write`
+- `SCOPE_notifications:read`
+- `SCOPE_notifications:write`
 
 **ROLE_USER**:
-- `profile:read`
-- `profile:write`
+- `SCOPE_profile:read`
+- `SCOPE_profile:write`
 
 **Token Structure**:
 ```json
 {
   "sub": "admin",
   "roles": ["ROLE_ADMIN"],
-  "scopes": ["user:read", "user:write", "user:manage", "profile:read", "profile:write"],
+  "scopes": ["SCOPE_users:read", "SCOPE_users:write", "SCOPE_profile:read", "SCOPE_profile:write", "SCOPE_notifications:read", "SCOPE_notifications:write"],
   "iat": 1703577600,
   "exp": 1703578500
 }
 ```
+
+### Available Endpoints
+
+#### Authentication Endpoints (`/api/v1/auth`)
+
+| Method | Path | Description | Required Scope |
+|--------|------|-------------|----------------|
+| POST | `/login` | Authenticate user, get JWT tokens | None (public) |
+| POST | `/refresh` | Refresh access token using refresh token | None (public) |
+| POST | `/register` | Register new user account | None (public) |
+| GET | `/me` | Get current user information | `SCOPE_profile:read` |
+
+#### User Management Endpoints (`/api/v1/users`)
+
+| Method | Path | Description | Required Scope |
+|--------|------|-------------|----------------|
+| GET | `/` | List all users (paginated) | `SCOPE_users:read` |
+| GET | `/{userId}` | Get specific user by ID | `SCOPE_users:read` |
+| PUT | `/{userId}/status` | Update user account status | `SCOPE_users:write` |
+| DELETE | `/{userId}` | Soft-delete user account | `SCOPE_users:write` |
+
+#### Profile Endpoints (`/api/v1/profile`)
+
+| Method | Path | Description | Required Scope |
+|--------|------|-------------|----------------|
+| GET | `/` | Get current user's profile | `SCOPE_profile:read` |
+| PUT | `/` | Update current user's profile | `SCOPE_profile:write` |
 
 ---
 
