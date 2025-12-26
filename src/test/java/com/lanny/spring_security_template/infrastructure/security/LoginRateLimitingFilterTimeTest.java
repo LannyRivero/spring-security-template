@@ -22,7 +22,7 @@ class LoginRateLimitingFilterTimeTest {
                 java.time.Instant.parse("2030-01-01T00:00:00Z")
         );
 
-        LoginRateLimitingFilter filter = new LoginRateLimitingFilter(clock, 5, 60);
+        LoginRateLimitingFilter filter = new LoginRateLimitingFilter(clock);
 
         HttpServletRequest req = mock(HttpServletRequest.class);
         HttpServletResponse res = mock(HttpServletResponse.class);
