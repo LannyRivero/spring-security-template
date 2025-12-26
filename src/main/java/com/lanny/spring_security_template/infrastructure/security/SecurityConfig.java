@@ -87,6 +87,18 @@ import org.springframework.web.cors.*;
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
+    private static final String[] PUBLIC_ENDPOINTS = {
+            "/actuator/health/**",
+            "/actuator/info",
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+    };
+
+    private static final String[] AUTH_ENDPOINTS = {
+            "/api/v1/auth/login",
+            "/api/v1/auth/refresh"
+    };
+
     private final JwtAuthorizationFilter jwtAuthz;
     private final CustomAuthEntryPoint entryPoint;
     private final CustomAccessDeniedHandler deniedHandler;
@@ -112,16 +124,6 @@ public class SecurityConfig {
         this.correlationIdFilter = correlationIdFilter;
     }
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-    }
-
     /**
      * Defines the main Spring Security filter chain.
      *
@@ -144,31 +146,23 @@ public class SecurityConfig {
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(deniedHandler))
                 .authorizeHttpRequests(auth -> auth
-
-                        // ---Public system endpoints ---
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers("/actuator/info").permitAll()
-
-                        // --Open API / Swagger ---
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
-
-                        // --Auth pucblic endpoints --
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
-
-                        // --Everything else protected --
+                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers(HttpMethod.POST, AUTH_ENDPOINTS).permitAll()
                         .anyRequest().authenticated());
 
-        // ---Filter order: explicit & stable--
+        // ---Filter order: explicit & documented--
         http.addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterAfter(securityHeadersFilter, CorrelationIdFilter.class);
 
-        // --Rate limit only on login/refresh(ideal: inside filter via RequestMatcher)
+        // IMPORTANT:
+        // LoginRateLimitingFilter MUST internally restrict itself to AUTH_ENDPOINTS.
+        // This configuration assumes that behavior by contract.
         http.addFilterAfter(loginRateLimitingFilter, SecurityHeadersFilter.class);
 
         // --JWT auth
         http.addFilterAfter(jwtAuthz, LoginRateLimitingFilter.class);
 
-        // --No cache after auth
+        // Disable caching for authenticated responses
         http.addFilterAfter(authNoCacheFilter, JwtAuthorizationFilter.class);
 
         return http.build();
@@ -199,5 +193,15 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);
         return source;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 }

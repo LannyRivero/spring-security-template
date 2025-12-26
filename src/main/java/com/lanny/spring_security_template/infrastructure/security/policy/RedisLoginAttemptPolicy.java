@@ -1,14 +1,18 @@
 package com.lanny.spring_security_template.infrastructure.security.policy;
 
 import java.time.Duration;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
+import com.lanny.spring_security_template.application.auth.policy.LoginAttemptResult;
 import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
+import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,63 +26,53 @@ import lombok.RequiredArgsConstructor;
  */
 @Component
 @RequiredArgsConstructor
+@Profile("prod")
 public class RedisLoginAttemptPolicy implements LoginAttemptPolicy {
 
     private static final Logger log = LoggerFactory.getLogger(RedisLoginAttemptPolicy.class);
 
     private final StringRedisTemplate redis;
+    private final RateLimitingProperties props;
     private final AuthMetricsService metrics;
 
-    private static final int MAX_ATTEMPTS = 3;
-    private static final Duration LOCK_TTL = Duration.ofMinutes(5);
-
-    @SuppressWarnings({ "null" })
     @Override
-    public boolean isUserLocked(String username) {
-        final var ops = redis.opsForValue();
-        final String key = key(username);
-        final String value = (String) ops.get(key);
+    public LoginAttemptResult registerAttempt(String key) {
 
-        if (value == null || value.isEmpty())
-            return false;
+        String attemptsKey = "login:attempts:" + key;
+        String blockKey = "login:block:" + key;
 
-        int attempts = Integer.parseInt(value);
-        boolean locked = attempts >= MAX_ATTEMPTS;
-
-        if (locked) {
-            log.warn("[AUTH_LOCK] User '{}' temporarily locked ({} failed attempts)", username, attempts);
+        // Already blocked?
+        Long blockTtl = redis.getExpire(blockKey);
+        if (blockTtl != null && blockTtl > 0) {
+            return new LoginAttemptResult(true, blockTtl);
         }
-        return locked;
-    }
 
-    @SuppressWarnings({ "null" })
-    @Override
-    public void recordFailedAttempt(String username) {
-        String key = key(username);
-        Long attempts = redis.opsForValue().increment(key);
+        // Increment attempts (atomic)
+        Long attempts = redis.opsForValue().increment(attemptsKey);
 
         if (attempts != null && attempts == 1L) {
-            redis.expire(key, LOCK_TTL);
+            redis.expire(attemptsKey, Objects.requireNonNull(Duration.ofSeconds(props.window())));
         }
 
-        if (attempts != null && attempts >= MAX_ATTEMPTS) {
+        if (attempts != null && attempts > props.maxAttempts()) {
+
+            redis.opsForValue().set(blockKey, "1");
+            redis.expire(blockKey, Objects.requireNonNull(Duration.ofSeconds(props.blockSeconds())));
+            redis.delete(attemptsKey);
+
             metrics.recordBruteForceDetected();
-            log.warn("[AUTH_BRUTEFORCE] User '{}' reached {} failed attempts → LOCKED for {} min",
-                    username, MAX_ATTEMPTS, LOCK_TTL.toMinutes());
-        } else {
-            log.info("[AUTH_FAIL] User '{}' failed login ({} / {})", username, attempts, MAX_ATTEMPTS);
+
+            log.warn("[AUTH_BRUTEFORCE] login blocked key={}", key);
+
+            return new LoginAttemptResult(true, props.retryAfter());
         }
+
+        return new LoginAttemptResult(false, 0);
     }
 
-    @SuppressWarnings({ "null" })
     @Override
-    public void resetAttempts(String username) {
-        String keyToDelete = key(username);
-        redis.delete(keyToDelete);
-        log.debug("[AUTH_RESET] Failed attempts reset for user '{}'", username);
-    }
-
-    private String key(String username) {
-        return "login:attempts:" + username.toLowerCase();
+    public void resetAttempts(String key) {
+        redis.delete("login:attempts:" + key);
+        redis.delete("login:block:" + key);
     }
 }

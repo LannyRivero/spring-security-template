@@ -14,50 +14,41 @@ package com.lanny.spring_security_template.application.auth.policy;
  * an in-memory cache — to store login attempts and enforce TTL-based unlocks.
  * </p>
  *
- * <p><strong>Responsibilities:</strong></p>
+ * <p>
+ * <strong>Responsibilities:</strong>
+ * </p>
  * <ul>
- *   <li>Track failed login attempts per username.</li>
- *   <li>Determine if a user is currently locked out.</li>
- *   <li>Reset counters after a successful login.</li>
+ * <li>Track failed login attempts per username.</li>
+ * <li>Determine if a user is currently locked out.</li>
+ * <li>Reset counters after a successful login.</li>
  * </ul>
  *
- * <p><strong>Enterprise recommendations:</strong></p>
+ * <p>
+ * <strong>Enterprise recommendations:</strong>
+ * </p>
  * <ul>
- *   <li>Redis-based implementation is ideal for distributed applications.</li>
- *   <li>Policies should be configurable via external properties.</li>
- *   <li>Never expose lockout status to the client to prevent enumeration.</li>
+ * <li>Redis-based implementation is ideal for distributed applications.</li>
+ * <li>Policies should be configurable via external properties.</li>
+ * <li>Never expose lockout status to the client to prevent enumeration.</li>
  * </ul>
  */
 public interface LoginAttemptPolicy {
 
     /**
-     * Checks whether the given user is temporarily locked due to
-     * excessive failed login attempts.
+     * Registers a login attempt and decides whether the request
+     * must be blocked.
      *
-     * @param username unique identifier of the user attempting to authenticate
-     * @return {@code true} if the user is locked and should be prevented from logging in
-     */
-    boolean isUserLocked(String username);
-
-    /**
-     * Records a failed login attempt for the given user.
      * <p>
-     * Implementations should increment a counter and, if the threshold is reached,
-     * start a lockout period.
+     * This operation MUST be atomic in distributed implementations.
      * </p>
      *
-     * @param username user whose attempt failed
+     * @param key rate-limit key (username, ip, or composite)
+     * @return evaluation result
      */
-    void recordFailedAttempt(String username);
+    LoginAttemptResult registerAttempt(String key);
 
     /**
-     * Resets the failed attempt counter for the given user.
-     * <p>
-     * Called automatically after a successful authentication.
-     * </p>
-     *
-     * @param username user whose attempts should be reset
+     * Resets the attempts after a successful authentication.
      */
-    void resetAttempts(String username);
+    void resetAttempts(String key);
 }
-
