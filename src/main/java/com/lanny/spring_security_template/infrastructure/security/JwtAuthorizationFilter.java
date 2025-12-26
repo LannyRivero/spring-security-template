@@ -13,7 +13,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.var;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
