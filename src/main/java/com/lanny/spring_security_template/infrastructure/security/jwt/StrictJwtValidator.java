@@ -133,8 +133,8 @@ public class StrictJwtValidator implements JwtValidator {
         try {
             List<String> values = claims.getStringListClaim(name);
 
-            // Nimbus JWT typically returns an immutable list here; avoid an extra defensive copy for performance.
-            return values != null ? List.copyOf(values) : List.of();            
+            // Create an unmodifiable defensive copy of the claim values.
+            return values != null ? List.copyOf(values) : List.of();           
         } catch (Exception ex) {
             return List.of();
         }
