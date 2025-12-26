@@ -14,33 +14,35 @@ import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
+import com.lanny.spring_security_template.infrastructure.jwt.exception.JwtKeyLoadingException;
+
 /**
  * {@code PemUtils}
  *
  * <p>
- * Utility class for loading RSA keys from PEM-encoded sources.
+ * Low-level utility for loading RSA keys from PEM-encoded sources.
  * </p>
  *
- * <h3>Supported formats</h3>
+ * <h2>Supported formats</h2>
  * <ul>
- * <li>PKCS#8 private keys ({@code BEGIN PRIVATE KEY})</li>
- * <li>PKCS#1 private keys ({@code BEGIN RSA PRIVATE KEY})</li>
- * <li>X.509 public keys ({@code BEGIN PUBLIC KEY})</li>
+ * <li>PKCS#8 private keys ({@code -----BEGIN PRIVATE KEY-----})</li>
+ * <li>PKCS#1 private keys ({@code -----BEGIN RSA PRIVATE KEY-----})</li>
+ * <li>X.509 public keys ({@code -----BEGIN PUBLIC KEY-----})</li>
  * </ul>
  *
- * <p>
- * Keys can be loaded from:
- * </p>
+ * <h2>Supported sources</h2>
  * <ul>
  * <li>Classpath resources</li>
  * <li>Filesystem paths</li>
- * <li>{@link InputStream} (KMS, Vault, remote sources)</li>
+ * <li>{@link InputStream} (KMS, Vault, Secrets Managers)</li>
  * </ul>
  *
- * <p>
- * Fail-fast behavior is enforced: invalid or unsupported keys
- * will prevent application startup.
- * </p>
+ * <h2>Design guarantees</h2>
+ * <ul>
+ * <li>Fail-fast: invalid keys prevent application startup</li>
+ * <li>No external crypto dependencies</li>
+ * <li>Infrastructure-only responsibility</li>
+ * </ul>
  */
 public final class PemUtils {
 
@@ -56,7 +58,7 @@ public final class PemUtils {
         try {
             return parsePrivateKey(loadPem(location));
         } catch (Exception e) {
-            throw new IllegalStateException("Cannot read RSA private key", e);
+            throw new JwtKeyLoadingException("rsa.private.load_failed", e);
         }
     }
 
@@ -64,7 +66,7 @@ public final class PemUtils {
         try {
             return parsePublicKey(loadPem(location));
         } catch (Exception e) {
-            throw new IllegalStateException("Cannot read RSA public key", e);
+            throw new JwtKeyLoadingException("rsa.public.load_failed", e);
         }
     }
 
@@ -76,7 +78,7 @@ public final class PemUtils {
         try {
             return parsePrivateKey(new String(is.readAllBytes(), StandardCharsets.UTF_8));
         } catch (Exception e) {
-            throw new IllegalStateException("Cannot read RSA private key from stream", e);
+            throw new JwtKeyLoadingException("rsa.private.load_failed", e);
         }
     }
 
@@ -84,7 +86,7 @@ public final class PemUtils {
         try {
             return parsePublicKey(new String(is.readAllBytes(), StandardCharsets.UTF_8));
         } catch (Exception e) {
-            throw new IllegalStateException("Cannot read RSA public key from stream", e);
+            throw new JwtKeyLoadingException("rsa.public.load_failed", e);
         }
     }
 
@@ -107,14 +109,14 @@ public final class PemUtils {
             return parsePkcs1PrivateKey(decoded);
         }
 
-        throw new IllegalArgumentException(
-                "Unsupported RSA private key format. Expected PKCS#8 or PKCS#1.");
+        throw new JwtKeyLoadingException("rsa.private.unsupported_format");
     }
 
     private static RSAPublicKey parsePublicKey(String pem) throws Exception {
         if (!pem.contains("BEGIN PUBLIC KEY")) {
-            throw new IllegalArgumentException("Invalid RSA public key format");
+            throw new JwtKeyLoadingException("rsa.public.invalid_format");
         }
+
         byte[] decoded = decodePem(pem);
         return (RSAPublicKey) KeyFactory.getInstance("RSA")
                 .generatePublic(new X509EncodedKeySpec(decoded));
@@ -125,22 +127,23 @@ public final class PemUtils {
                 .replaceAll("-----BEGIN ([A-Z ]+)-----", "")
                 .replaceAll("-----END ([A-Z ]+)-----", "")
                 .replaceAll("\\s+", "");
+
         return Base64.getDecoder().decode(sanitized);
     }
 
     // ==========================================================
-    // PKCS#1 ASN.1 DER parsing (robust)
+    // PKCS#1 ASN.1 DER parsing
     // ==========================================================
 
     private static RSAPrivateKey parsePkcs1PrivateKey(byte[] data) throws Exception {
+
         int offset = 0;
 
         if (data[offset++] != 0x30) {
-            throw new IllegalArgumentException("Invalid PKCS#1 sequence");
+            throw new JwtKeyLoadingException("rsa.pkcs1.invalid_sequence");
         }
 
         offset += readLengthBytes(data, offset);
-
         offset = skipInteger(data, offset); // version
 
         BigInteger modulus = readInteger(data, offset);
@@ -180,7 +183,7 @@ public final class PemUtils {
     }
 
     // ==========================================================
-    // ASN.1 helpers (short + long form)
+    // ASN.1 helpers
     // ==========================================================
 
     private static int readLength(byte[] data, int offset) {
@@ -202,7 +205,7 @@ public final class PemUtils {
 
     private static BigInteger readInteger(byte[] data, int offset) {
         if (data[offset] != 0x02) {
-            throw new IllegalArgumentException("Expected INTEGER tag");
+            throw new JwtKeyLoadingException("asn1.expected_integer");
         }
         int length = readLength(data, offset + 1);
         int lengthBytes = readLengthBytes(data, offset + 1);
@@ -212,9 +215,6 @@ public final class PemUtils {
     }
 
     private static int skipInteger(byte[] data, int offset) {
-        if (data[offset] != 0x02) {
-            throw new IllegalArgumentException("Expected INTEGER tag");
-        }
         int length = readLength(data, offset + 1);
         int lengthBytes = readLengthBytes(data, offset + 1);
         return offset + 1 + lengthBytes + length;
@@ -226,27 +226,19 @@ public final class PemUtils {
 
     private static String loadPem(String location) throws IOException {
 
-        // Classpath
-        try (InputStream is = PemUtils.class.getResourceAsStream(location)) {
+        String normalized = location.startsWith("/") ? location : "/" + location;
+
+        try (InputStream is = PemUtils.class.getResourceAsStream(normalized)) {
             if (is != null) {
                 return new String(is.readAllBytes(), StandardCharsets.UTF_8);
             }
         }
 
-        if (!location.startsWith("/")) {
-            try (InputStream is = PemUtils.class.getResourceAsStream("/" + location)) {
-                if (is != null) {
-                    return new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                }
-            }
-        }
-
-        // Filesystem
         Path path = Path.of(location);
         if (Files.exists(path)) {
             return Files.readString(path, StandardCharsets.UTF_8);
         }
 
-        throw new IllegalArgumentException("RSA key file not found: " + location);
+        throw new JwtKeyLoadingException("rsa.key.not_found");
     }
 }

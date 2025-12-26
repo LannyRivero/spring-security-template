@@ -4,6 +4,9 @@ import com.lanny.spring_security_template.application.auth.port.out.JwtValidator
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidJwtAudienceException;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidJwtIssuerException;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.MissingJwtClaimException;
 import com.nimbusds.jwt.JWTClaimsSet;
 import org.springframework.stereotype.Component;
 
@@ -53,6 +56,10 @@ import java.util.List;
 @Component
 public class StrictJwtValidator implements JwtValidator {
 
+    private static final String CLAIM_ROLES = "roles";
+    private static final String CLAIM_SCOPES = "scopes";
+    private static final String CLAIM_TOKEN_USE = "token_use";
+
     private final JwtUtils jwtUtils;
     private final SecurityJwtProperties properties;
 
@@ -63,56 +70,55 @@ public class StrictJwtValidator implements JwtValidator {
         this.properties = properties;
     }
 
-    /**
-     * Validates a JWT and returns its verified claims.
-     *
-     * <p>
-     * Validation process:
-     * </p>
-     * <ol>
-     * <li>Cryptographic validation (signature, algorithm, expiration)</li>
-     * <li>Issuer validation</li>
-     * <li>Mandatory claim presence checks</li>
-     * <li>Controlled extraction of roles and scopes</li>
-     * </ol>
-     *
-     * @param token raw JWT string (without {@code Bearer } prefix)
-     * @return verified and normalized JWT claims
-     *
-     * @throws IllegalArgumentException if the token is invalid or fails validation
-     */
     @Override
     public JwtClaimsDTO validate(String token) {
 
-        // Cryptographic validation (signature, header, exp, nbf)
+        // Cryptographic validation (signature, alg, exp, nbf)
         JWTClaimsSet claims = jwtUtils.validateAndParse(token);
 
-        // Strict issuer validation
+        // Issuer validation
         if (!properties.issuer().equals(claims.getIssuer())) {
-            throw new IllegalArgumentException("Invalid token issuer");
+            throw new InvalidJwtIssuerException();
         }
 
         // Mandatory claims
-        if (claims.getSubject() == null || claims.getSubject().isBlank()) {
-            throw new IllegalArgumentException("Missing subject");
+        String subject = claims.getSubject();
+        if (subject == null || subject.isBlank()) {
+            throw new MissingJwtClaimException("sub");
         }
 
-        if (claims.getJWTID() == null || claims.getJWTID().isBlank()) {
-            throw new IllegalArgumentException("Missing jti");
+        String jti = claims.getJWTID();
+        if (jti == null || jti.isBlank()) {
+            throw new MissingJwtClaimException("jti");
         }
 
-        if (claims.getAudience() == null || claims.getAudience().isEmpty()) {
-            throw new IllegalArgumentException("Missing audience");
+        // token_use validation (STRICT)
+        TokenUse tokenUse = TokenUse.from(
+                (String) claims.getClaim(CLAIM_TOKEN_USE));
+
+        // Audience validation (depends on token_use)
+        List<String> audience = claims.getAudience();
+        if (audience == null || audience.isEmpty()) {
+            throw new MissingJwtClaimException("aud");
         }
 
-        // Controlled extraction of roles and scopes
-        List<String> roles = safeList(claims, "roles");
-        List<String> scopes = safeList(claims, "scopes");
+        String expectedAudience = switch (tokenUse) {
+            case ACCESS -> properties.accessAudience();
+            case REFRESH -> properties.refreshAudience();
+        };
+
+        if (!audience.contains(expectedAudience)) {
+            throw new InvalidJwtAudienceException();
+        }
+
+        // Controlled extraction
+        List<String> roles = safeList(claims, CLAIM_ROLES);
+        List<String> scopes = safeList(claims, CLAIM_SCOPES);
 
         return new JwtClaimsDTO(
-                claims.getSubject(),
-                claims.getJWTID(),
-                claims.getAudience(),
+                subject,
+                jti,
+                audience,
                 claims.getIssueTime().toInstant().getEpochSecond(),
                 claims.getNotBeforeTime() != null
                         ? claims.getNotBeforeTime().toInstant().getEpochSecond()
@@ -120,29 +126,13 @@ public class StrictJwtValidator implements JwtValidator {
                 claims.getExpirationTime().toInstant().getEpochSecond(),
                 roles,
                 scopes,
-                (String) claims.getClaim("token_use"));
+                tokenUse.name().toLowerCase());
     }
 
-    /**
-     * Safely extracts a string list claim.
-     *
-     * <p>
-     * This method guarantees:
-     * </p>
-     * <ul>
-     * <li>No exceptions are propagated from malformed claims</li>
-     * <li>Null-safe behavior</li>
-     * <li>Finite cardinality (empty list if missing)</li>
-     * </ul>
-     *
-     * @param claims JWT claims set
-     * @param name   claim name
-     * @return immutable list of claim values or empty list
-     */
     private List<String> safeList(JWTClaimsSet claims, String name) {
         try {
             List<String> values = claims.getStringListClaim(name);
-            return values != null ? values : List.of();
+            return values != null ? List.copyOf(values) : List.of();
         } catch (Exception ex) {
             return List.of();
         }
