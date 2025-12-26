@@ -5,12 +5,9 @@ import com.lanny.spring_security_template.domain.exception.UserNotFoundException
 import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.domain.model.UserStatus;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 /**
  * Application service for user management operations.
