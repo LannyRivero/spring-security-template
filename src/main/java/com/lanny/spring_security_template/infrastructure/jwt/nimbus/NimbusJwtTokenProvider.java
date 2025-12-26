@@ -102,7 +102,12 @@ public class NimbusJwtTokenProvider implements TokenProvider {
     public String extractSubject(String token) {
         try {
             JWTClaimsSet claims = jwtUtils.validateAndParse(token);
-            return claims.getSubject();
+            String subject = claims.getSubject();
+
+            if (subject == null || subject.isBlank()) {
+                throw new IllegalArgumentException("JWT subject (sub) claim is missing or blank");
+            }
+            return subject;
         } catch (Exception ex) {
             throw new IllegalArgumentException("Invalid JWT token", ex);
         }
@@ -112,8 +117,17 @@ public class NimbusJwtTokenProvider implements TokenProvider {
     public String extractJti(String token) {
         try {
             JWTClaimsSet claims = jwtUtils.validateAndParse(token);
-            return claims.getJWTID();
+
+            String jti = claims.getJWTID();
+
+            if (jti == null || jti.isBlank()) {
+                throw new IllegalArgumentException("JWT token does not contain a non-blank jti (JWT ID) claim");
+            }
+            return jti;
         } catch (Exception ex) {
+            if (ex instanceof IllegalArgumentException) {
+                throw (IllegalArgumentException) ex;
+            }
             throw new IllegalArgumentException("Invalid JWT token", ex);
         }
     }
