@@ -96,7 +96,26 @@ web
 
 ---
 
-## 🚀 Características Enterprise
+## � Architecture Decision Records (ADRs)
+
+Todas las decisiones arquitectónicas importantes están documentadas en ADRs:
+
+| ADR | Título | Tags |
+|-----|--------|------|
+| [001](docs/adr/001-nimbus-jwt-library.md) | Nimbus JOSE+JWT vs JJWT | `jwt`, `library` |
+| [002](docs/adr/002-rsa-signature-algorithm.md) | RSA vs HMAC para firma JWT | `cryptography`, `rsa` |
+| [003](docs/adr/003-hexagonal-architecture.md) | Arquitectura Hexagonal + DDD | `architecture`, `ddd` |
+| [004](docs/adr/004-refresh-token-strategy.md) | Estrategia de Refresh Token con Rotación | `security`, `owasp` |
+| [005](docs/adr/005-cryptographic-key-management.md) | Gestión de Claves Criptográficas | `security`, `keys` |
+| [006](docs/adr/006-profile-based-configuration.md) | Estrategia de Profiles | `configuration` |
+| [007](docs/adr/007-redis-blacklist-sessions.md) | Redis para Blacklist y Sessions | `redis`, `scalability` |
+| [008](docs/adr/008-stateless-jwt-authentication.md) | Autenticación Stateless JWT | `authentication` |
+
+📖 **[Ver índice completo de ADRs](docs/adr/README.md)**
+
+---
+
+## �🚀 Características Enterprise
 ### 🔐 Autenticación Nimbus JOSE + JWT (Nivel Corporativo)
 
 - Access tokens autocontenidos
