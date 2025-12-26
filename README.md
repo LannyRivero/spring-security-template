@@ -289,11 +289,78 @@ security.jwt.secret: ${JWT_SECRET_BASE64}
 8. Añadir tus casos de uso (application layer)
 9. Extender roles/scopes según tu dominio
 ---
-## 📘 Swagger UI
 
-```bash
+## 📘 OpenAPI Documentation (Swagger UI)
+
+### 🌐 Acceso a la Documentación
+
+La documentación OpenAPI está disponible en:
+
+```
 http://localhost:8080/swagger-ui/index.html
 ```
+
+**URLs alternativas**:
+- `/swagger-ui.html` (redirect)
+- `/v3/api-docs` (OpenAPI JSON spec)
+- `/v3/api-docs.yaml` (OpenAPI YAML spec)
+
+### 🔒 Autenticación en Swagger UI
+
+1. **Login** usando `POST /api/v1/auth/login`:
+   ```json
+   {
+     "usernameOrEmail": "admin",
+     "password": "admin123"
+   }
+   ```
+
+2. **Copiar el `accessToken`** de la respuesta
+
+3. Click en **"Authorize" 🔒** (arriba a la derecha)
+
+4. **Pegar el token** (sin "Bearer " prefix) y click "Authorize"
+
+5. **Probar endpoints protegidos** - todos los requests incluirán el JWT automáticamente
+
+### 🎯 Features Enterprise
+
+- ✅ **Security Schemes**: JWT Bearer authentication con scopes documentados
+- ✅ **Ejemplos Completos**: Request/Response examples para cada endpoint
+- ✅ **Error Responses**: Formato estandarizado RFC 9457 Problem Details
+- ✅ **Scopes Documentados**: Cada endpoint muestra los scopes requeridos
+- ✅ **Validaciones**: Todas las validaciones documentadas en schemas
+- ✅ **Try it Out**: Prueba endpoints directamente desde Swagger UI
+
+### 📚 Documentación Completa
+
+Para guía detallada de uso, ver: **[OpenAPI Guide](docs/guides/openapi-guide.md)**
+
+**Incluye**:
+- Autenticación paso a paso
+- Estructura de la API y versionado
+- Modelo de seguridad (scopes + roles)
+- Formato de errores estandarizado
+- Cómo extender la documentación
+- Best practices y troubleshooting
+
+### 🔐 Usuarios Pre-Seeded (Dev/Demo)
+
+| Username | Password | Role | Scopes |
+|----------|----------|------|--------|
+| `admin` | `admin123` | ROLE_ADMIN | `user:manage`, `profile:read`, `profile:write` |
+| `user` | `user123` | ROLE_USER | `profile:read`, `profile:write` |
+
+### ⚠️ Disponibilidad
+
+OpenAPI documentation está **SOLO disponible** en:
+- ✅ `dev` profile
+- ✅ `local` profile  
+- ✅ `demo` profile
+- ✅ `test` profile
+
+❌ **DESHABILITADO en `prod`** por seguridad (prevenir exposición de estructura de API)
+
 ---
 ## 📦 Stack Técnico
 
