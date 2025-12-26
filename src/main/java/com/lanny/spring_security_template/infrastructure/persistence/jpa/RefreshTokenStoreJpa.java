@@ -175,7 +175,7 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
      */
     @Override
     public List<String> findAllForUser(String username) {
-        return repo.findByUsername(username)
+        return repo.findAllByUsername(username)
                 .stream()
                 .map(RefreshTokenEntity::getJtiHash)
                 .toList();

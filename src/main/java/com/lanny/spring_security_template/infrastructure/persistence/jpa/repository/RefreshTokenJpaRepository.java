@@ -2,8 +2,6 @@ package com.lanny.spring_security_template.infrastructure.persistence.jpa.reposi
 
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.RefreshTokenEntity;
 
-import io.micrometer.common.lang.NonNullApi;
-
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -13,7 +11,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-@NonNullApi
 public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenEntity, Long> {
 
     /**
