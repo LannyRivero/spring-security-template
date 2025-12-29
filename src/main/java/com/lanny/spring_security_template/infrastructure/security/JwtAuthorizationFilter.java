@@ -38,36 +38,25 @@ import static com.lanny.spring_security_template.infrastructure.observability.Md
  * using <b>access tokens only</b>.
  * </p>
  *
- * <p>
- * This filter:
- * </p>
+ * <h2>Responsibilities</h2>
  * <ul>
- * <li>Extracts and validates JWT access tokens from the
- * {@code Authorization: Bearer <token>} header</li>
- * <li>Rejects refresh tokens explicitly</li>
- * <li>Prevents token replay via blacklist checks</li>
- * <li>Maps roles and scopes to Spring Security authorities</li>
- * <li>Populates the {@link SecurityContextHolder} for authorized requests</li>
- * </ul>
- *
- * <h2>Security guarantees</h2>
- * <ul>
- * <li>Only cryptographically valid access tokens are accepted</li>
- * <li>Refresh tokens can never be used for authorization</li>
- * <li>Revoked tokens are rejected before authentication</li>
- * <li>Tokens without granted authorities are rejected</li>
+ * <li>Extract and validate Bearer tokens</li>
+ * <li>Reject refresh tokens explicitly</li>
+ * <li>Prevent token replay using blacklist checks</li>
+ * <li>Map roles and scopes to granted authorities</li>
+ * <li>Populate the {@link SecurityContextHolder}</li>
  * </ul>
  *
  * <h2>Observability</h2>
  * <ul>
- * <li>Authenticated username is propagated via MDC</li>
- * <li>Security logs contain only controlled failure reasons</li>
- * <li>No sensitive data (tokens, secrets) is logged</li>
+ * <li>Uses MDC when available (correlationId, request path, username)</li>
+ * <li>Falls back to request data if MDC is missing</li>
+ * <li>Never logs tokens or PII</li>
  * </ul>
  *
  * <p>
- * This filter is designed for <b>stateless, production-grade APIs</b>
- * and complies with enterprise security standards (OWASP ASVS, ENS).
+ * Designed for stateless, production-grade APIs and compliant with
+ * OWASP ASVS / ENS requirements.
  * </p>
  */
 @Component
@@ -89,33 +78,6 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
     this.authoritiesMapper = authoritiesMapper;
   }
 
-  /**
-   * Performs JWT authorization for an incoming HTTP request.
-   *
-   * <p>
-   * Processing steps:
-   * </p>
-   * <ol>
-   * <li>Skip public and system endpoints</li>
-   * <li>Extract Bearer token from Authorization header</li>
-   * <li>Validate token cryptographically and semantically</li>
-   * <li>Reject revoked or non-access tokens</li>
-   * <li>Map roles and scopes to granted authorities</li>
-   * <li>Populate the security context</li>
-   * </ol>
-   *
-   * <p>
-   * If validation fails, the request continues without authentication
-   * and a controlled security event is logged.
-   * </p>
-   *
-   * @param request  incoming HTTP request
-   * @param response HTTP response
-   * @param chain    filter chain
-   *
-   * @throws ServletException in case of servlet errors
-   * @throws IOException      in case of I/O errors
-   */
   @Override
   protected void doFilterInternal(
       @NonNull HttpServletRequest request,
@@ -159,11 +121,19 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
       JwtAuthFailureReason reason = mapFailureReason(ex);
 
+      String path = MDC.get(REQUEST_PATH) != null
+          ? MDC.get(REQUEST_PATH)
+          : request.getRequestURI();
+
+      String method = request.getMethod();
+      String correlationId = MDC.get(CORRELATION_ID);
+
       log.warn(
-          "JWT authorization failed reason={} path={} correlationId={}",
+          "JWT authorization failed reason={} method={} path={} correlationId={}",
           reason,
-          MDC.get(REQUEST_PATH),
-          MDC.get(CORRELATION_ID));
+          method,
+          path,
+          correlationId);
 
       SecurityContextHolder.clearContext();
     }
