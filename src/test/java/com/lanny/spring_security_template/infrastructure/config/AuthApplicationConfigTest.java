@@ -40,237 +40,241 @@ import com.lanny.spring_security_template.domain.time.ClockProvider;
 
 class AuthApplicationConfigTest {
 
-    private AuthApplicationConfig config;
+        private AuthApplicationConfig config;
 
-    // Mocks for all dependencies required by the config methods
-    @Mock
-    private UserAccountGateway userGateway;
-    @Mock
-    private PasswordHasher passwordHasher;
-    @Mock
-    private AuthMetricsService metricsService;
-    @Mock
-    private TokenProvider tokenProvider;
-    @Mock
-    private ClockProvider clockProvider;
-    @Mock
-    private TokenPolicyProperties tokenPolicy;
-    @Mock
-    private SessionRegistryGateway sessionRegistry;
-    @Mock
-    private TokenBlacklistGateway blacklist;
-    @Mock
-    private SessionPolicy sessionPolicy;
-    @Mock
-    private RefreshTokenStore refreshTokenStore;
-    @Mock
-    private RoleProvider roleProvider;
-    @Mock
-    private ScopePolicy scopePolicy;
-    @Mock
-    private LoginAttemptPolicy loginAttemptPolicy;
-    @Mock
-    private RefreshTokenPolicy refreshTokenPolicy;
-    @Mock
-    private RotationPolicy rotationPolicy;
+        // Mocks for all dependencies required by the config methods
+        @Mock
+        private UserAccountGateway userGateway;
+        @Mock
+        private PasswordHasher passwordHasher;
+        @Mock
+        private AuthMetricsService metricsService;
+        @Mock
+        private TokenProvider tokenProvider;
+        @Mock
+        private ClockProvider clockProvider;
+        @Mock
+        private TokenPolicyProperties tokenPolicy;
+        @Mock
+        private SessionRegistryGateway sessionRegistry;
+        @Mock
+        private TokenBlacklistGateway blacklist;
+        @Mock
+        private SessionPolicy sessionPolicy;
+        @Mock
+        private RefreshTokenStore refreshTokenStore;
+        @Mock
+        private RoleProvider roleProvider;
+        @Mock
+        private ScopePolicy scopePolicy;
+        @Mock
+        private LoginAttemptPolicy loginAttemptPolicy;
+        @Mock
+        private RefreshTokenPolicy refreshTokenPolicy;
+        @Mock
+        private RotationPolicy rotationPolicy;
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-        config = new AuthApplicationConfig();
-    }
+        @BeforeEach
+        void setUp() {
+                MockitoAnnotations.openMocks(this);
+                config = new AuthApplicationConfig();
+        }
 
-    // --------------------------------------------------------------
-    // VALIDATORS & METRICS
-    // --------------------------------------------------------------
-    @Test
-    @DisplayName("testShouldCreateAuthenticationValidatorBean")
-    void testShouldCreateAuthenticationValidatorBean() {
-        var bean = config.authenticationValidator(userGateway, passwordHasher);
+        // --------------------------------------------------------------
+        // VALIDATORS & METRICS
+        // --------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldCreateAuthenticationValidatorBean")
+        void testShouldCreateAuthenticationValidatorBean() {
+                var bean = config.authenticationValidator(userGateway, passwordHasher);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(AuthenticationValidator.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(AuthenticationValidator.class);
+        }
 
-    @Test
-    @DisplayName("testShouldCreateLoginMetricsRecorderBean")
-    void testShouldCreateLoginMetricsRecorderBean() {
-        var bean = config.loginMetricsRecorder(metricsService);
+        @Test
+        @DisplayName("testShouldCreateLoginMetricsRecorderBean")
+        void testShouldCreateLoginMetricsRecorderBean() {
+                var bean = config.loginMetricsRecorder(metricsService);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(LoginMetricsRecorder.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(LoginMetricsRecorder.class);
+        }
 
-    // --------------------------------------------------------------
-    // TOKEN ISSUER
-    // --------------------------------------------------------------
-    @Test
-    @DisplayName("testShouldCreateTokenIssuerBean")
-    void testShouldCreateTokenIssuerBean() {
-        var bean = config.tokenIssuer(tokenProvider, clockProvider, tokenPolicy);
+        // --------------------------------------------------------------
+        // TOKEN ISSUER
+        // --------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldCreateTokenIssuerBean")
+        void testShouldCreateTokenIssuerBean() {
+                var bean = config.tokenIssuer(tokenProvider, clockProvider, tokenPolicy);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(TokenIssuer.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(TokenIssuer.class);
+        }
 
-    // --------------------------------------------------------------
-    // SESSION MANAGEMENT
-    // --------------------------------------------------------------
-    @Test
-    @DisplayName("testShouldCreateSessionManagerBean")
-    void testShouldCreateSessionManagerBean() {
-        var bean = config.sessionManager(sessionRegistry, blacklist, sessionPolicy, refreshTokenStore);
+        // --------------------------------------------------------------
+        // SESSION MANAGEMENT
+        // --------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldCreateSessionManagerBean")
+        void testShouldCreateSessionManagerBean() {
+                var bean = config.sessionManager(sessionRegistry, blacklist, sessionPolicy, refreshTokenStore);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(SessionManager.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(SessionManager.class);
+        }
 
-    @Test
-    @DisplayName("testShouldCreateTokenSessionCreatorBean")
-    void testShouldCreateTokenSessionCreatorBean() {
-        var bean = config.tokenSessionCreator(
-                roleProvider,
-                scopePolicy,
-                tokenIssuer(),
-                sessionManager(),
-                refreshTokenStore);
+        @Test
+        @DisplayName("testShouldCreateTokenSessionCreatorBean")
+        void testShouldCreateTokenSessionCreatorBean() {
+                var bean = config.tokenSessionCreator(
+                                roleProvider,
+                                scopePolicy,
+                                tokenIssuer(),
+                                sessionManager(),
+                                refreshTokenStore);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(TokenSessionCreator.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(TokenSessionCreator.class);
+        }
 
-    private SessionManager sessionManager() {
-        return new SessionManager(sessionRegistry, blacklist, sessionPolicy, refreshTokenStore);
-    }
+        private SessionManager sessionManager() {
+                return new SessionManager(sessionRegistry, blacklist, sessionPolicy, refreshTokenStore);
+        }
 
-    // --------------------------------------------------------------
-    // LOGIN SERVICE
-    // --------------------------------------------------------------
-    @Test
-    @DisplayName("testShouldCreateLoginServiceBean")
-    void testShouldCreateLoginServiceBean() {
-        var validator = config.authenticationValidator(userGateway, passwordHasher);
-        var recorder = config.loginMetricsRecorder(metricsService);
-        var sessionCreator = new TokenSessionCreator(roleProvider, scopePolicy, tokenIssuer(), sessionManager(),
-                refreshTokenStore);
+        // --------------------------------------------------------------
+        // LOGIN SERVICE
+        // --------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldCreateLoginServiceBean")
+        void testShouldCreateLoginServiceBean() {
+                var validator = config.authenticationValidator(userGateway, passwordHasher);
+                var recorder = config.loginMetricsRecorder(metricsService);
+                var sessionCreator = new TokenSessionCreator(roleProvider, scopePolicy, tokenIssuer(), sessionManager(),
+                                refreshTokenStore);
 
-        var bean = config.loginService(validator, sessionCreator, recorder, loginAttemptPolicy);
+                var bean = config.loginService(validator, sessionCreator, recorder, loginAttemptPolicy);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(LoginService.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(LoginService.class);
+        }
 
-    // --------------------------------------------------------------
-    // REFRESH TOKEN SERVICES
-    // --------------------------------------------------------------
-    @Test
-    @DisplayName("testShouldCreateRefreshTokenValidatorBean")
-    void testShouldCreateRefreshTokenValidatorBean() {
-        var bean = config.refreshTokenValidator(refreshTokenStore, blacklist, refreshTokenPolicy);
+        // --------------------------------------------------------------
+        // REFRESH TOKEN SERVICES
+        // --------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldCreateRefreshTokenValidatorBean")
+        void testShouldCreateRefreshTokenValidatorBean() {
+                var bean = config.refreshTokenValidator(refreshTokenPolicy);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(RefreshTokenValidator.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(RefreshTokenValidator.class);
+        }
 
-    @Test
-    @DisplayName("testShouldCreateTokenRotationHandlerBean")
-    void testShouldCreateTokenRotationHandlerBean() {
-        var bean = config.tokenRotationHandler(
-                roleProvider,
-                scopePolicy,
-                new TokenIssuer(tokenProvider, clockProvider, tokenPolicy),
-                refreshTokenStore,
-                sessionRegistry,
-                blacklist,
-                rotationPolicy);
+        @Test
+        @DisplayName("testShouldCreateTokenRotationHandlerBean")
+        void testShouldCreateTokenRotationHandlerBean() {
+                var bean = config.tokenRotationHandler(
+                                roleProvider,
+                                scopePolicy,
+                                new TokenIssuer(tokenProvider, clockProvider, tokenPolicy),
+                                refreshTokenStore,
+                                sessionRegistry,
+                                blacklist,
+                                rotationPolicy);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(TokenRotationHandler.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(TokenRotationHandler.class);
+        }
 
-    @Test
-    @DisplayName("testShouldCreateTokenRefreshResultFactoryBean")
-    void testShouldCreateTokenRefreshResultFactoryBean() {
-        var bean = config.tokenRefreshResultFactory(
-                roleProvider,
-                scopePolicy,
-                tokenProvider,
-                clockProvider,
-                tokenPolicy);
+        @Test
+        @DisplayName("testShouldCreateTokenRefreshResultFactoryBean")
+        void testShouldCreateTokenRefreshResultFactoryBean() {
+                var bean = config.tokenRefreshResultFactory(
+                                roleProvider,
+                                scopePolicy,
+                                tokenProvider,
+                                clockProvider,
+                                tokenPolicy);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(TokenRefreshResultFactory.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(TokenRefreshResultFactory.class);
+        }
 
-    @Test
-    @DisplayName("testShouldCreateRefreshServiceBean")
-    void testShouldCreateRefreshServiceBean() {
-        var bean = config.refreshService(
-                tokenProvider,
-                new RefreshTokenValidator(refreshTokenStore, blacklist, refreshTokenPolicy),
-                new TokenRotationHandler(roleProvider, scopePolicy, tokenIssuer(), refreshTokenStore, sessionRegistry,
-                        blacklist, rotationPolicy),
-                new TokenRefreshResultFactory(roleProvider, scopePolicy, tokenProvider, clockProvider, tokenPolicy));
+        @Test
+        @DisplayName("testShouldCreateRefreshServiceBean")
+        void testShouldCreateRefreshServiceBean() {
+                var bean = config.refreshService(
+                                tokenProvider,
+                                new RefreshTokenValidator(refreshTokenPolicy),
+                                refreshTokenStore,
+                                new TokenRotationHandler(roleProvider, scopePolicy, tokenIssuer(), refreshTokenStore,
+                                                sessionRegistry,
+                                                blacklist, rotationPolicy),
+                                new TokenRefreshResultFactory(roleProvider, scopePolicy, tokenProvider, clockProvider,
+                                                tokenPolicy));
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(RefreshService.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(RefreshService.class);
+        }
 
-    private TokenIssuer tokenIssuer() {
-        return new TokenIssuer(tokenProvider, clockProvider, tokenPolicy);
-    }
+        private TokenIssuer tokenIssuer() {
+                return new TokenIssuer(tokenProvider, clockProvider, tokenPolicy);
+        }
 
-    // --------------------------------------------------------------
-    // ME SERVICE
-    // --------------------------------------------------------------
-    @Test
-    @DisplayName("testShouldCreateMeServiceBean")
-    void testShouldCreateMeServiceBean() {
-        var bean = config.meService(userGateway, roleProvider, scopePolicy);
+        // --------------------------------------------------------------
+        // ME SERVICE
+        // --------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldCreateMeServiceBean")
+        void testShouldCreateMeServiceBean() {
+                var bean = config.meService(userGateway, roleProvider, scopePolicy);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(MeService.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(MeService.class);
+        }
 
-    // --------------------------------------------------------------
-    // CHANGE PASSWORD SERVICE
-    // --------------------------------------------------------------
-    @Test
-    @DisplayName("testShouldCreateChangePasswordServiceBean")
-    void testShouldCreateChangePasswordServiceBean() {
-        var bean = config.changePasswordService(userGateway, refreshTokenStore, passwordHasher, passwordPolicy());
+        // --------------------------------------------------------------
+        // CHANGE PASSWORD SERVICE
+        // --------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldCreateChangePasswordServiceBean")
+        void testShouldCreateChangePasswordServiceBean() {
+                var bean = config.changePasswordService(userGateway, refreshTokenStore, passwordHasher,
+                                passwordPolicy());
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(ChangePasswordService.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(ChangePasswordService.class);
+        }
 
-    private PasswordPolicy passwordPolicy() {
-        return raw -> {
-        };
-    }
+        private PasswordPolicy passwordPolicy() {
+                return raw -> {
+                };
+        }
 
-    // --------------------------------------------------------------
-    // DEV REGISTER SERVICE
-    // --------------------------------------------------------------
-    @Test
-    @DisplayName("testShouldCreateDevRegisterServiceBean")
-    void testShouldCreateDevRegisterServiceBean() {
-        var bean = config.devRegisterService(userGateway, passwordHasher, passwordPolicy(), metricsService);
+        // --------------------------------------------------------------
+        // DEV REGISTER SERVICE
+        // --------------------------------------------------------------
+        @Test
+        @DisplayName("testShouldCreateDevRegisterServiceBean")
+        void testShouldCreateDevRegisterServiceBean() {
+                var bean = config.devRegisterService(userGateway, passwordHasher, passwordPolicy(), metricsService);
 
-        assertThat(bean)
-                .isNotNull()
-                .isInstanceOf(DevRegisterService.class);
-    }
+                assertThat(bean)
+                                .isNotNull()
+                                .isInstanceOf(DevRegisterService.class);
+        }
 }

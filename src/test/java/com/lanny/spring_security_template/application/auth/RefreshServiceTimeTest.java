@@ -68,7 +68,7 @@ class RefreshServiceTimeTest {
                 verify(validator).validate(claims);
                 verify(resultFactory).newAccessOnly(claims, refreshToken);
                 verify(rotationHandler).shouldRotate();
-                verify(rotationHandler, never()).rotate(any());
+                verify(rotationHandler, never()).rotate(any(), any());
 
         }
 

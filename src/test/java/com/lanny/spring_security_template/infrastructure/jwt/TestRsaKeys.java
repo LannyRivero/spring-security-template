@@ -33,12 +33,22 @@ public final class TestRsaKeys {
                 }
 
                 @Override
-                public RSAPublicKey publicKey() {
+                public RSAPublicKey getPublicKey() {
                     return pub;
                 }
 
                 @Override
                 public String keyId() {
+                    return "test-key";
+                }
+
+                @Override
+                public java.util.Map<String, RSAPublicKey> verificationKeys() {
+                    return java.util.Map.of("test-key", pub);
+                }
+
+                @Override
+                public String activeKid() {
                     return "test-key";
                 }
             };
