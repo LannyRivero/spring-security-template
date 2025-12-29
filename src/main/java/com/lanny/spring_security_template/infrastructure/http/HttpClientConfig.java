@@ -1,5 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.http;
 
+import com.lanny.spring_security_template.infrastructure.security.ssrf.UrlSecurityValidator;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
@@ -13,9 +14,31 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * HTTP client infrastructure configuration.
+ *
+ * Responsibilities:
+ * - Configure Apache HttpClient (pooling, timeouts)
+ * - Expose RestTemplate for outbound calls
+ * - Register SSRF protection via UrlSecurityValidator
+ * - Propagate correlation-id headers
+ */
 @Configuration
 @EnableConfigurationProperties(HttpClientProperties.class)
 public class HttpClientConfig {
+
+    // --------------------------------------------------
+    // SSRF / Outbound URL validation
+    // --------------------------------------------------
+
+    @Bean
+    public UrlSecurityValidator urlSecurityValidator() {
+        return new UrlSecurityValidator();
+    }
+
+    // --------------------------------------------------
+    // RestTemplate (Apache HttpClient based)
+    // --------------------------------------------------
 
     @Bean
     public RestTemplate restTemplate(HttpClientProperties props) {
@@ -39,10 +62,6 @@ public class HttpClientConfig {
                 .setDefaultRequestConfig(requestConfig)
                 .disableAutomaticRetries()
                 .build();
-
-        if (httpClient == null) {
-            throw new IllegalStateException("HttpClient cannot be null");
-        }
 
         RestTemplate rt = new RestTemplate(new HttpComponentsClientHttpRequestFactory(httpClient));
 
