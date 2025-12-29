@@ -2,6 +2,8 @@ package com.lanny.spring_security_template.infrastructure.persistence.jpa.reposi
 
 import static org.assertj.core.api.Assertions.*;
 
+import org.hibernate.exception.ConstraintViolationException;
+
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -11,11 +13,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.test.context.ActiveProfiles;
 
-import com.lanny.spring_security_template.domain.model.User;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.RoleEntity;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.ScopeEntity;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.UserEntity;
@@ -237,7 +237,7 @@ public class UserJpaRepositoryTest {
         assertThatThrownBy(() -> {
             userJpaRepository.save(duplicate);
             entityManager.flush();
-        }).isInstanceOf(DataIntegrityViolationException.class);
+        }).isInstanceOf(ConstraintViolationException.class);
     }
 
     // =========================================================================
