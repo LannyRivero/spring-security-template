@@ -286,6 +286,19 @@ public class UserJpaRepositoryTest {
             }).isInstanceOf(ConstraintViolationException.class);
         }
 
+        @Test
+        @DisplayName("Should fail when password hash is null")
+        void shouldFailWhenPasswordHashIsNull() {
+
+            UserEntity user = UserTestData.defaultUser();
+            user.setPasswordHash(null);
+
+            assertThatThrownBy(() -> {
+                userJpaRepository.save(user);
+                entityManager.flush();
+            }).isInstanceOf(ConstraintViolationException.class);
+        }
+
     }
     // =========================================================================
     // TEST DATA HELPERS
