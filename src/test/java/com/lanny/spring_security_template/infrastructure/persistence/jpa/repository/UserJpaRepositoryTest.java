@@ -136,10 +136,8 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should fetch user with relations")
         void testShouldFetchUserWithRelations() {
-            UserEntity user = createUser("john_doe", "john@example.com", "hashedPassword123");
-            user.getRoles().add(adminRole);
-            user.getScopes().add(profileReadScope);
-            UserEntity saved = entityManager.persistAndFlush(user);
+
+            UserEntity saved = givenPersistedUserWithRelations();
 
             Optional<UserEntity> found = userJpaRepository.fetchWithRelations(saved.getId());
 
