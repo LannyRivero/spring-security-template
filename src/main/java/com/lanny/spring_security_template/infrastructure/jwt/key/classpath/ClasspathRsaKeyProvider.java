@@ -1,37 +1,36 @@
 package com.lanny.spring_security_template.infrastructure.jwt.key.classpath;
 
+import com.lanny.spring_security_template.infrastructure.config.JwtAlgorithm;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
 import com.lanny.spring_security_template.infrastructure.jwt.nimbus.PemUtils;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
- * Classpath-based RSA key provider with multi-kid support.
+ * RSA Key Provider loading keys from the application classpath.
  *
  * <p>
- * Intended exclusively for {@code dev} and {@code test} profiles.
- * Loads RSA keys from classpath resources.
+ * Intended for development and test environments.
+ * Uses PEM-encoded keys bundled with the application.
  * </p>
  *
  * <p>
- * Supports:
- * <ul>
- * <li>Single active signing key (activeKid)</li>
- * <li>Multiple verification keys (verificationKids)</li>
- * <li>Zero-downtime key rotation</li>
- * </ul>
+ * Selection is controlled via:
+ * 
+ * <pre>
+ * security.jwt.rsa.source = classpath
+ * </pre>
  * </p>
  */
 @Component
-@Profile({ "dev", "test" })
+@ConditionalOnProperty(prefix = "security.jwt.rsa", name = "source", havingValue = "classpath")
 public class ClasspathRsaKeyProvider implements RsaKeyProvider {
 
   private final String activeKid;
@@ -40,27 +39,20 @@ public class ClasspathRsaKeyProvider implements RsaKeyProvider {
 
   public ClasspathRsaKeyProvider(SecurityJwtProperties props) {
 
-    SecurityJwtProperties.RsaProperties rsa = requireRsa(props);
-
-    this.activeKid = requireText(rsa.activeKid(), "security.jwt.rsa.active-kid");
-
-    List<String> verificationKids = rsa.verificationKids();
-    if (!verificationKids.contains(activeKid)) {
+    if (props.algorithm() != JwtAlgorithm.RSA) {
       throw new IllegalStateException(
-          "active-kid must be included in verification-kids");
+          "ClasspathRsaKeyProvider requires algorithm=RSA");
     }
 
+    SecurityJwtProperties.RsaProperties rsa = props.rsa();
+    if (rsa == null) {
+      throw new IllegalStateException(
+          "RSA configuration is required when algorithm=RSA");
+    }
+
+    this.activeKid = rsa.activeKid();
     this.privateKey = loadPrivateKey(rsa.privateKeyLocation());
-
-    Map<String, RSAPublicKey> pubs = new HashMap<>();
-    for (String kid : verificationKids) {
-      String path = requireText(
-          rsa.publicKeys().get(kid),
-          "security.jwt.rsa.public-keys[" + kid + "]");
-      pubs.put(kid, loadPublicKey(path));
-    }
-
-    this.verificationKeys = Map.copyOf(pubs);
+    this.verificationKeys = loadPublicKeys(rsa);
   }
 
   // ======================================================
@@ -83,16 +75,8 @@ public class ClasspathRsaKeyProvider implements RsaKeyProvider {
   }
 
   // ======================================================
-  // Internals
+  // Key loading
   // ======================================================
-
-  private static SecurityJwtProperties.RsaProperties requireRsa(SecurityJwtProperties props) {
-    if (props.rsa() == null) {
-      throw new IllegalStateException(
-          "RSA configuration is required when algorithm=RSA");
-    }
-    return props.rsa();
-  }
 
   private RSAPrivateKey loadPrivateKey(String path) {
     try (InputStream is = loadClasspath(path)) {
@@ -103,13 +87,26 @@ public class ClasspathRsaKeyProvider implements RsaKeyProvider {
     }
   }
 
-  private RSAPublicKey loadPublicKey(String path) {
-    try (InputStream is = loadClasspath(path)) {
-      return PemUtils.readPublicKey(is);
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          "Failed to load RSA public key from classpath: " + path, e);
+  private Map<String, RSAPublicKey> loadPublicKeys(SecurityJwtProperties.RsaProperties rsa) {
+
+    Map<String, RSAPublicKey> keys = new HashMap<>();
+
+    for (String kid : rsa.verificationKids()) {
+      String path = rsa.publicKeys().get(kid);
+      if (path == null || path.isBlank()) {
+        throw new IllegalStateException(
+            "Missing public key for kid: " + kid);
+      }
+
+      try (InputStream is = loadClasspath(path)) {
+        keys.put(kid, PemUtils.readPublicKey(is));
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Failed to load RSA public key for kid=" + kid, e);
+      }
     }
+
+    return Map.copyOf(keys);
   }
 
   private InputStream loadClasspath(String path) {
@@ -120,12 +117,5 @@ public class ClasspathRsaKeyProvider implements RsaKeyProvider {
           "RSA key not found in classpath: " + normalized);
     }
     return is;
-  }
-
-  private static String requireText(String value, String property) {
-    if (value == null || value.isBlank()) {
-      throw new IllegalStateException(property + " must not be null or blank");
-    }
-    return value;
   }
 }

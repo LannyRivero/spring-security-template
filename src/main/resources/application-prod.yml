@@ -1,11 +1,11 @@
 # ================================================================
-# 🚀 SPRING SECURITY TEMPLATE - PRODUCTION CONFIGURATION
+# 🚀 SPRING SECURITY TEMPLATE — PRODUCTION CONFIGURATION
 # ================================================================
 
-# =============================
-# 🗄️ DATASOURCE (PostgreSQL)
-# =============================
 spring:
+  application:
+    name: spring-security-template
+
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:spring_security_prod}
     username: ${DB_USER}
@@ -57,15 +57,13 @@ server:
     include-stacktrace: never
 
 # =============================
-# 🔐 JWT / SECURITY (RSA · MULTI-KID)
+# 🔐 SECURITY (JWT + CORS)
 # =============================
 security:
   jwt:
-    provider: nimbus
-    key-provider: keystore
     algorithm: RSA
 
-    issuer: security-template
+    issuer: https://security-template.company.com
     access-audience: access-service
     refresh-audience: refresh-service
 
@@ -76,27 +74,47 @@ security:
     rotate-refresh-tokens: true
     max-active-sessions: 1
 
-    # ------------------------------------------------
-    # 🔑 KEY ROTATION (ENTERPRISE)
-    # ------------------------------------------------
-    active-kid: prod-rsa-2024
-    verification-kids:
-      - prod-rsa-2023
-      - prod-rsa-2024
+    default-roles: []
+    default-scopes: []
 
-    keystore:
-      path: ${KEYSTORE_PATH:/opt/keys/security-template.p12}
-      type: ${KEYSTORE_TYPE:PKCS12}
-      password: ${KEYSTORE_PASSWORD}
-      key-password: ${KEY_PASSWORD}
+    rsa:
+      source: keystore
 
-      # kid → alias mapping
-      kid-alias:
-        prod-rsa-2023: jwt-key-2023
-        prod-rsa-2024: jwt-key-2024
+      active-kid: prod-rsa-2024
+      verification-kids:
+        - prod-rsa-2023
+        - prod-rsa-2024
+
+      keystore:
+        path: ${KEYSTORE_PATH:/opt/keys/security-template.p12}
+        type: ${KEYSTORE_TYPE:PKCS12}
+        password: ${KEYSTORE_PASSWORD}
+        key-password: ${KEY_PASSWORD}
+
+        kid-alias:
+          prod-rsa-2023: jwt-key-2023
+          prod-rsa-2024: jwt-key-2024
+
+  cors:
+    allowed-origins:
+      - https://app.security-template.com
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    allowed-headers:
+      - Authorization
+      - Content-Type
+      - X-Requested-With
+      - X-Correlation-Id
+    exposed-headers:
+      - Authorization
+      - X-Correlation-Id
+    allow-credentials: true
 
 # =============================
-# 🚦 RATE LIMITING (STRICT)
+# 🚦 RATE LIMITING
 # =============================
 rate-limiting:
   enabled: true
@@ -106,29 +124,6 @@ rate-limiting:
   block-seconds: 600
   retry-after: 60
   login-path: /api/v1/auth/login
-
-# =============================
-# 🌐 CORS (RESTRICTED)
-# =============================
-cors:
-  enabled: true
-  allow-credentials: true
-  allowed-origins:
-    - https://app.security-template.com
-  allowed-methods:
-    - GET
-    - POST
-    - PUT
-    - DELETE
-  allowed-headers:
-    - Content-Type
-    - Authorization
-    - X-Requested-With
-    - X-Correlation-Id
-  exposed-headers:
-    - Authorization
-    - X-Correlation-Id
-  max-age-seconds: 3600
 
 # =============================
 # 🧾 LOGGING
@@ -160,4 +155,3 @@ management:
         enabled: true
     tags:
       application: spring-security-template
-
