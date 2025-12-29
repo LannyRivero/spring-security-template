@@ -201,7 +201,9 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should return empty when user not found by email")
         void testShouldReturnEmptyWhenUserNotFoundByEmail() {
-            Optional<UserEntity> found = userJpaRepository.findByEmailIgnoreCase("nonexistent@example.com");
+
+            Optional<UserEntity> found = userJpaRepository.findByEmailIgnoreCase(
+                    "nonexistent@example.com");
 
             assertThat(found).isEmpty();
         }
@@ -209,10 +211,13 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should return empty when user not found by username or email")
         void testShouldReturnEmptyWhenUserNotFoundByUsernameOrEmail() {
-            Optional<UserEntity> found = userJpaRepository.findByUsernameOrEmail("nonexistent");
+
+            Optional<UserEntity> found = userJpaRepository.findByUsernameOrEmail(
+                    "nonexistent");
 
             assertThat(found).isEmpty();
         }
+
     }
 
     // =========================================================================
