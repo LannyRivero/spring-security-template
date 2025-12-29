@@ -1,6 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.persistence.jpa.repository;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
 
 import java.util.Optional;
 
@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -221,6 +222,25 @@ public class UserJpaRepositoryTest {
     }
 
     // =========================================================================
+    // CONSTRAINT TESTS
+    // =========================================================================
+    @Test
+    @DisplayName("Should fail when username is not unique")
+    void testShouldFailWhenUsernameIsNotUnique() {
+
+        givenPersistedUserWithUsername("duplicate");
+
+        UserEntity duplicate = UserTestData.defaultUser();
+        duplicate.setUsername("duplicate");
+        duplicate.setEmail("other@example.com");
+
+        assertThatThrownBy(() -> {
+            userJpaRepository.save(duplicate);
+            entityManager.flush();
+        }).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    // =========================================================================
     // TEST DATA HELPERS
     // =========================================================================
 
@@ -232,6 +252,18 @@ public class UserJpaRepositoryTest {
         UserEntity user = UserTestData.defaultUser();
         user.getRoles().add(adminRole);
         user.getScopes().add(profileReadScope);
+        return entityManager.persistAndFlush(user);
+    }
+
+    private UserEntity givenPersistedUserWithUsername(String username) {
+        UserEntity user = UserTestData.defaultUser();
+        user.setUsername(username);
+        return entityManager.persistAndFlush(user);
+    }
+
+    private UserEntity givenPersistedUserWithEmail(String email) {
+        UserEntity user = UserTestData.defaultUser();
+        user.setEmail(email);
         return entityManager.persistAndFlush(user);
     }
 
