@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -297,6 +298,71 @@ public class UserJpaRepositoryTest {
                 userJpaRepository.save(user);
                 entityManager.flush();
             }).isInstanceOf(ConstraintViolationException.class);
+        }
+
+    }
+
+    // =========================================================================
+    // TRANSACTION TESTS
+    // =========================================================================
+    @Nested
+    @DisplayName("Transaction Rollback Tests")
+    class TransactionTests {
+        @Test
+        @DisplayName("Should rollback transaction on constraint violation")
+        void shouldRollbackTransactionOnConstraintViolation() {
+
+            givenPersistedUserWithUsername("original");
+
+            long countBefore = userJpaRepository.count();
+
+            assertThatThrownBy(() -> {
+                UserEntity duplicate = UserTestData.defaultUser();
+                duplicate.setUsername("original");
+                duplicate.setEmail("different@example.com");
+
+                userJpaRepository.save(duplicate);
+                entityManager.flush();
+            }).hasRootCauseInstanceOf(
+                    org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException.class);
+
+            long countAfter = userJpaRepository.count();
+            assertThat(countAfter).isEqualTo(countBefore);
+        }
+
+    }
+
+    // =========================================================================
+    // EDGE CASES
+    // =========================================================================
+    @Nested
+    @DisplayName("Edge Cases")
+    class EdgeCaseTests {
+        @Test
+        @DisplayName("Should return empty optional when user not found")
+        void shouldReturnEmptyOptionalWhenUserNotFound() {
+
+            Optional<UserEntity> found = userJpaRepository.findByUsernameIgnoreCase("nonexistent");
+
+            assertThat(found).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should handle user with empty roles and scopes")
+        void shouldHandleUserWithEmptyRolesAndScopes() {
+
+            UserEntity user = UserTestData.defaultUser();
+            user.setUsername("minimaluser");
+            user.setEmail("minimal@example.com");
+
+            entityManager.persistAndFlush(user);
+            entityManager.clear();
+
+            Optional<UserEntity> found = userJpaRepository.findByUsernameIgnoreCase("minimaluser");
+
+            assertThat(found).isPresent();
+            assertThat(found.get().getRoles()).isEmpty();
+            assertThat(found.get().getScopes()).isEmpty();
         }
 
     }
