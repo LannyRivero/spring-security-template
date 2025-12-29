@@ -1,12 +1,13 @@
 package com.lanny.spring_security_template.infrastructure.persistence.jpa.repository;
 
-import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.UserEntity;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.Optional;
+import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.UserEntity;
 
 /**
  * JPA repository for {@link UserEntity}.
