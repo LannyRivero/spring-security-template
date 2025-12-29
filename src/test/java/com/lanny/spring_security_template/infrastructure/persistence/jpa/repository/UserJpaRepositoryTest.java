@@ -106,13 +106,11 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should find user by email ignoring case")
         void testShouldFindUserByEmailIgnoreCase() {
-            UserEntity user = createUser("john_doe", "john@example.com", "hashedPassword123");
-            entityManager.persistAndFlush(user);
 
-            Optional<UserEntity> found = userJpaRepository.findByEmailIgnoreCase("JOHN@EXAMPLE.COM");
-
+            givenPersistedUser();
+            Optional<UserEntity> found = userJpaRepository.findByEmailIgnoreCase(UserTestData.EMAIL_UPPER);
             assertThat(found).isPresent();
-            assertThat(found.get().getEmail()).isEqualTo("john@example.com");
+            assertThat(found.get().getEmail()).isEqualTo(UserTestData.EMAIL);
         }
 
         @Test
