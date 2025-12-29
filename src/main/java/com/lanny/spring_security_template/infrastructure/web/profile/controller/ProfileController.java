@@ -401,8 +401,8 @@ public class ProfileController {
      * @return user ID from JWT subject claim
      */
     private String extractUserId(Authentication authentication) {
-        if (authentication instanceof JwtAuthenticationToken jwtAuth) {
-            return jwtAuth.getToken().getSubject();
+        if (authentication != null && authentication.getName() != null) {
+            return authentication.getName();
         }
         throw new IllegalStateException("Unable to extract user ID from authentication");
     }
