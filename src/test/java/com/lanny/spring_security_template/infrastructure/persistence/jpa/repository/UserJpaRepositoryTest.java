@@ -149,10 +149,11 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should return true when username exists")
         void testShouldReturnTrueWhenUsernameExists() {
-            UserEntity user = createUser("john_doe", "john@example.com", "hashedPassword123");
-            entityManager.persistAndFlush(user);
 
-            boolean exists = userJpaRepository.existsByUsernameIgnoreCase("JOHN_DOE");
+            givenPersistedUser();
+
+            boolean exists = userJpaRepository.existsByUsernameIgnoreCase(
+                    UserTestData.USERNAME_UPPER);
 
             assertThat(exists).isTrue();
         }
