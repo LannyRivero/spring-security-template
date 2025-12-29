@@ -1,10 +1,9 @@
 package com.lanny.spring_security_template.infrastructure.jwt.key.keystore;
 
+import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
@@ -15,121 +14,64 @@ import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * {@code KeystoreRsaKeyProvider}
+ * Keystore-based RSA key provider (enterprise-grade).
  *
  * <p>
- * Production-grade {@link RsaKeyProvider} supporting RSA key rotation
- * (multi-kid).
- * </p>
+ * Activated when:
+ * {@code security.jwt.rsa.source = keystore}
  *
  * <p>
- * Keys are loaded eagerly at startup and cached for the lifetime of the
- * application.
- * Any misconfiguration fails fast during boot.
- * </p>
+ * Features:
+ * <ul>
+ * <li>Multi-kid verification</li>
+ * <li>Single active signing key</li>
+ * <li>Zero-downtime key rotation</li>
+ * </ul>
  */
 @Slf4j
 @Component
-@Profile("prod")
-@ConditionalOnProperty(name = "security.jwt.key-provider", havingValue = "keystore")
+@ConditionalOnProperty(prefix = "security.jwt.rsa", name = "source", havingValue = "keystore")
 public class KeystoreRsaKeyProvider implements RsaKeyProvider {
 
-    private static final int MIN_RSA_KEY_SIZE = 2048;
+    private static final int MIN_RSA_BITS = 2048;
 
     private final String activeKid;
     private final RSAPrivateKey privateKey;
     private final Map<String, RSAPublicKey> verificationKeys;
 
-    public KeystoreRsaKeyProvider(
-            @Value("${security.jwt.active-kid}") String activeKid,
-            @Value("${security.jwt.verification-kids}") List<String> verificationKids,
-            @Value("#{${security.jwt.keystore.kid-alias}}") Map<String, String> kidAliasMap,
-            @Value("${security.jwt.keystore.path}") String keystorePath,
-            @Value("${security.jwt.keystore.type:PKCS12}") String keystoreType,
-            @Value("${security.jwt.keystore.password}") String keystorePassword,
-            @Value("${security.jwt.keystore.key-password}") String keyPassword) {
+    public KeystoreRsaKeyProvider(SecurityJwtProperties props) {
 
-        this.activeKid = requireText(activeKid, "security.jwt.active-kid");
+        SecurityJwtProperties.RsaProperties rsa = requireRsa(props);
+        SecurityJwtProperties.KeystoreProperties ks = rsa.keystore();
 
-        if (verificationKids == null || verificationKids.isEmpty()) {
-            throw new IllegalStateException("security.jwt.verification-kids must not be empty.");
-        }
+        this.activeKid = rsa.activeKid();
 
-        // Detect duplicate kids early
-        Set<String> uniqueKids = new HashSet<>(verificationKids);
-        if (uniqueKids.size() != verificationKids.size()) {
-            throw new IllegalStateException(
-                    "Duplicate kid detected in security.jwt.verification-kids");
-        }
+        KeyStore keyStore = loadKeystore(ks);
 
-        if (!uniqueKids.contains(this.activeKid)) {
-            throw new IllegalStateException(
-                    "active-kid must be included in verification-kids.");
-        }
+        this.privateKey = loadPrivateKey(
+                keyStore,
+                ks.kidAlias().get(activeKid),
+                ks.keyPassword().toCharArray());
 
-        // Ensure alias coverage
-        if (kidAliasMap == null || !kidAliasMap.keySet().containsAll(uniqueKids)) {
-            throw new IllegalStateException(
-                    "security.jwt.keystore.kid-alias must define aliases for all verification-kids");
-        }
+        this.verificationKeys = loadPublicKeys(
+                keyStore,
+                ks.kidAlias(),
+                rsa.verificationKids());
 
-        Path ksPath = normalizeAndValidatePath(keystorePath);
-        validateKeystoreFile(ksPath);
-
-        try (InputStream is = Files.newInputStream(ksPath)) {
-
-            KeyStore keyStore = KeyStore.getInstance(keystoreType);
-            keyStore.load(is, keystorePassword.toCharArray());
-
-            // --------------------------------------------------
-            // Load ACTIVE signing key
-            // --------------------------------------------------
-            String activeAlias = requireText(
-                    kidAliasMap.get(this.activeKid),
-                    "security.jwt.keystore.kid-alias[" + this.activeKid + "]");
-
-            this.privateKey = loadPrivateKey(
-                    keyStore,
-                    activeAlias,
-                    keyPassword.toCharArray());
-
-            // --------------------------------------------------
-            // Load verification public keys (active + old)
-            // --------------------------------------------------
-            Map<String, RSAPublicKey> pubs = new HashMap<>();
-
-            for (String kid : uniqueKids) {
-                String alias = requireText(
-                        kidAliasMap.get(kid),
-                        "security.jwt.keystore.kid-alias[" + kid + "]");
-
-                RSAPublicKey pub = loadPublicKey(keyStore, alias);
-                validateKeySize(pub, alias);
-                pubs.put(kid, pub);
-            }
-
-            this.verificationKeys = Map.copyOf(pubs);
-
-            log.info(
-                    "✓ Loaded RSA keys from keystore [type={}, activeKid={}, verificationKids={}]",
-                    keystoreType,
-                    this.activeKid,
-                    this.verificationKeys.keySet());
-
-        } catch (Exception e) {
-            throw new IllegalStateException(
-                    "Failed to load RSA keys from keystore. " +
-                            "Check path, passwords, aliases and key formats.",
-                    e);
-        }
+        log.info(
+                "✓ Loaded RSA keys from keystore [activeKid={}, verificationKids={}]",
+                activeKid,
+                verificationKeys.keySet());
     }
 
-    // --------------------------------------------------
+    // ======================================================
     // RsaKeyProvider
-    // --------------------------------------------------
+    // ======================================================
 
     @Override
     public String activeKid() {
@@ -146,85 +88,125 @@ public class KeystoreRsaKeyProvider implements RsaKeyProvider {
         return verificationKeys;
     }
 
-    // --------------------------------------------------
-    // Key loading helpers
-    // --------------------------------------------------
+    // ======================================================
+    // Internals
+    // ======================================================
+
+    private static KeyStore loadKeystore(
+            SecurityJwtProperties.KeystoreProperties ks) {
+
+        Path path = normalizeAndValidatePath(ks.path());
+
+        try (InputStream is = Files.newInputStream(path)) {
+            KeyStore keyStore = KeyStore.getInstance(ks.type());
+            keyStore.load(is, ks.password().toCharArray());
+            return keyStore;
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Failed to load keystore from " + path, e);
+        }
+    }
 
     private RSAPrivateKey loadPrivateKey(
             KeyStore ks,
             String alias,
-            char[] keyPassword) throws Exception {
+            char[] password) {
 
-        Key key = ks.getKey(alias, keyPassword);
-        if (!(key instanceof RSAPrivateKey priv)) {
+        requireText(alias, "keystore.kid-alias[activeKid]");
+
+        try {
+            Key key = ks.getKey(alias, password);
+            if (!(key instanceof RSAPrivateKey priv)) {
+                throw new IllegalStateException(
+                        "Alias does not reference an RSA private key: " + alias);
+            }
+            validateKeySize(priv, alias);
+            return priv;
+        } catch (Exception e) {
             throw new IllegalStateException(
-                    "Alias does not reference an RSA private key: " + alias);
+                    "Failed to load RSA private key for alias: " + alias, e);
         }
-        validateKeySize(priv, alias);
-        return priv;
     }
 
-    private RSAPublicKey loadPublicKey(
+    private static Map<String, RSAPublicKey> loadPublicKeys(
             KeyStore ks,
-            String alias) throws Exception {
+            Map<String, String> kidAlias,
+            List<String> verificationKids) {
 
-        X509Certificate cert = (X509Certificate) ks.getCertificate(alias);
-        if (cert == null) {
-            throw new IllegalStateException(
-                    "No X509 certificate found for alias: " + alias);
-        }
-        if (!(cert.getPublicKey() instanceof RSAPublicKey pub)) {
-            throw new IllegalStateException(
-                    "Certificate public key is not RSA for alias: " + alias);
-        }
-        return pub;
-    }
+        Map<String, RSAPublicKey> pubs = new HashMap<>();
 
-    // --------------------------------------------------
-    // Validation helpers
-    // --------------------------------------------------
+        for (String kid : verificationKids) {
+            String alias = requireText(
+                    kidAlias.get(kid),
+                    "keystore.kid-alias[" + kid + "]");
 
-    private static String requireText(String value, String property) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException(property + " must not be null or blank.");
+            try {
+                X509Certificate cert = (X509Certificate) ks.getCertificate(alias);
+                if (cert == null) {
+                    throw new IllegalStateException(
+                            "No certificate found for alias: " + alias);
+                }
+
+                if (!(cert.getPublicKey() instanceof RSAPublicKey pub)) {
+                    throw new IllegalStateException(
+                            "Certificate public key is not RSA: " + alias);
+                }
+
+                validateKeySize(pub, alias);
+                pubs.put(kid, pub);
+
+            } catch (Exception e) {
+                throw new IllegalStateException(
+                        "Failed to load RSA public key for alias: " + alias, e);
+            }
         }
-        return value;
+
+        return Map.copyOf(pubs);
     }
 
     private static Path normalizeAndValidatePath(String rawPath) {
-        Path path = Path.of(requireText(rawPath, "security.jwt.keystore.path")).normalize();
+        requireText(rawPath, "keystore.path");
+        Path path = Path.of(rawPath).normalize();
+
         if (!path.isAbsolute()) {
             throw new IllegalStateException(
                     "Keystore path must be absolute in production: " + path);
         }
+        if (!Files.exists(path) || !Files.isReadable(path)) {
+            throw new IllegalStateException(
+                    "Keystore file does not exist or is not readable: " + path);
+        }
         return path;
     }
 
-    private static void validateKeystoreFile(Path path) {
-        if (!Files.exists(path)) {
-            throw new IllegalStateException("Keystore file does not exist: " + path);
-        }
-        if (!Files.isRegularFile(path)) {
-            throw new IllegalStateException("Keystore path is not a file: " + path);
-        }
-        if (!Files.isReadable(path)) {
-            throw new IllegalStateException("Keystore file is not readable: " + path);
+    private static void validateKeySize(RSAPrivateKey key, String ref) {
+        if (key.getModulus().bitLength() < MIN_RSA_BITS) {
+            throw new IllegalStateException(
+                    "RSA private key too weak (<2048 bits): " + ref);
         }
     }
 
-    private static void validateKeySize(RSAPrivateKey key, String alias) {
-        if (key.getModulus().bitLength() < MIN_RSA_KEY_SIZE) {
+    private static void validateKeySize(RSAPublicKey key, String ref) {
+        if (key.getModulus().bitLength() < MIN_RSA_BITS) {
             throw new IllegalStateException(
-                    "RSA private key for alias '" + alias + "' is weaker than "
-                            + MIN_RSA_KEY_SIZE + " bits.");
+                    "RSA public key too weak (<2048 bits): " + ref);
         }
     }
 
-    private static void validateKeySize(RSAPublicKey key, String alias) {
-        if (key.getModulus().bitLength() < MIN_RSA_KEY_SIZE) {
+    private static SecurityJwtProperties.RsaProperties requireRsa(
+            SecurityJwtProperties props) {
+
+        if (props.rsa() == null) {
             throw new IllegalStateException(
-                    "RSA public key for alias '" + alias + "' is weaker than "
-                            + MIN_RSA_KEY_SIZE + " bits.");
+                    "RSA configuration is required when algorithm=RSA");
         }
+        return props.rsa();
+    }
+
+    private static String requireText(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(name + " must not be blank");
+        }
+        return value;
     }
 }

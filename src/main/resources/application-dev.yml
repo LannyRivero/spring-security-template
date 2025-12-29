@@ -1,8 +1,14 @@
 # ================================================================
-# 🌱 SPRING SECURITY TEMPLATE - DEVELOPMENT CONFIGURATION
+# 🌱 SPRING SECURITY TEMPLATE — DEVELOPMENT CONFIGURATION
 # ================================================================
 
 spring:
+  application:
+    name: spring-security-template
+
+  # =============================
+  # 🗄️ DATASOURCE (MySQL DEV)
+  # =============================
   datasource:
     url: jdbc:mysql://localhost:3306/security_template?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: ${DATABASE_USERNAME:root}
@@ -18,11 +24,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: none
-    show-sql: true
     open-in-view: false
+    show-sql: true
 
   flyway:
-    enabled: false
+    enabled: false   # ❌ nunca forzar Flyway en dev
     baseline-on-migrate: true
     validate-on-migrate: true
     locations:
@@ -39,55 +45,76 @@ spring:
       port: 6379
       timeout: 2000
 
-# ✅ Toggle propio (no Spring)
-redis:
-  enabled: false
-
 # =============================
-# SERVER CONFIG
+# ⚙️ SERVER
 # =============================
 server:
   port: 8080
   forward-headers-strategy: framework
 
 # =============================
-# 🔐 JWT CONFIGURATION
+# 🔐 SECURITY (JWT + CORS)
 # =============================
 security:
   jwt:
-    issuer: security-template
+    algorithm: RSA
+
+    issuer: https://security-template.dev.local
     access-audience: access-service
     refresh-audience: refresh-service
-    max-active-sessions: 2
 
-    algorithm: RSA
     access-ttl: PT1H
     refresh-ttl: P7D
-    rotate-refresh-tokens: true
     allowed-clock-skew-seconds: 60
+
+    rotate-refresh-tokens: true
+    max-active-sessions: 2
 
     default-roles:
       - ROLE_USER
     default-scopes:
       - profile:read
 
+    # ------------------------------------------------
+    # 🔑 RSA CONFIG (DEV → CLASSPATH PROVIDER)
+    # ------------------------------------------------
     rsa:
-      # 🔑 Multi-kid (aunque hoy sea 1)
+      source: classpath   # 👈 activa ClasspathRsaKeyProvider
+
       active-kid: dev-rsa-1
       verification-kids:
         - dev-rsa-1
 
       private-key-location: keys/rsa-private.pem
 
-      # MAP kid -> public key (classpath)
       public-keys:
         dev-rsa-1: keys/rsa-public.pem
 
-    hmac:
-      secret-base64: ${JWT_SECRET_BASE64:dev-secret-12345}
+  cors:
+    allowed-origins:
+      - http://localhost:3000
+      - http://127.0.0.1:5173
+      - https://localhost:5173
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - OPTIONS
+    allowed-headers:
+      - Content-Type
+      - Authorization
+      - X-Requested-With
+      - X-Correlation-Id
+    exposed-headers:
+      - Authorization
+      - X-Correlation-Id
+    allow-credentials: true
+    max-age-seconds: 3600
 
 # =============================
-# 🛡️ RATE LIMITING
+# 🚦 RATE LIMITING (DEV)
 # =============================
 rate-limiting:
   enabled: true
@@ -99,28 +126,7 @@ rate-limiting:
   login-path: /api/v1/auth/login
 
 # =============================
-# 🌐 CORS CONFIGURATION
-# =============================
-cors:
-  enabled: true
-  allow-credentials: true
-  allowed-origins:
-    - http://localhost:3000
-    - http://127.0.0.1:5173
-    - https://localhost:5173
-  allowed-methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-  allowed-headers:
-    - Content-Type
-    - Authorization
-    - X-Requested-With
-    - X-Correlation-Id
-  exposed-headers:
-    - X-Correlation-Id
-    - Authorization
-  max-age-seconds: 3600
-
-# =============================
-# 🧾 LOGGING
+# 🧾 LOGGING (VERBOSE DEV)
 # =============================
 logging:
   level:
@@ -131,16 +137,19 @@ logging:
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 
 # =============================
-# ⚙️ ACTUATOR + METRICS
+# 📈 ACTUATOR + METRICS
 # =============================
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include:
+          - health
+          - info
+          - prometheus
   endpoint:
-    prometheus:
-      enabled: true
+    health:
+      show-details: always
   metrics:
     export:
       prometheus:
@@ -157,3 +166,5 @@ http:
     request-timeout: 5000
     read-timeout: 5000
     max-connections: 50
+
+
