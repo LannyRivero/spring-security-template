@@ -161,10 +161,11 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should return true when email exists")
         void testShouldReturnTrueWhenEmailExists() {
-            UserEntity user = createUser("john_doe", "john@example.com", "hashedPassword123");
-            entityManager.persistAndFlush(user);
 
-            boolean exists = userJpaRepository.existsByEmailIgnoreCase("JOHN@EXAMPLE.COM");
+            givenPersistedUser();
+
+            boolean exists = userJpaRepository.existsByEmailIgnoreCase(
+                    UserTestData.EMAIL_UPPER);
 
             assertThat(exists).isTrue();
         }
@@ -172,6 +173,7 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should return false when username does not exist")
         void testShouldReturnFalseWhenUsernameDoesNotExist() {
+
             boolean exists = userJpaRepository.existsByUsernameIgnoreCase("nonexistent");
 
             assertThat(exists).isFalse();
@@ -180,7 +182,9 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should return false when email does not exist")
         void testShouldReturnFalseWhenEmailDoesNotExist() {
-            boolean exists = userJpaRepository.existsByEmailIgnoreCase("nonexistent@example.com");
+
+            boolean exists = userJpaRepository.existsByEmailIgnoreCase(
+                    "nonexistent@example.com");
 
             assertThat(exists).isFalse();
         }
@@ -188,6 +192,7 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should return empty when user not found by username")
         void testShouldReturnEmptyWhenUserNotFoundByUsername() {
+
             Optional<UserEntity> found = userJpaRepository.findByUsernameIgnoreCase("nonexistent");
 
             assertThat(found).isEmpty();
