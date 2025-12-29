@@ -2,6 +2,7 @@ package com.lanny.spring_security_template.infrastructure.config;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -14,95 +15,105 @@ import jakarta.validation.constraints.NotNull;
 /**
  * Strongly-typed configuration for JWT issuance, validation and rotation.
  *
- * Loaded under prefix: security.jwt.*
+ * Prefix: security.jwt
  *
- * Fully enterprise-ready (OWASP ASVS 2.x / 3.x compliant).
+ * Infrastructure-only configuration.
+ * All cross-field and conditional validation MUST be handled
+ * by a dedicated validator (fail-fast at startup).
  */
 @ConfigurationProperties(prefix = "security.jwt")
 public record SecurityJwtProperties(
 
-                /** Token issuer (iss claim). Must uniquely identify this auth server. */
-                @NotBlank(message = "issuer must not be blank") @DefaultValue("spring-security-template") String issuer,
+                /** Token issuer (iss claim). */
+                @NotBlank @DefaultValue("spring-security-template") String issuer,
 
-                /** Audience expected in access tokens. */
-                @NotBlank(message = "accessAudience must not be blank") @DefaultValue("access") String accessAudience,
+                /** Audience for access tokens. */
+                @NotBlank @DefaultValue("access") String accessAudience,
 
-                /** Audience expected in refresh tokens. */
-                @NotBlank(message = "refreshAudience must not be blank") @DefaultValue("refresh") String refreshAudience,
+                /** Audience for refresh tokens. */
+                @NotBlank @DefaultValue("refresh") String refreshAudience,
 
-                /** Access token TTL (ISO-8601 duration: PT15M, PT10M...) */
-                @NotNull(message = "accessTtl must be provided") @DefaultValue("PT15M") Duration accessTtl,
+                /** Access token TTL (ISO-8601, e.g. PT15M). */
+                @NotNull @DefaultValue("PT15M") Duration accessTtl,
 
-                /** Refresh token TTL (ISO-8601 duration: P7D, P14D...) */
-                @NotNull(message = "refreshTtl must be provided") @DefaultValue("P7D") Duration refreshTtl,
+                /** Refresh token TTL (ISO-8601, e.g. P7D). */
+                @NotNull @DefaultValue("P7D") Duration refreshTtl,
 
-                /** Allowed clock skew (seconds) for exp, iat, nbf validation. */
-                @Min(value = 0, message = "allowedClockSkewSeconds must be >= 0") @DefaultValue("60") long allowedClockSkewSeconds,
+                /** Allowed clock skew (seconds). */
+                @Min(0) @DefaultValue("60") long allowedClockSkewSeconds,
 
-                /** Signing algorithm (RSA or HMAC). */
-                @NotNull(message = "algorithm must be specified") @DefaultValue("RSA") JwtAlgorithm algorithm,
+                /** Signing algorithm. */
+                @NotNull @DefaultValue("RSA") JwtAlgorithm algorithm,
 
-                /** Whether refresh tokens should be rotated (ASVS 2.8.4). */
+                /** Enable refresh token rotation. */
                 @DefaultValue("false") boolean rotateRefreshTokens,
 
-                /** Default RBAC roles assigned to new users. */
+                /** Default roles assigned to new users. */
                 @DefaultValue( {
                 }) List<String> defaultRoles,
 
-                /** Default OAuth-like scopes for new users. */
+                /** Default scopes assigned to new users. */
                 @DefaultValue({}) List<String> defaultScopes,
 
-                /** Maximum number of concurrent sessions allowed per user. */
-                @Min(value = 1, message = "maxActiveSessions must be >= 1") @DefaultValue("1") int maxActiveSessions,
+                /** Maximum concurrent sessions per user. */
+                @Min(1) @DefaultValue("1") int maxActiveSessions,
 
-                /**
-                 * HMAC settings (only required when {@link #algorithm()} is {@code HMAC}).
-                 *
-                 * <p>
-                 * The secret must be Base64-encoded and at least 256 bits for HS256.
-                 * </p>
-                 */
-                @Valid @DefaultValue HmacProperties hmac,
+                /** HMAC configuration (used when algorithm = HMAC). */
+                @Valid HmacProperties hmac,
+
+                /** RSA configuration (used when algorithm = RSA). */
                 @Valid RsaProperties rsa){
 
-        public SecurityJwtProperties {
-                // Ensure non-null nested config to avoid NPE in dev when RSA is used.
-                if (hmac == null) {
-                        hmac = new HmacProperties("");
-                }
-                if (rsa == null) {
-                        rsa = new RsaProperties(null, List.of(), null, java.util.Map.of());
-                }
-        }
-
-        // =========================
+        // ======================================================
         // RSA CONFIG (MULTI-KID)
-        // =========================
+        // ======================================================
         public record RsaProperties(
+
+                        /** Key source: filesystem | keystore | classpath */
+                        @NotBlank String source,
 
                         /** Kid used to SIGN new tokens */
                         @NotBlank String activeKid,
 
-                        /** All kids accepted for verification (active + old) */
+                        /** Kids accepted for verification (active + old) */
                         @NotNull List<String> verificationKids,
 
-                        /** Private key used for signing (only activeKid) */
-                        @NotBlank String privateKeyLocation,
+                        /** Used when source = filesystem | classpath */
+                        String privateKeyLocation,
 
-                        /** Map kid -> public key path */
-                        @NotNull java.util.Map<String, String> publicKeys) {
+                        /** Used when source = filesystem | classpath */
+                        Map<String, String> publicKeys,
+
+                        /** Used when source = keystore */
+                        @Valid KeystoreProperties keystore) {
         }
 
-        // =========================
-        // HMAC CONFIG
-        // =========================
-        public record HmacProperties(
-                        /**
-                         * Base64-encoded secret used for HS256 signing/verification.
-                         * Must be provided via environment variables in production.
-                         */
-                        @NotBlank(message = "hmac.secretBase64 must not be blank when algorithm=HMAC") @DefaultValue("") String secretBase64
+        // ======================================================
+        // KEYSTORE CONFIG
+        // ======================================================
+        public record KeystoreProperties(
 
-        ) {
+                        @NotBlank String path,
+
+                        @NotBlank String type,
+
+                        @NotBlank String password,
+
+                        @NotBlank String keyPassword,
+
+                        /** kid → keystore alias mapping */
+                        @NotNull Map<String, String> kidAlias) {
+        }
+
+        // ======================================================
+        // HMAC CONFIG
+        // ======================================================
+        public record HmacProperties(
+
+                        /**
+                         * Base64-encoded secret.
+                         * Required when algorithm = HMAC.
+                         */
+                        @NotBlank(message = "hmac.secretBase64 must not be blank when algorithm=HMAC") String secretBase64) {
         }
 }
