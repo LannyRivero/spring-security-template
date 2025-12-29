@@ -13,20 +13,35 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 /**
- *  CustomAuthEntryPoint — maneja errores 401 en formato JSON.
+ * CustomAuthEntryPoint — handles 401 Unauthorized errors in JSON format.
  */
 @Component
 public class CustomAuthEntryPoint implements AuthenticationEntryPoint {
 
     private static final Logger log = LoggerFactory.getLogger(CustomAuthEntryPoint.class);
-    private final ObjectMapper mapper = new ObjectMapper();
+
+    private final ObjectMapper mapper;
+    private final ApiErrorFactory errorFactory;
+
+    public CustomAuthEntryPoint(
+            ObjectMapper mapper,
+            ApiErrorFactory errorFactory) {
+        this.mapper = mapper;
+        this.errorFactory = errorFactory;
+    }
 
     @Override
-    public void commence(HttpServletRequest request, HttpServletResponse response,
-                         AuthenticationException ex) throws IOException {
+    public void commence(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AuthenticationException ex) throws IOException {
 
         log.warn("Unauthorized: {}", ex.getMessage());
-        ApiError error = ApiError.of(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized", request);
+
+        ApiError error = errorFactory.create(
+                HttpServletResponse.SC_UNAUTHORIZED,
+                "Unauthorized",
+                request);
 
         response.setStatus(error.status());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
