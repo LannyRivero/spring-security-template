@@ -16,41 +16,37 @@ import java.util.List;
  * {@code StrictJwtValidator}
  *
  * <p>
- * Production-grade JWT validator enforcing <b>strict security guarantees</b>
- * on top of cryptographic validation.
+ * High-level JWT validator enforcing <b>semantic and domain-specific security
+ * rules</b>
+ * on top of low-level cryptographic validation.
  * </p>
  *
  * <h2>Responsibilities</h2>
  * <ul>
- * <li>Delegate <b>all cryptographic validation</b> (signature, algorithm, key
- * id,
- * expiration baseline) to {@link JwtUtils}</li>
- * <li>Apply <b>strict semantic validation</b> of JWT claims required by the
- * security domain</li>
- * <li>Produce a {@link JwtClaimsDTO} used by the security layer to build
- * authentication</li>
+ * <li>Delegate <b>all cryptographic and temporal validation</b>
+ * (signature, alg, kid, exp, iat, nbf)
+ * to {@link JwtUtils}</li>
+ * <li>Enforce <b>issuer, audience and token_use semantics</b></li>
+ * <li>Validate presence of mandatory claims</li>
+ * <li>Produce a {@link JwtClaimsDTO} for the security layer</li>
+ * </ul>
+ *
+ * <h2>Explicitly NOT responsible for</h2>
+ * <ul>
+ * <li>Signature verification</li>
+ * <li>Time-based validation</li>
+ * <li>Authorization decisions</li>
  * </ul>
  *
  * <h2>Security guarantees</h2>
  * <ul>
- * <li>Tokens with invalid or missing signatures are rejected</li>
- * <li>Forged or manipulated claims are rejected</li>
  * <li>Only tokens issued by the configured issuer are accepted</li>
+ * <li>Audience is validated according to {@code token_use}</li>
+ * <li>Malformed or forged claims are rejected deterministically</li>
  * </ul>
  *
- * <h2>Design notes</h2>
- * <ul>
- * <li>This class <b>never parses or verifies signatures directly</b></li>
- * <li>{@link JwtUtils} is the single source of truth for cryptographic
- * validation</li>
- * <li>This validator focuses exclusively on domain and security semantics</li>
- * </ul>
- *
- * <h2>Auditing</h2>
  * <p>
- * This implementation is suitable for banking-grade systems and passes
- * common security audits (ISO 27001, SOC2, ENS) when used with a correct
- * {@link JwtUtils} implementation.
+ * This design follows OWASP ASVS and is suitable for banking-grade systems.
  * </p>
  */
 @Component
@@ -61,27 +57,33 @@ public class StrictJwtValidator implements JwtValidator {
     private static final String CLAIM_TOKEN_USE = "token_use";
 
     private final JwtUtils jwtUtils;
-    private final SecurityJwtProperties properties;
+    private final SecurityJwtProperties props;
 
     public StrictJwtValidator(
             JwtUtils jwtUtils,
-            SecurityJwtProperties properties) {
+            SecurityJwtProperties props) {
         this.jwtUtils = jwtUtils;
-        this.properties = properties;
+        this.props = props;
     }
 
     @Override
     public JwtClaimsDTO validate(String token) {
 
-        // Cryptographic validation (signature, alg, exp, nbf)
+        // --------------------------------------------------
+        // 1. Cryptographic + temporal validation
+        // --------------------------------------------------
         JWTClaimsSet claims = jwtUtils.validateAndParse(token);
 
-        // Issuer validation
-        if (!properties.issuer().equals(claims.getIssuer())) {
+        // --------------------------------------------------
+        // 2. Issuer validation
+        // --------------------------------------------------
+        if (!props.issuer().equals(claims.getIssuer())) {
             throw new InvalidJwtIssuerException();
         }
 
-        // Mandatory claims
+        // --------------------------------------------------
+        // 3. Mandatory claims
+        // --------------------------------------------------
         String subject = claims.getSubject();
         if (subject == null || subject.isBlank()) {
             throw new MissingJwtClaimException("sub");
@@ -92,28 +94,34 @@ public class StrictJwtValidator implements JwtValidator {
             throw new MissingJwtClaimException("jti");
         }
 
-        // token_use validation (STRICT)
+        // --------------------------------------------------
+        // 4. token_use semantics
+        // --------------------------------------------------
         TokenUse tokenUse = TokenUse.from(
                 (String) claims.getClaim(CLAIM_TOKEN_USE));
 
-        // Audience validation (depends on token_use)
+        // --------------------------------------------------
+        // 5. Audience validation (depends on token_use)
+        // --------------------------------------------------
         List<String> audience = claims.getAudience();
         if (audience == null || audience.isEmpty()) {
             throw new MissingJwtClaimException("aud");
         }
 
         String expectedAudience = switch (tokenUse) {
-            case ACCESS -> properties.accessAudience();
-            case REFRESH -> properties.refreshAudience();
+            case ACCESS -> props.accessAudience();
+            case REFRESH -> props.refreshAudience();
         };
 
         if (!audience.contains(expectedAudience)) {
             throw new InvalidJwtAudienceException();
         }
 
-        // Controlled extraction
-        List<String> roles = safeList(claims, CLAIM_ROLES);
-        List<String> scopes = safeList(claims, CLAIM_SCOPES);
+        // --------------------------------------------------
+        // 6. Controlled extraction
+        // --------------------------------------------------
+        List<String> roles = safeStringList(claims, CLAIM_ROLES);
+        List<String> scopes = safeStringList(claims, CLAIM_SCOPES);
 
         return new JwtClaimsDTO(
                 subject,
@@ -129,12 +137,22 @@ public class StrictJwtValidator implements JwtValidator {
                 tokenUse.name().toLowerCase());
     }
 
-    private List<String> safeList(JWTClaimsSet claims, String name) {
+    // ======================================================
+    // Helpers
+    // ======================================================
+
+    /**
+     * Safely extracts a list claim as an immutable list.
+     *
+     * <p>
+     * Any malformed or unexpected claim value results in an empty list,
+     * never an exception.
+     * </p>
+     */
+    private List<String> safeStringList(JWTClaimsSet claims, String name) {
         try {
             List<String> values = claims.getStringListClaim(name);
-
-            // Create an unmodifiable defensive copy of the claim values.
-            return values != null ? List.copyOf(values) : List.of();           
+            return values != null ? List.copyOf(values) : List.of();
         } catch (Exception ex) {
             return List.of();
         }

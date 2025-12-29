@@ -1,5 +1,16 @@
 package com.lanny.spring_security_template.infrastructure.jwt.nimbus;
 
+import com.lanny.spring_security_template.domain.time.ClockProvider;
+import com.lanny.spring_security_template.infrastructure.config.JwtAlgorithm;
+import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
+import com.lanny.spring_security_template.infrastructure.jwt.exception.JwtValidationException;
+import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
+import com.nimbusds.jose.*;
+import com.nimbusds.jose.crypto.*;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+import org.springframework.stereotype.Component;
+
 import java.nio.charset.StandardCharsets;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
@@ -7,44 +18,34 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.stereotype.Component;
-
-import com.lanny.spring_security_template.domain.time.ClockProvider;
-import com.lanny.spring_security_template.infrastructure.config.JwtAlgorithm;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
-import com.lanny.spring_security_template.infrastructure.jwt.exception.JwtValidationException;
-import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
-
-import com.nimbusds.jose.*;
-import com.nimbusds.jose.crypto.MACSigner;
-import com.nimbusds.jose.crypto.MACVerifier;
-import com.nimbusds.jose.crypto.RSASSASigner;
-import com.nimbusds.jose.crypto.RSASSAVerifier;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
-
 /**
- * Low-level JWT utility based on Nimbus JOSE + JWT.
+ * JwtUtils
  *
  * <p>
- * Responsibilities:
+ * Low-level JWT utility based on Nimbus JOSE + JWT.
+ * </p>
+ *
+ * <h2>Responsibilities</h2>
  * <ul>
- * <li>Token generation (access / refresh)</li>
- * <li>Cryptographic validation</li>
- * <li>Structural and temporal claim validation</li>
+ * <li>JWT generation (access / refresh)</li>
+ * <li>Cryptographic validation (signature, alg, kid, typ)</li>
+ * <li>Temporal validation (exp, iat, nbf with clock skew)</li>
+ * </ul>
+ *
+ * <h2>Explicitly NOT responsible for</h2>
+ * <ul>
+ * <li>Issuer validation (iss)</li>
+ * <li>Audience validation (aud)</li>
+ * <li>token_use semantics</li>
+ * <li>Authorization or role validation</li>
  * </ul>
  *
  * <p>
- * This class performs NO authorization decisions; it only handles token generation
- * and validation.
- *
- * IMPORTANT:
- * Do not use this class directly for authorization decisions; use
- * JwtValidator or StrictJwtValidator instead.
+ * Semantic and domain-level validation MUST be handled by
+ * {@code StrictJwtValidator}.
+ * </p>
  */
 @Component
 public final class JwtUtils {
@@ -58,15 +59,15 @@ public final class JwtUtils {
 
     private final RsaKeyProvider keyProvider;
     private final SecurityJwtProperties props;
-    private final ClockProvider clockProvider;
+    private final ClockProvider clock;
 
     public JwtUtils(
             RsaKeyProvider keyProvider,
             SecurityJwtProperties props,
-            ClockProvider clockProvider) {
+            ClockProvider clock) {
         this.keyProvider = keyProvider;
         this.props = props;
-        this.clockProvider = clockProvider;
+        this.clock = clock;
     }
 
     // ======================================================
@@ -82,7 +83,10 @@ public final class JwtUtils {
         return generateToken(subject, roles, scopes, ttl, false);
     }
 
-    public String generateRefreshToken(String subject, Duration ttl) {
+    public String generateRefreshToken(
+            String subject,
+            Duration ttl) {
+
         return generateToken(subject, List.of(), List.of(), ttl, true);
     }
 
@@ -94,22 +98,17 @@ public final class JwtUtils {
             boolean refresh) {
 
         try {
-            Instant now = clockProvider.now();
+            Instant now = clock.now();
 
-            Instant exp = ttl != null
+            Instant expiration = ttl != null
                     ? now.plus(ttl)
                     : now.plus(refresh ? props.refreshTtl() : props.accessTtl());
 
-            String audience = refresh
-                    ? Optional.ofNullable(props.refreshAudience()).orElse(props.accessAudience())
-                    : props.accessAudience();
-
             JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
                     .subject(subject)
-                    .issuer(props.issuer())
-                    .audience(audience)
+                    .issuer(props.issuer()) // issuer se INCLUYE, pero NO se valida aquí
                     .issueTime(Date.from(now))
-                    .expirationTime(Date.from(exp))
+                    .expirationTime(Date.from(expiration))
                     .jwtID(UUID.randomUUID().toString())
                     .claim(CLAIM_TOKEN_USE, refresh ? TOKEN_USE_REFRESH : TOKEN_USE_ACCESS);
 
@@ -128,29 +127,33 @@ public final class JwtUtils {
 
             return jwt.serialize();
 
-        } catch (Exception e) {
-            throw new IllegalStateException("JWT generation failed", e);
+        } catch (Exception ex) {
+            throw new IllegalStateException("JWT generation failed", ex);
         }
     }
 
     // ======================================================
-    // VALIDATION
+    // VALIDATION ENTRY POINT
     // ======================================================
 
+    /**
+     * Performs cryptographic and temporal validation only.
+     *
+     * @throws JwtValidationException if signature, structure or timing is invalid
+     */
     public JWTClaimsSet validateAndParse(String token) {
+
         try {
             SignedJWT jwt = SignedJWT.parse(token);
 
             validateHeader(jwt);
             validateSignature(jwt);
+            validateTemporalClaims(jwt.getJWTClaimsSet());
 
-            JWTClaimsSet claims = jwt.getJWTClaimsSet();
-            validateClaims(claims);
+            return jwt.getJWTClaimsSet();
 
-            return claims;
-
-        } catch (Exception e) {
-            throw new JwtValidationException(e);
+        } catch (Exception ex) {
+            throw new JwtValidationException(ex);
         }
     }
 
@@ -161,15 +164,15 @@ public final class JwtUtils {
     private void validateHeader(SignedJWT jwt) throws JOSEException {
 
         if (!resolveJwsAlgorithm().equals(jwt.getHeader().getAlgorithm())) {
-            throw new JOSEException("alg");
+            throw new JOSEException("Invalid JWT alg");
         }
 
         if (!JOSEObjectType.JWT.equals(jwt.getHeader().getType())) {
-            throw new JOSEException("typ");
+            throw new JOSEException("Invalid JWT typ");
         }
 
         if (jwt.getHeader().getKeyID() == null || jwt.getHeader().getKeyID().isBlank()) {
-            throw new JOSEException("kid");
+            throw new JOSEException("Missing JWT kid");
         }
     }
 
@@ -178,61 +181,28 @@ public final class JwtUtils {
         JWSVerifier verifier = resolveVerifier(jwt.getHeader().getKeyID());
 
         if (!jwt.verify(verifier)) {
-            throw new JOSEException("sig");
+            throw new JOSEException("Invalid JWT signature");
         }
     }
 
-    private void validateClaims(JWTClaimsSet claims) throws JOSEException {
+    private void validateTemporalClaims(JWTClaimsSet claims) throws JOSEException {
 
-        Instant now = clockProvider.now();
+        Instant now = clock.now();
         long skew = props.allowedClockSkewSeconds();
 
         if (claims.getExpirationTime() == null ||
                 claims.getExpirationTime().toInstant().isBefore(now.minusSeconds(skew))) {
-            throw new JOSEException("exp");
+            throw new JOSEException("JWT expired");
         }
 
         if (claims.getIssueTime() != null &&
                 claims.getIssueTime().toInstant().isAfter(now.plusSeconds(skew))) {
-            throw new JOSEException("iat");
+            throw new JOSEException("Invalid iat");
         }
 
         if (claims.getNotBeforeTime() != null &&
                 claims.getNotBeforeTime().toInstant().isAfter(now.plusSeconds(skew))) {
-            throw new JOSEException("nbf");
-        }
-
-        if (!Objects.equals(claims.getIssuer(), props.issuer())) {
-            throw new JOSEException("iss");
-        }
-
-        String tokenUseValue;
-        try {
-            tokenUseValue = claims.getStringClaim(CLAIM_TOKEN_USE);
-        } catch (java.text.ParseException e) {
-            throw new JOSEException("token_use", e);
-        }
-
-        String expectedAudience = TOKEN_USE_REFRESH.equals(tokenUseValue)
-                ? Optional.ofNullable(props.refreshAudience()).orElse(props.accessAudience())
-                : props.accessAudience();
-
-        if (claims.getAudience() == null || !claims.getAudience().contains(expectedAudience)) {
-            throw new JOSEException("aud");
-        }
-
-        validateTokenUsePresent(claims);
-    }
-
-    private void validateTokenUsePresent(JWTClaimsSet claims) throws JOSEException {
-        String tokenUse;
-        try {
-            tokenUse = claims.getStringClaim(CLAIM_TOKEN_USE);
-        } catch (java.text.ParseException e) {
-            throw new JOSEException("token_use", e);
-        }
-        if (!TOKEN_USE_ACCESS.equals(tokenUse) && !TOKEN_USE_REFRESH.equals(tokenUse)) {
-            throw new JOSEException("token_use");
+            throw new JOSEException("Invalid nbf");
         }
     }
 
@@ -247,47 +217,50 @@ public final class JwtUtils {
     }
 
     private JWSSigner resolveSigner() throws KeyLengthException {
+
         if (props.algorithm() == JwtAlgorithm.HMAC) {
-            return new MACSigner(resolveHmacSecretBytes());
+            return new MACSigner(resolveHmacSecret());
         }
+
         return new RSASSASigner(keyProvider.privateKey());
     }
 
     private JWSVerifier resolveVerifier(String kid) throws JOSEException {
+
         if (props.algorithm() == JwtAlgorithm.HMAC) {
-            return new MACVerifier(resolveHmacSecretBytes());
+            return new MACVerifier(resolveHmacSecret());
         }
 
-        RSAPublicKey pub = keyProvider.findPublicKey(kid)
-                .orElseThrow(() -> new JOSEException("kid"));
+        RSAPublicKey publicKey = keyProvider.findPublicKey(kid)
+                .orElseThrow(() -> new JOSEException("Unknown kid"));
 
-        return new RSASSAVerifier(pub);
+        return new RSASSAVerifier(publicKey);
     }
 
-    private byte[] resolveHmacSecretBytes() {
+    private byte[] resolveHmacSecret() {
         return Base64.getDecoder()
                 .decode(props.hmac().secretBase64().getBytes(StandardCharsets.UTF_8));
     }
 
     // ======================================================
-    // HELPERS (⚠️ NOT FOR AUTHORIZATION)
+    // TECHNICAL HELPERS (NOT FOR AUTHZ)
     // ======================================================
 
     /**
-     * ⚠️ Technical validation only.
-     * Do NOT use for authorization decisions.
+     * Technical validity check only.
+     * Never use for authorization decisions.
      */
     public boolean isValid(String token) {
         try {
             validateAndParse(token);
             return true;
-        } catch (Exception e) {
+        } catch (Exception ex) {
             return false;
         }
     }
 
     /**
-     * ⚠️ Extracts subject without authorization checks.
+     * Extracts subject after cryptographic validation.
      */
     public String extractSubject(String token) {
         return validateAndParse(token).getSubject();
