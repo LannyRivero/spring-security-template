@@ -365,6 +365,23 @@ public class UserJpaRepositoryTest {
             assertThat(found.get().getScopes()).isEmpty();
         }
 
+        @Test
+        @DisplayName("Should handle special characters in username")
+        void shouldHandleSpecialCharactersInUsername() {
+
+            UserEntity user = UserTestData.defaultUser();
+            user.setUsername("user.name-123_test");
+            user.setEmail("special@example.com");
+
+            entityManager.persistAndFlush(user);
+
+            Optional<UserEntity> found = userJpaRepository.findByUsernameIgnoreCase("user.name-123_test");
+
+            assertThat(found).isPresent();
+            assertThat(found.get().getUsername())
+                    .isEqualTo("user.name-123_test");
+        }
+
     }
     // =========================================================================
     // TEST DATA HELPERS
