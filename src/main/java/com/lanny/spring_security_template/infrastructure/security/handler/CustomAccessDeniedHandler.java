@@ -13,7 +13,22 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 /**
- * CustomAccessDeniedHandler — handles 403 errors in JSON format.
+ * CustomAccessDeniedHandler
+ *
+ * Handles authorization failures (HTTP 403) and returns
+ * a standardized JSON error response.
+ *
+ * <p>
+ * Responsibilities:
+ * <ul>
+ * <li>Translate {@link AccessDeniedException} into HTTP 403 responses</li>
+ * <li>Delegate error construction to {@link ApiErrorFactory}</li>
+ * <li>Serialize the response using Spring-managed {@link ObjectMapper}</li>
+ * </ul>
+ *
+ * <p>
+ * This handler contains no business logic and no temporal logic.
+ * All error structure decisions are centralized in {@link ApiErrorFactory}.
  */
 @Component
 public class CustomAccessDeniedHandler implements AccessDeniedHandler {
@@ -38,10 +53,7 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
 
         log.warn("Access denied: {}", ex.getMessage());
 
-        ApiError error = errorFactory.create(
-                HttpServletResponse.SC_FORBIDDEN,
-                "Forbidden",
-                request);
+        ApiError error = errorFactory.forbidden(request);
 
         response.setStatus(error.status());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
