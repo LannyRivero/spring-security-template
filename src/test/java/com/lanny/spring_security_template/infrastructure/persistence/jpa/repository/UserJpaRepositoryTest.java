@@ -260,6 +260,19 @@ public class UserJpaRepositoryTest {
             }).isInstanceOf(ConstraintViolationException.class);
         }
 
+        @Test
+        @DisplayName("Should fail when username is null")
+        void shouldFailWhenUsernameIsNull() {
+
+            UserEntity user = UserTestData.defaultUser();
+            user.setUsername(null);
+
+            assertThatThrownBy(() -> {
+                userJpaRepository.save(user);
+                entityManager.flush();
+            }).isInstanceOf(ConstraintViolationException.class);
+        }
+
     }
     // =========================================================================
     // TEST DATA HELPERS
