@@ -1,7 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.jwt.nimbus;
 
 import java.nio.charset.StandardCharsets;
-import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.time.Instant;
@@ -251,7 +250,7 @@ public final class JwtUtils {
         if (props.algorithm() == JwtAlgorithm.HMAC) {
             return new MACSigner(resolveHmacSecretBytes());
         }
-        return new RSASSASigner((RSAPrivateKey) keyProvider.privateKey());
+        return new RSASSASigner(keyProvider.privateKey());
     }
 
     private JWSVerifier resolveVerifier(String kid) throws JOSEException {
