@@ -224,22 +224,43 @@ public class UserJpaRepositoryTest {
     // =========================================================================
     // CONSTRAINT TESTS
     // =========================================================================
-    @Test
-    @DisplayName("Should fail when username is not unique")
-    void testShouldFailWhenUsernameIsNotUnique() {
+    @Nested
+    @DisplayName("Constraint Validation Tests")
+    class ConstraintTests {
 
-        givenPersistedUserWithUsername("duplicate");
+        @Test
+        @DisplayName("Should fail when username is not unique")
+        void testShouldFailWhenUsernameIsNotUnique() {
 
-        UserEntity duplicate = UserTestData.defaultUser();
-        duplicate.setUsername("duplicate");
-        duplicate.setEmail("other@example.com");
+            givenPersistedUserWithUsername("duplicate");
 
-        assertThatThrownBy(() -> {
-            userJpaRepository.save(duplicate);
-            entityManager.flush();
-        }).isInstanceOf(ConstraintViolationException.class);
+            UserEntity duplicate = UserTestData.defaultUser();
+            duplicate.setUsername("duplicate");
+            duplicate.setEmail("other@example.com");
+
+            assertThatThrownBy(() -> {
+                userJpaRepository.save(duplicate);
+                entityManager.flush();
+            }).isInstanceOf(ConstraintViolationException.class);
+        }
+
+        @Test
+        @DisplayName("Should fail when email is not unique")
+        void testShouldFailWhenEmailIsNotUnique() {
+
+            givenPersistedUserWithEmail("duplicate@example.com");
+
+            UserEntity duplicate = UserTestData.defaultUser();
+            duplicate.setUsername("other_user");
+            duplicate.setEmail("duplicate@example.com");
+
+            assertThatThrownBy(() -> {
+                userJpaRepository.save(duplicate);
+                entityManager.flush();
+            }).isInstanceOf(ConstraintViolationException.class);
+        }
+
     }
-
     // =========================================================================
     // TEST DATA HELPERS
     // =========================================================================
