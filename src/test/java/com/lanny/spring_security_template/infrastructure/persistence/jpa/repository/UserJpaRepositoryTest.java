@@ -382,6 +382,23 @@ public class UserJpaRepositoryTest {
                     .isEqualTo("user.name-123_test");
         }
 
+        @Test
+        @DisplayName("Should handle long email addresses")
+        void shouldHandleLongEmailAddresses() {
+
+            String longEmail = "a".repeat(140) + "@test.com";
+
+            UserEntity user = UserTestData.defaultUser();
+            user.setUsername("longuser");
+            user.setEmail(longEmail);
+
+            entityManager.persistAndFlush(user);
+
+            Optional<UserEntity> found = userJpaRepository.findByEmailIgnoreCase(longEmail);
+
+            assertThat(found).isPresent();
+        }
+
     }
     // =========================================================================
     // TEST DATA HELPERS
