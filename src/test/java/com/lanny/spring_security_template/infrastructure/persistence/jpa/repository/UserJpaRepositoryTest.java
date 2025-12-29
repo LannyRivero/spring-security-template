@@ -116,13 +116,11 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should find user by username or email with username")
         void testShouldFindUserByUsernameOrEmailWithUsername() {
-            UserEntity user = createUser("john_doe", "john@example.com", "hashedPassword123");
-            entityManager.persistAndFlush(user);
 
-            Optional<UserEntity> found = userJpaRepository.findByUsernameOrEmail("john_doe");
-
+            givenPersistedUser();
+            Optional<UserEntity> found = userJpaRepository.findByUsernameOrEmail(UserTestData.USERNAME);
             assertThat(found).isPresent();
-            assertThat(found.get().getUsername()).isEqualTo("john_doe");
+            assertThat(found.get().getUsername()).isEqualTo(UserTestData.USERNAME);
         }
 
         @Test
