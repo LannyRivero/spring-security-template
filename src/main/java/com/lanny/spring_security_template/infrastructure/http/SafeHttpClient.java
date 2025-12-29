@@ -1,5 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.http;
 
+import com.lanny.spring_security_template.infrastructure.security.ssrf.UrlSecurityValidator;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -16,11 +17,7 @@ import java.util.Objects;
  * - Enforce destination validation (SSRF protection)
  * - Prevent direct RestTemplate usage in upper layers
  *
- * IMPORTANT:
- * - This class does NOT implement security policies itself.
- * - All destination security rules are delegated to UrlSecurityValidator.
- *
- * This design keeps transport concerns separate from security policy.
+ * All destination security rules are delegated to UrlSecurityValidator.
  */
 @Component
 public class SafeHttpClient {
@@ -39,9 +36,10 @@ public class SafeHttpClient {
         Objects.requireNonNull(responseType, "responseType must not be null");
 
         URI uri = parseUri(url);
+        Objects.requireNonNull(uri, "parsed URI must not be null");
         validator.validate(uri);
 
-        return restTemplate.getForObject(Objects.requireNonNull(uri), responseType);
+        return restTemplate.getForObject(uri, responseType);
     }
 
     public <T> T post(String url, Object body, Class<T> responseType) {
@@ -50,24 +48,20 @@ public class SafeHttpClient {
         Objects.requireNonNull(responseType, "responseType must not be null");
 
         URI uri = parseUri(url);
+        Objects.requireNonNull(uri, "parsed URI must not be null");
         validator.validate(uri);
 
-        return restTemplate.postForObject(Objects.requireNonNull(uri), body, responseType);
+        return restTemplate.postForObject(uri, body, responseType);
     }
 
     /**
-     * Parses and validates URI format.
+     * Parses and normalizes a URL into a URI.
      *
-     * Contract:
-     * - Returns a valid URI
-     * - Throws IllegalArgumentException if the format is invalid
-     *
-     * NOTE:
-     * URI.create never returns null.
+     * @throws IllegalArgumentException if the URL format is invalid
      */
     private URI parseUri(String url) {
         try {
-            return URI.create(url);
+            return URI.create(url).normalize();
         } catch (IllegalArgumentException ex) {
             throw new IllegalArgumentException(
                     "Invalid URL format for outbound HTTP call",
