@@ -39,7 +39,7 @@ import com.lanny.spring_security_template.application.auth.port.out.RefreshToken
  * </ul>
  */
 @Component
-@Profile({ "test", "local" })
+@Profile("!prod")
 public class NoOpRefreshTokenConsumptionAdapter
         implements RefreshTokenConsumptionPort {
 
