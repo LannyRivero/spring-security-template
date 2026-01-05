@@ -79,7 +79,7 @@ class TokenSessionCreatorTest {
                 assertThat(result.accessToken()).isEqualTo("access-token");
                 assertThat(result.refreshToken()).isEqualTo("refresh-token");
 
-                verify(refreshTokenStore).save(eq(USERNAME), eq(REFRESH_JTI), any(), any());
+                verify(refreshTokenStore).save(eq(USERNAME), eq(REFRESH_JTI), any(), any(), any(), any());
                 verify(sessionManager).register(eq(issuedTokens));
                 verify(tokenIssuer).issueTokens(eq(USERNAME), any(RoleScopeResult.class));
 
@@ -98,7 +98,7 @@ class TokenSessionCreatorTest {
                                 .isInstanceOf(RuntimeException.class)
                                 .hasMessage("Issuer error");
 
-                verify(refreshTokenStore, never()).save(any(), any(), any(), any());
+                verify(refreshTokenStore, never()).save(any(), any(), any(), any(), any(), any());
                 verify(sessionManager, never()).register(any());
         }
 

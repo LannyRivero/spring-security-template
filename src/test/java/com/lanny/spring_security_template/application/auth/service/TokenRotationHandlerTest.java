@@ -94,7 +94,7 @@ class TokenRotationHandlerTest {
                                 .thenReturn(issuedTokens);
 
                 // Act
-                JwtResult result = handler.rotate(claims);
+                JwtResult result = handler.rotate(claims, "refresh-token-value");
 
                 // Assert
                 assertThat(result.accessToken()).isEqualTo("access-new");
@@ -104,7 +104,7 @@ class TokenRotationHandlerTest {
                 verify(sessionRegistry).removeSession(USERNAME, OLD_JTI);
 
                 verify(tokenIssuer).issueTokens(eq(USERNAME), any());
-                verify(refreshTokenStore).save(eq(USERNAME), eq(NEW_JTI), any(), any());
+                verify(refreshTokenStore).save(eq(USERNAME), eq(NEW_JTI), any(), any(), any(), any());
                 verify(sessionRegistry).registerSession(eq(USERNAME), eq(NEW_JTI), any());
 
                 verifyNoMoreInteractions(blacklist, refreshTokenStore, sessionRegistry, tokenIssuer);
