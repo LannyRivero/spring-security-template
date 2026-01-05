@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional;
+package com.lanny.spring_security_template.infrastructure.transactional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;

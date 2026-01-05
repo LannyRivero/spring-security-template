@@ -3,6 +3,7 @@ package com.lanny.spring_security_template.infrastructure.adapter.usecase.transa
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.service.RefreshService;
+import com.lanny.spring_security_template.infrastructure.transactional.RefreshTransactionalAdapter;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
