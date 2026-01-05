@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.transactional;
+package com.lanny.spring_security_template.infrastructure.adapter.transactional;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;

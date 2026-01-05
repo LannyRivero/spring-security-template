@@ -20,10 +20,10 @@ import com.lanny.spring_security_template.application.auth.command.RegisterComma
 import com.lanny.spring_security_template.application.auth.query.MeQuery;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.result.MeResult;
-import com.lanny.spring_security_template.infrastructure.transactional.ChangePasswordTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.transactional.DevRegisterTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.transactional.LoginTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.transactional.RefreshTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.ChangePasswordTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.DevRegisterTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.LoginTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.RefreshTransactionalAdapter;
 
 @ExtendWith(MockitoExtension.class)
 class AuthUseCaseImplTest {

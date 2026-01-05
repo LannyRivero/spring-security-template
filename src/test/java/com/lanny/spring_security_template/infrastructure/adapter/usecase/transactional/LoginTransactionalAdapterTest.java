@@ -3,7 +3,7 @@ package com.lanny.spring_security_template.infrastructure.adapter.usecase.transa
 import com.lanny.spring_security_template.application.auth.command.LoginCommand;
 import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.service.LoginService;
-import com.lanny.spring_security_template.infrastructure.transactional.LoginTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.LoginTransactionalAdapter;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -2,12 +2,12 @@ package com.lanny.spring_security_template.infrastructure.config;
 
 import com.lanny.spring_security_template.application.auth.port.in.AuthUseCase;
 import com.lanny.spring_security_template.application.auth.service.*;
-import com.lanny.spring_security_template.infrastructure.transactional.ChangePasswordTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.transactional.DevRegisterTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.transactional.LoginTransactionalAdapter;
-import com.lanny.spring_security_template.infrastructure.transactional.RefreshTransactionalAdapter;
 import com.lanny.spring_security_template.application.auth.port.out.AuditEventPublisher;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.ChangePasswordTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.DevRegisterTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.LoginTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.RefreshTransactionalAdapter;
 
 import org.junit.jupiter.api.DisplayName;
 import java.util.Optional;

@@ -8,7 +8,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
-import com.lanny.spring_security_template.infrastructure.transactional.DevRegisterTransactionalAdapter;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.DevRegisterTransactionalAdapter;
 
 /**
  * Minimal banking-grade context test.
