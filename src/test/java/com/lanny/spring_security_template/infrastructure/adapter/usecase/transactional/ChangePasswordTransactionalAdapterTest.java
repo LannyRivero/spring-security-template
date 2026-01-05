@@ -4,6 +4,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 import com.lanny.spring_security_template.application.auth.service.ChangePasswordService;
+import com.lanny.spring_security_template.infrastructure.adapter.transactional.ChangePasswordTransactionalAdapter;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

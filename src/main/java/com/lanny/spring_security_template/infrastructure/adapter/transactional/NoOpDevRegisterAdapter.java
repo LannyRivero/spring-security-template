@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.adapter.usecase.transactional;
+package com.lanny.spring_security_template.infrastructure.adapter.transactional;
 
 import com.lanny.spring_security_template.application.auth.command.RegisterCommand;
 import com.lanny.spring_security_template.application.auth.port.out.DevRegisterPort;

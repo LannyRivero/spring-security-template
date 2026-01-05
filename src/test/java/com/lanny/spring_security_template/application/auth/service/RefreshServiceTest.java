@@ -50,8 +50,7 @@ class RefreshServiceTest {
                 1000L,
                 2000L,
                 List.of("ROLE_USER"),
-                List.of("profile:read")
-                ,"refresh");
+                List.of("profile:read"), "refresh");
     }
 
     @Test
@@ -75,7 +74,7 @@ class RefreshServiceTest {
         verify(validator).validate(claims);
         verify(rotationHandler).shouldRotate();
         verify(resultFactory).newAccessOnly(claims, REFRESH);
-        verify(rotationHandler, never()).rotate(any());
+        verify(rotationHandler, never()).rotate(any(), any());
     }
 
     @Test
@@ -89,7 +88,7 @@ class RefreshServiceTest {
         when(tokenProvider.validateAndGetClaims(cmd.refreshToken())).thenReturn(Optional.of(claims));
         doNothing().when(validator).validate(claims);
         when(rotationHandler.shouldRotate()).thenReturn(true);
-        when(rotationHandler.rotate(claims)).thenReturn(rotated);
+        when(rotationHandler.rotate(claims, REFRESH)).thenReturn(rotated);
 
         JwtResult result = refreshService.refresh(cmd);
 
@@ -144,6 +143,6 @@ class RefreshServiceTest {
         refreshService.refresh(cmd);
 
         verify(resultFactory).newAccessOnly(claims, REFRESH);
-        verify(rotationHandler, never()).rotate(any());
+        verify(rotationHandler, never()).rotate(any(), any());
     }
 }

@@ -1,6 +1,7 @@
 package com.lanny.spring_security_template.application.auth;
 
 import com.lanny.spring_security_template.application.auth.command.RefreshCommand;
+import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenConsumptionPort;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.TokenProvider;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
@@ -36,9 +37,10 @@ class RefreshServiceTimeTest {
                 RefreshTokenStore refreshTokenStore = mock(RefreshTokenStore.class);
                 TokenRotationHandler rotationHandler = mock(TokenRotationHandler.class);
                 TokenRefreshResultFactory resultFactory = mock(TokenRefreshResultFactory.class);
+                RefreshTokenConsumptionPort refreshTokenConsumption = mock(RefreshTokenConsumptionPort.class);
 
                 RefreshService service = new RefreshService(
-                                tokenProvider, validator, refreshTokenStore, rotationHandler, resultFactory);
+                                tokenProvider, validator, refreshTokenConsumption, refreshTokenStore, rotationHandler, resultFactory);
 
                 String refreshToken = "valid-refresh-token";
 
@@ -81,9 +83,10 @@ class RefreshServiceTimeTest {
                 RefreshTokenStore refreshTokenStore = mock(RefreshTokenStore.class);
                 TokenRotationHandler rotationHandler = mock(TokenRotationHandler.class);
                 TokenRefreshResultFactory resultFactory = mock(TokenRefreshResultFactory.class);
+                RefreshTokenConsumptionPort refreshTokenConsumption = mock(RefreshTokenConsumptionPort.class);
 
                 RefreshService service = new RefreshService(
-                                tokenProvider, validator, refreshTokenStore, rotationHandler, resultFactory);
+                                tokenProvider, validator, refreshTokenConsumption, refreshTokenStore, rotationHandler, resultFactory);
 
                 when(tokenProvider.validateAndGetClaims("invalid-token"))
                                 .thenReturn(Optional.empty());

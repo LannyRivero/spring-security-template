@@ -8,6 +8,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.core5.util.Timeout;
 import org.slf4j.MDC;
+import java.util.Objects;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -63,7 +64,8 @@ public class HttpClientConfig {
                 .disableAutomaticRetries()
                 .build();
 
-        RestTemplate rt = new RestTemplate(new HttpComponentsClientHttpRequestFactory(httpClient));
+        RestTemplate rt = new RestTemplate(
+                new HttpComponentsClientHttpRequestFactory(Objects.requireNonNull(httpClient)));
 
         rt.getInterceptors().add((request, body, execution) -> {
             if (props.propagateCorrelationId()) {

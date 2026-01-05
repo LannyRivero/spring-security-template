@@ -178,11 +178,18 @@ public class AuthApplicationConfig {
     public RefreshService refreshService(
             TokenProvider tokenProvider,
             RefreshTokenValidator validator,
+            RefreshTokenConsumptionPort refreshTokenConsumption,
             RefreshTokenStore refreshTokenStore,
             TokenRotationHandler rotationHandler,
             TokenRefreshResultFactory resultFactory) {
 
-        return new RefreshService(tokenProvider, validator, refreshTokenStore, rotationHandler, resultFactory);
+        return new RefreshService(
+                tokenProvider,
+                validator,
+                refreshTokenConsumption,
+                refreshTokenStore,
+                rotationHandler,
+                resultFactory);
     }
 
     // ============================================================

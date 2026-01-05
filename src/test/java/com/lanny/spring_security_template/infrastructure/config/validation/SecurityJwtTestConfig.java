@@ -11,6 +11,6 @@ public class SecurityJwtTestConfig {
 
     @Bean
     SecurityJwtPropertiesValidator validator(SecurityJwtProperties props) {
-        return new SecurityJwtPropertiesValidator(props);
+        return new SecurityJwtPropertiesValidator();
     }
 }
