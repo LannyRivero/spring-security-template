@@ -39,7 +39,15 @@ We will use **Redis** for:
 - **Development/Test**: In-memory adapters (no Redis dependency)
 - **Demo/Production**: Redis (single instance or cluster)
 - **Key design**: Namespaced keys with TTL matching token expiration
-- **Data structures**: Strings for blacklist, Sets for session registry
+- **Data structures**: Strings for blacklist, Sorted Sets for session registry
+
+### Blacklist eviction strategy
+
+- **Blacklisted tokens rely exclusively on their natural expiration lifecycle.**
+- **Each revoked token is stored with a TTL equal to its remaining lifetime**
+- **Once expired, Redis automatically removes the entry**
+- **No explicit cleanup jobs, schedulers, or key-scanning mechanisms are used**
+- **This design avoids unsafe Redis operations and reduces operational complexity.**
 
 ### Architecture
 
@@ -49,11 +57,10 @@ application/auth/port/out/
 └── SessionRegistryGateway.java     # Interface
 
 infrastructure/
-├── jwt/blacklist/
-│   └── InMemoryTokenBlacklistGateway.java   # @Profile({"dev", "test"})
 └── security/
     ├── blacklist/
-    │   └── RedisTokenBlacklistGateway.java  # @Profile({"prod", "demo"})
+    │   └── InMemoryTokenBlacklistGateway.java   # @Profile({"dev", "test"})
+    │   └── RedisTokenBlacklistGateway.java      # @Profile({"prod", "demo"})
     └── session/
         ├── InMemorySessionRegistryGateway.java  # @Profile({"dev", "test"})
         └── RedisSessionRegistryGateway.java      # @Profile({"prod", "demo"})
