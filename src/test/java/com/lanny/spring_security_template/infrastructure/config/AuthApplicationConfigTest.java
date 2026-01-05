@@ -1,6 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +16,7 @@ import com.lanny.spring_security_template.application.auth.policy.RotationPolicy
 import com.lanny.spring_security_template.application.auth.policy.SessionPolicy;
 import com.lanny.spring_security_template.application.auth.policy.TokenPolicyProperties;
 import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
+import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenConsumptionPort;
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenStore;
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
 import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
@@ -222,7 +224,8 @@ class AuthApplicationConfigTest {
                                                 sessionRegistry,
                                                 blacklist, rotationPolicy),
                                 new TokenRefreshResultFactory(roleProvider, scopePolicy, tokenProvider, clockProvider,
-                                                tokenPolicy));
+                                                tokenPolicy),
+                                mock(RefreshTokenConsumptionPort.class));
 
                 assertThat(bean)
                                 .isNotNull()

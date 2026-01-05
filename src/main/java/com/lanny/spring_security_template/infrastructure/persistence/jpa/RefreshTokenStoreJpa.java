@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -84,7 +85,7 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
                 .expiresAt(expiresAt)
                 .build();
 
-        repo.save(entity);
+        repo.save(Objects.requireNonNull(entity, "RefreshTokenEntity must not be null"));
     }
 
     /**
