@@ -1,8 +1,11 @@
 package com.lanny.spring_security_template.infrastructure.adapter.security;
 
 import java.time.Duration;
+import java.util.List;
 
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenConsumptionPort;
@@ -36,22 +39,40 @@ import com.lanny.spring_security_template.infrastructure.security.redis.RedisRef
  * </ul>
  */
 @Component
-@Profile({ "prod", "demo" })
+@Profile("prod")
 public class RedisRefreshTokenConsumptionAdapter
         implements RefreshTokenConsumptionPort {
 
-    private final RedisRefreshTokenConsumer consumer;
+    private static final String KEY_PREFIX = "refresh:consume:";
 
-    public RedisRefreshTokenConsumptionAdapter(
-            RedisRefreshTokenConsumer consumer) {
-        this.consumer = consumer;
+    private final StringRedisTemplate redis;
+    private final DefaultRedisScript<Long> script;
+
+    public RedisRefreshTokenConsumptionAdapter(StringRedisTemplate redis) {
+        this.redis = redis;
+        this.script = new DefaultRedisScript<>();
+        this.script.setResultType(Long.class);
+        this.script.setScriptText("""
+                    if redis.call("SETNX", KEYS[1], "1") == 1 then
+                      redis.call("PEXPIRE", KEYS[1], ARGV[1])
+                      return 1
+                    else
+                      return 0
+                    end
+                """);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean consume(String jti, Duration remainingTtl) {
-        return consumer.consume(jti, remainingTtl);
+
+        String key = KEY_PREFIX + jti;
+        long ttlMillis = remainingTtl.toMillis();
+
+        Long result = redis.execute(
+                script,
+                List.of(key),
+                String.valueOf(ttlMillis));
+
+        return result != null && result == 1;
     }
 }

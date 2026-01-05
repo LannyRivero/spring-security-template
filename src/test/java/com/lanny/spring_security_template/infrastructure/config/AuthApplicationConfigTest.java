@@ -219,13 +219,13 @@ class AuthApplicationConfigTest {
                 var bean = config.refreshService(
                                 tokenProvider,
                                 new RefreshTokenValidator(refreshTokenPolicy),
+                                mock(RefreshTokenConsumptionPort.class),
                                 refreshTokenStore,
                                 new TokenRotationHandler(roleProvider, scopePolicy, tokenIssuer(), refreshTokenStore,
                                                 sessionRegistry,
                                                 blacklist, rotationPolicy),
                                 new TokenRefreshResultFactory(roleProvider, scopePolicy, tokenProvider, clockProvider,
-                                                tokenPolicy),
-                                mock(RefreshTokenConsumptionPort.class));
+                                                tokenPolicy));
 
                 assertThat(bean)
                                 .isNotNull()
