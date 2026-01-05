@@ -40,7 +40,7 @@ class RefreshServiceTimeTest {
                 RefreshTokenConsumptionPort refreshTokenConsumption = mock(RefreshTokenConsumptionPort.class);
 
                 RefreshService service = new RefreshService(
-                                tokenProvider, validator, refreshTokenStore, rotationHandler, resultFactory, refreshTokenConsumption);
+                                tokenProvider, validator, refreshTokenConsumption, refreshTokenStore, rotationHandler, resultFactory);
 
                 String refreshToken = "valid-refresh-token";
 
@@ -86,7 +86,7 @@ class RefreshServiceTimeTest {
                 RefreshTokenConsumptionPort refreshTokenConsumption = mock(RefreshTokenConsumptionPort.class);
 
                 RefreshService service = new RefreshService(
-                                tokenProvider, validator, refreshTokenStore, rotationHandler, resultFactory, refreshTokenConsumption);
+                                tokenProvider, validator, refreshTokenConsumption, refreshTokenStore, rotationHandler, resultFactory);
 
                 when(tokenProvider.validateAndGetClaims("invalid-token"))
                                 .thenReturn(Optional.empty());

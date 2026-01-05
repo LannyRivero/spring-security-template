@@ -34,10 +34,11 @@ public class RefreshService {
 
     private final TokenProvider tokenProvider;
     private final RefreshTokenValidator validator;
+     private final RefreshTokenConsumptionPort refreshTokenConsumption;
     private final RefreshTokenStore refreshTokenStore;
     private final TokenRotationHandler rotationHandler;
     private final TokenRefreshResultFactory resultFactory;
-    private final RefreshTokenConsumptionPort refreshTokenConsumption;
+   
 
     /**
      * Executes the refresh-token workflow for the provided {@link RefreshCommand}.
