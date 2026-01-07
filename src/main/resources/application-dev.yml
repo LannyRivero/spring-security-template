@@ -73,7 +73,7 @@ security:
     default-roles:
       - ROLE_USER
     default-scopes:
-      - profile:read
+      - profile:read   
 
     # ------------------------------------------------
     # 🔑 RSA CONFIG (DEV → CLASSPATH PROVIDER)
@@ -89,6 +89,9 @@ security:
 
       public-keys:
         dev-rsa-1: keys/rsa-public.pem
+  network:
+    trusted-proxy-prefixes:
+      - "127.0.0.1"
 
   cors:
     allowed-origins:
