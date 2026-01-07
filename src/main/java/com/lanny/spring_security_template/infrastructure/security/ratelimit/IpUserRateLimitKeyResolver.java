@@ -13,18 +13,19 @@ import com.lanny.spring_security_template.infrastructure.security.network.Client
  * {@code IpUserRateLimitKeyResolver}
  *
  * <p>
- * Builds rate-limiting keys based on a combination of:
+ * Builds rate-limiting keys based on:
  * </p>
  * <ul>
  * <li>Resolved client IP address</li>
- * <li>Username (hashed, when available)</li>
+ * <li>Hashed username when available</li>
  * </ul>
  *
  * <h2>Security guarantees</h2>
  * <ul>
  * <li>No blind trust in forwarded headers</li>
  * <li>No PII leakage (hashed usernames)</li>
- * <li>Consistent IP resolution across the system</li>
+ * <li>Stable, deterministic keys</li>
+ * <li>Fail-safe behavior (never breaks login flow)</li>
  * </ul>
  */
 @Component
@@ -60,7 +61,7 @@ public class IpUserRateLimitKeyResolver implements RateLimitKeyResolver {
      * NOTE:
      * <ul>
      * <li>Works for form-based login</li>
-     * <li>Returns null for JSON-based login (EXPECTED)</li>
+     * <li>Returns null for JSON login (EXPECTED)</li>
      * </ul>
      * </p>
      */
@@ -69,8 +70,12 @@ public class IpUserRateLimitKeyResolver implements RateLimitKeyResolver {
     }
 
     /**
-     * Hashes username to avoid PII leakage while keeping
-     * rate-limiting keys stable.
+     * Hashes username to avoid PII leakage.
+     *
+     * <p>
+     * Fail-safe by design: hashing errors must never
+     * break authentication or rate limiting.
+     * </p>
      */
     private String hashUser(String username) {
         try {
@@ -80,8 +85,9 @@ public class IpUserRateLimitKeyResolver implements RateLimitKeyResolver {
                     .withoutPadding()
                     .encodeToString(hash)
                     .substring(0, 16);
-        } catch (Exception e) {
-            throw new IllegalStateException("Cannot hash username for rate limiting", e);
+        } catch (Exception ex) {
+            // Defensive fallback (deterministic, non-PII)
+            return "hash_error";
         }
     }
 }
