@@ -26,10 +26,38 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * {@code LoginRateLimitingFilter}
  *
+ * <p>
  * Infrastructure-level security filter that enforces rate limiting
  * on authentication attempts.
+ * </p>
  *
- * Applied strictly to POST requests targeting the configured login endpoint.
+ * <h2>Execution scope</h2>
+ * <ul>
+ * <li>Applies ONLY to POST requests</li>
+ * <li>Applies ONLY to the configured login endpoint</li>
+ * <li>Disabled automatically when rate limiting is off</li>
+ * </ul>
+ *
+ * <h2>Responsibilities</h2>
+ * <ul>
+ * <li>Resolve rate-limit key via {@link RateLimitKeyResolver}</li>
+ * <li>Delegate brute-force detection to {@link LoginAttemptPolicy}</li>
+ * <li>Short-circuit blocked requests with RFC-compliant error responses</li>
+ * </ul>
+ *
+ * <h2>Important note</h2>
+ * <p>
+ * Resetting login attempts after a successful authentication
+ * is the responsibility of the application layer (login use case),
+ * NOT this filter.
+ * </p>
+ *
+ * <h2>Security guarantees</h2>
+ * <ul>
+ * <li>No PII leakage</li>
+ * <li>No logging of rate-limit keys</li>
+ * <li>Deterministic behavior</li>
+ * </ul>
  */
 @Slf4j
 @Component
@@ -48,6 +76,7 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
             ObjectMapper objectMapper,
             LoginAttemptPolicy loginAttemptPolicy,
             ApiErrorFactory errorFactory) {
+
         this.props = props;
         this.keyResolver = keyResolver;
         this.objectMapper = objectMapper;
@@ -74,7 +103,6 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String key = keyResolver.resolveKey(request);
-
         LoginAttemptResult result = loginAttemptPolicy.registerAttempt(key);
 
         if (!result.allowed()) {
@@ -100,9 +128,7 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
         response.setContentType("application/json;charset=UTF-8");
 
         if (retryAfterSeconds > 0) {
-            response.setHeader(
-                    "Retry-After",
-                    String.valueOf(retryAfterSeconds));
+            response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
         }
 
         ApiError error = errorFactory.create(
@@ -110,8 +136,6 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
                 "Too many login attempts. Please try again later.",
                 request);
 
-        objectMapper.writeValue(
-                response.getWriter(),
-                error);
+        objectMapper.writeValue(response.getWriter(), error);
     }
 }
