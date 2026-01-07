@@ -1,14 +1,14 @@
 package com.lanny.spring_security_template.infrastructure.jwt;
 
-import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
-import com.lanny.spring_security_template.infrastructure.security.jwt.exception.NoAuthoritiesException;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.NoAuthoritiesException;
 
 /**
  * {@code JwtAuthoritiesMapper}
@@ -42,14 +42,17 @@ public class JwtAuthoritiesMapper {
      *
      * @param claims validated domain-level JWT claims
      * @return immutable collection of granted authorities
+     * @throws NoAuthoritiesException if no authorities can be derived
      */
     public Collection<SimpleGrantedAuthority> map(JwtClaimsDTO claims) {
 
         Set<SimpleGrantedAuthority> authorities = new HashSet<>();
 
-        claims.roles().forEach(role -> authorities.add(new SimpleGrantedAuthority(role)));
+        claims.roles()
+                .forEach(role -> authorities.add(new SimpleGrantedAuthority(role)));
 
-        claims.scopes().forEach(scope -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope)));
+        claims.scopes()
+                .forEach(scope -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope)));
 
         if (authorities.isEmpty()) {
             throw new NoAuthoritiesException();

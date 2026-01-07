@@ -1,11 +1,10 @@
 package com.lanny.spring_security_template.infrastructure.security.filter;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import static com.lanny.spring_security_template.infrastructure.observability.MdcKeys.*;
 
-import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
+import java.util.UUID;
+
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -13,47 +12,47 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-import java.util.UUID;
+import com.lanny.spring_security_template.infrastructure.security.network.ClientIpResolver;
 
-import static com.lanny.spring_security_template.infrastructure.observability.MdcKeys.*;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * {@code CorrelationIdFilter}
  *
  * <p>
- * Establishes a request-scoped correlation context used for
- * <b>logging, auditing, metrics and distributed tracing</b>.
- * </p>
- *
- * <p>
- * Responsibilities:
+ * Establishes a request-scoped correlation context for:
  * </p>
  * <ul>
- *   <li>Propagate an incoming correlation ID when present</li>
- *   <li>Generate a new correlation ID when missing or invalid</li>
- *   <li>Expose the correlation ID in the HTTP response</li>
- *   <li>Populate MDC with request-scoped metadata</li>
- *   <li>Guarantee MDC cleanup to prevent thread-local leakage</li>
+ * <li>Structured logging</li>
+ * <li>Security auditing</li>
+ * <li>Metrics and tracing</li>
  * </ul>
  *
- * <h2>Execution order</h2>
- * <p>
- * This filter is executed with the <b>highest precedence</b> to ensure
- * that correlation data is available to all downstream filters,
- * security components and application logic.
- * </p>
- *
- * <h2>Design notes</h2>
+ * <h2>Responsibilities</h2>
  * <ul>
- *   <li>No business logic is executed in this filter</li>
- *   <li>Correlation ID format is strictly validated</li>
- *   <li>Safe for use behind gateways, load balancers and reverse proxies</li>
+ * <li>Propagate or generate a correlation ID</li>
+ * <li>Expose the correlation ID in the response</li>
+ * <li>Populate MDC with request metadata</li>
+ * <li>Ensure safe MDC cleanup</li>
  * </ul>
  *
+ * <h2>Important design decision</h2>
  * <p>
- * Designed for <b>production-grade, enterprise systems</b> requiring
- * reliable end-to-end request traceability.
+ * This filter does <b>NOT</b> resolve the client IP directly.
+ * IP resolution is delegated to {@link ClientIpResolver} to avoid
+ * security issues related to spoofed forwarded headers.
+ * </p>
+ * 
+ * 
+ * <p>
+ * NOTE:
+ * This filter is compatible with distributed tracing systems
+ * (e.g. OpenTelemetry, Sleuth) and intentionally does not override
+ * existing trace/span identifiers if present.
  * </p>
  */
 @Slf4j
@@ -62,32 +61,37 @@ import static com.lanny.spring_security_template.infrastructure.observability.Md
 public class CorrelationIdFilter extends OncePerRequestFilter {
 
     private static final String CORRELATION_HEADER = "X-Correlation-Id";
-    private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
+
+    private final ClientIpResolver ipResolver;
+
+    public CorrelationIdFilter(ClientIpResolver ipResolver) {
+        this.ipResolver = ipResolver;
+    }
 
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
-            @NonNull FilterChain chain
-    ) throws ServletException, IOException {
+            @NonNull FilterChain chain) throws ServletException, IOException {
+
+        String correlationId = resolveCorrelationId(request);
 
         try {
-            // Resolve or generate correlation ID
-            String correlationId = resolveCorrelationId(request);
-
-            // Propagate to response
+            // Propagate correlation ID
             response.setHeader(CORRELATION_HEADER, correlationId);
 
             // Populate MDC
             MDC.put(CORRELATION_ID, correlationId);
-            MDC.put(REQUEST_PATH, request.getRequestURI());
-            MDC.put(CLIENT_IP, resolveClientIp(request));
+            MDC.put(REQUEST_PATH, request.getMethod() + " " + request.getRequestURI());
+            MDC.put(CLIENT_IP, ipResolver.resolve(request));
 
             chain.doFilter(request, response);
 
         } finally {
-            // Mandatory cleanup to avoid thread-local leakage
-            MDC.clear();
+            // Remove ONLY keys introduced by this filter
+            MDC.remove(CORRELATION_ID);
+            MDC.remove(REQUEST_PATH);
+            MDC.remove(CLIENT_IP);
         }
     }
 
@@ -110,13 +114,4 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             return false;
         }
     }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader(FORWARDED_FOR_HEADER);
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
 }
-

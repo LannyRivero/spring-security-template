@@ -35,29 +35,31 @@ import static com.lanny.spring_security_template.infrastructure.observability.Md
  *
  * <p>
  * Spring Security filter responsible for <b>JWT-based authorization</b>
- * using <b>access tokens only</b>.
+ * using <b>ACCESS tokens only</b>.
  * </p>
  *
  * <h2>Responsibilities</h2>
  * <ul>
- * <li>Extract and validate Bearer tokens</li>
+ * <li>Extract and validate Bearer access tokens</li>
  * <li>Reject refresh tokens explicitly</li>
- * <li>Prevent token replay using blacklist checks</li>
+ * <li>Prevent replay using token blacklist</li>
  * <li>Map roles and scopes to granted authorities</li>
- * <li>Populate the {@link SecurityContextHolder}</li>
+ * <li>Populate {@link SecurityContextHolder}</li>
+ * </ul>
+ *
+ * <h2>Security guarantees</h2>
+ * <ul>
+ * <li>No tokens are logged</li>
+ * <li>No PII leakage</li>
+ * <li>Fail-safe: authentication is NEVER partially set</li>
  * </ul>
  *
  * <h2>Observability</h2>
  * <ul>
- * <li>Uses MDC when available (correlationId, request path, username)</li>
- * <li>Falls back to request data if MDC is missing</li>
- * <li>Never logs tokens or PII</li>
+ * <li>Structured logs with correlationId</li>
+ * <li>Method + path always present</li>
+ * <li>Controlled failure reasons (finite enum)</li>
  * </ul>
- *
- * <p>
- * Designed for stateless, production-grade APIs and compliant with
- * OWASP ASVS / ENS requirements.
- * </p>
  */
 @Component
 @Order(80)
@@ -73,6 +75,7 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
       JwtValidator jwtValidator,
       TokenBlacklistGateway tokenBlacklistGateway,
       JwtAuthoritiesMapper authoritiesMapper) {
+
     this.jwtValidator = jwtValidator;
     this.tokenBlacklistGateway = tokenBlacklistGateway;
     this.authoritiesMapper = authoritiesMapper;
@@ -121,11 +124,8 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
       JwtAuthFailureReason reason = mapFailureReason(ex);
 
-      String path = MDC.get(REQUEST_PATH) != null
-          ? MDC.get(REQUEST_PATH)
-          : request.getRequestURI();
-
       String method = request.getMethod();
+      String path = resolvePath(request);
       String correlationId = MDC.get(CORRELATION_ID);
 
       log.warn(
@@ -135,6 +135,7 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
           path,
           correlationId);
 
+      // FAIL-SAFE: never leave partial authentication
       SecurityContextHolder.clearContext();
     }
 
@@ -143,6 +144,17 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
     } finally {
       MDC.remove(USERNAME);
     }
+  }
+
+  // ======================================================
+  // Helpers
+  // ======================================================
+
+  private String resolvePath(HttpServletRequest request) {
+    String mdcPath = MDC.get(REQUEST_PATH);
+    return (mdcPath != null && !mdcPath.isBlank())
+        ? mdcPath
+        : request.getRequestURI();
   }
 
   private JwtAuthFailureReason mapFailureReason(Exception ex) {
@@ -159,6 +171,7 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
     if (ex instanceof IllegalArgumentException) {
       return JwtAuthFailureReason.INVALID_CLAIMS;
     }
+
     return JwtAuthFailureReason.UNKNOWN;
   }
 }
