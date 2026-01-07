@@ -9,7 +9,6 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenConsumptionPort;
-import com.lanny.spring_security_template.infrastructure.security.redis.RedisRefreshTokenConsumer;
 
 /**
  * ============================================================
