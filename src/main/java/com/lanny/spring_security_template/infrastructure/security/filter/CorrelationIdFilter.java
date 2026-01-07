@@ -1,11 +1,10 @@
 package com.lanny.spring_security_template.infrastructure.security.filter;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import static com.lanny.spring_security_template.infrastructure.observability.MdcKeys.*;
 
-import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
+import java.util.UUID;
+
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -13,12 +12,13 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-import java.util.UUID;
-
 import com.lanny.spring_security_template.infrastructure.security.network.ClientIpResolver;
 
-import static com.lanny.spring_security_template.infrastructure.observability.MdcKeys.*;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * {@code CorrelationIdFilter}
@@ -45,6 +45,14 @@ import static com.lanny.spring_security_template.infrastructure.observability.Md
  * This filter does <b>NOT</b> resolve the client IP directly.
  * IP resolution is delegated to {@link ClientIpResolver} to avoid
  * security issues related to spoofed forwarded headers.
+ * </p>
+ * 
+ * 
+ * <p>
+ * NOTE:
+ * This filter is compatible with distributed tracing systems
+ * (e.g. OpenTelemetry, Sleuth) and intentionally does not override
+ * existing trace/span identifiers if present.
  * </p>
  */
 @Slf4j
