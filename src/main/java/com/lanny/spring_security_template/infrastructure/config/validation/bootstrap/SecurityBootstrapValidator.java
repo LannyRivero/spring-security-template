@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.security.bootstrap;
+package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap;
 
 import java.util.Comparator;
 import java.util.List;
@@ -15,11 +15,15 @@ import org.springframework.stereotype.Component;
  * <p>
  * This is the single entry point for security startup validation.
  * It guarantees deterministic ordering and fail-fast behavior.
+ * </p>
  *
  * <p>
- * Security guarantee:
- * - No secrets/tokens are logged.
- * - Only check names are logged.
+ * <b>Security guarantees</b>:
+ * <ul>
+ * <li>Application fails fast if security configuration is invalid</li>
+ * <li>No secrets, tokens or key material are logged</li>
+ * <li>All validations are executed in deterministic order</li>
+ * </ul>
  */
 @Component
 public final class SecurityBootstrapValidator implements SmartLifecycle {
@@ -35,19 +39,29 @@ public final class SecurityBootstrapValidator implements SmartLifecycle {
 
     @Override
     public void start() {
-        // Ensures it's run once as part of lifecycle start.
-        if (running)
+        // Ensure execution happens only once
+        if (running) {
             return;
+        }
+
+        if (checks.isEmpty()) {
+            throw new IllegalStateException(
+                    "No SecurityStartupCheck beans registered — security bootstrap validation is mandatory");
+        }
 
         checks.stream()
                 .sorted(Comparator.comparingInt(SecurityStartupCheck::getOrder))
                 .forEach(check -> {
-                    log.info("Security bootstrap check: {}", check.name());
+                    log.info("Security bootstrap check [{}] starting", check.name());
                     check.validate(); // must throw on failure
+                    log.info("Security bootstrap check [{}] OK", check.name());
                 });
 
         running = true;
-        log.info("Security bootstrap validation completed successfully (checks={}).", checks.size());
+
+        log.info(
+                "Security bootstrap validation completed successfully (checks={})",
+                checks.size());
     }
 
     @Override
@@ -61,8 +75,8 @@ public final class SecurityBootstrapValidator implements SmartLifecycle {
     }
 
     /**
-     * Start early in lifecycle. This is defensive, but not too early (still after
-     * bean creation).
+     * Start early in lifecycle. This ensures validation happens
+     * before any security-sensitive component is used.
      */
     @Override
     public int getPhase() {
@@ -70,7 +84,7 @@ public final class SecurityBootstrapValidator implements SmartLifecycle {
     }
 
     /**
-     * We want to block startup until validation is done.
+     * Block application startup until validation completes.
      */
     @Override
     public boolean isAutoStartup() {

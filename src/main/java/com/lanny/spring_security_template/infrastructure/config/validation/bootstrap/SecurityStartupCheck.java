@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.security.bootstrap;
+package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap;
 
 import org.springframework.core.Ordered;
 
