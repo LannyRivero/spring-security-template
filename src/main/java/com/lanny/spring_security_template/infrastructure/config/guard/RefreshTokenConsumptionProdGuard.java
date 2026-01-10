@@ -1,21 +1,34 @@
 package com.lanny.spring_security_template.infrastructure.config.guard;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
-
 import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenConsumptionPort;
+import com.lanny.spring_security_template.infrastructure.config.validation.InvalidSecurityConfigurationException;
 
-@Configuration
-@Profile("prod")
-public class RefreshTokenConsumptionProdGuard {
+import java.util.Map;
 
-    @Bean
-    RefreshTokenConsumptionPort refreshTokenConsumptionMissingGuard() {
-        throw new IllegalStateException(
-            "FATAL: No RefreshTokenConsumptionPort configured for prod. " +
-            "Atomic refresh token consumption is mandatory."
-        );
+/**
+ * =====================================================================
+ * RefreshTokenConsumptionProdGuard
+ * =====================================================================
+ *
+ * Stateless guard that ensures an atomic {@link RefreshTokenConsumptionPort}
+ * is configured for production environments.
+ *
+ * <p>
+ * Refresh token reuse protection is mandatory in production.
+ * Missing this port results in an insecure authentication system.
+ * </p>
+ */
+public final class RefreshTokenConsumptionProdGuard {
+
+    public void validate(Map<String, RefreshTokenConsumptionPort> ports) {
+
+        if (ports.isEmpty()) {
+            throw new InvalidSecurityConfigurationException(
+                "No RefreshTokenConsumptionPort configured. " +
+                "Atomic refresh token consumption is mandatory in production."
+            );
+        }
     }
 }
+
 
