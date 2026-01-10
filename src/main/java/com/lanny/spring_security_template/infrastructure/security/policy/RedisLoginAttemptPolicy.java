@@ -74,127 +74,82 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RedisLoginAttemptPolicy implements LoginAttemptPolicy {
 
-    private static final String ATTEMPTS_PREFIX = "login:attempts:";
-    private static final String BLOCK_PREFIX = "login:block:";
+        private static final String ATTEMPTS_PREFIX = "login:attempts:";
+        private static final String BLOCK_PREFIX = "login:block:";
 
-    private final StringRedisTemplate redis;
-    private final RateLimitingProperties props;
-    private final AuthMetricsService metrics;
+        private final StringRedisTemplate redis;
+        private final RateLimitingProperties props;
+        private final AuthMetricsService metrics;
 
-    /**
-     * Lua script that performs the full attempt registration and lockout decision
-     * atomically.
-     *
-     * <p>
-     * <b>Return contract</b>
-     * </p>
-     * <ul>
-     * <li>Returns {@code 0} when the attempt is allowed.</li>
-     * <li>Returns {@code > 0} with the lockout TTL (in seconds) when blocked.</li>
-     * </ul>
-     *
-     * <p>
-     * <b>Keys</b>
-     * </p>
-     * <ul>
-     * <li>KEYS[1] = attemptsKey</li>
-     * <li>KEYS[2] = blockKey</li>
-     * </ul>
-     *
-     * <p>
-     * <b>Args</b>
-     * </p>
-     * <ul>
-     * <li>ARGV[1] = maxAttempts</li>
-     * <li>ARGV[2] = windowSeconds</li>
-     * <li>ARGV[3] = blockSeconds</li>
-     * </ul>
-     */
-    private final @NonNull RedisScript<Long> script = new DefaultRedisScript<>(
-            """
-                    local attemptsKey = KEYS[1]
-                    local blockKey = KEYS[2]
+        /**
+         * Lua script return contract:
+         * - 0 -> allowed
+         * - >0 -> blocked, return TTL seconds
+         *
+         * Notes:
+         * - If blockKey exists but TTL is -1 (no expiry) or -2 (missing), we normalize
+         * to 0.
+         * - We always set TTL on attemptsKey on first attempt.
+         */
+        private final @NonNull RedisScript<Long> script = new DefaultRedisScript<>(
+                        """
+                                        local attemptsKey = KEYS[1]
+                                        local blockKey = KEYS[2]
 
-                    local maxAttempts = tonumber(ARGV[1])
-                    local windowSeconds = tonumber(ARGV[2])
-                    local blockSeconds = tonumber(ARGV[3])
+                                        local maxAttempts = tonumber(ARGV[1])
+                                        local windowSeconds = tonumber(ARGV[2])
+                                        local blockSeconds = tonumber(ARGV[3])
 
-                    local blockTtl = redis.call("TTL", blockKey)
-                    if blockTtl > 0 then
-                      return blockTtl
-                    end
+                                        local blockTtl = redis.call("TTL", blockKey)
 
-                    local attempts = redis.call("INCR", attemptsKey)
-                    if attempts == 1 then
-                      redis.call("EXPIRE", attemptsKey, windowSeconds)
-                    end
+                                        -- TTL meanings:
+                                        -- -2: key does not exist
+                                        -- -1: key exists but no expiry (unsafe for lockout keys)
+                                        if blockTtl > 0 then
+                                          return blockTtl
+                                        end
 
-                    if attempts > maxAttempts then
-                      redis.call("SET", blockKey, "1", "EX", blockSeconds)
-                      redis.call("DEL", attemptsKey)
-                      return blockSeconds
-                    end
+                                        local attempts = redis.call("INCR", attemptsKey)
+                                        if attempts == 1 then
+                                          redis.call("EXPIRE", attemptsKey, windowSeconds)
+                                        end
 
-                    return 0
-                    """,
-            Long.class);
+                                        if attempts > maxAttempts then
+                                          redis.call("SET", blockKey, "1", "EX", blockSeconds)
+                                          redis.call("DEL", attemptsKey)
+                                          return blockSeconds
+                                        end
 
-    /**
-     * Registers an authentication attempt for a given rate-limit key.
-     *
-     * <p>
-     * This method is expected to be called <b>before</b> the authentication flow
-     * proceeds,
-     * so the login endpoint can be short-circuited when blocked.
-     * </p>
-     *
-     * <p>
-     * If blocked, this method returns a {@link LoginAttemptResult} containing a
-     * retry-after
-     * value based on the real lockout TTL stored in Redis.
-     * </p>
-     *
-     * @param key rate-limiting key (already normalized/hashed by the resolver)
-     * @return {@link LoginAttemptResult} indicating whether the attempt should be
-     *         blocked
-     */
-    @Override
-    public LoginAttemptResult registerAttempt(String key) {
+                                        return 0
+                                        """,
+                        Long.class);
 
-        final List<String> keys = List.of(
-                ATTEMPTS_PREFIX + key,
-                BLOCK_PREFIX + key);
+        @Override
+        public LoginAttemptResult registerAttempt(String key) {
 
-        Long retryAfterSeconds = redis.execute(
-                script,
-                keys,
-                String.valueOf(props.maxAttempts()),
-                String.valueOf(props.window()),
-                String.valueOf(props.blockSeconds()));
+                final List<String> keys = List.of(
+                                ATTEMPTS_PREFIX + key,
+                                BLOCK_PREFIX + key);
 
-        if (retryAfterSeconds != null && retryAfterSeconds > 0) {
-            metrics.recordBruteForceDetected();
-            return new LoginAttemptResult(true, retryAfterSeconds);
+                Long retryAfterSeconds = redis.execute(
+                                script,
+                                keys,
+                                String.valueOf(props.maxAttempts()),
+                                String.valueOf(props.window()),
+                                String.valueOf(props.blockSeconds()));
+
+                if (retryAfterSeconds != null && retryAfterSeconds > 0) {
+                        metrics.recordBruteForceDetected();
+                        return LoginAttemptResult.blocked(retryAfterSeconds);
+                }
+
+                return LoginAttemptResult.allowAccess();
         }
 
-        return new LoginAttemptResult(false, 0);
-    }
-
-    /**
-     * Resets attempts and block state for the given key.
-     *
-     * <p>
-     * Intended to be called after a successful authentication to clear any previous
-     * failed attempts and remove lockout state early.
-     * </p>
-     *
-     * @param key rate-limiting key (same key used in
-     *            {@link #registerAttempt(String)})
-     */
-    @Override
-    public void resetAttempts(String key) {
-        redis.delete(List.of(
-                ATTEMPTS_PREFIX + key,
-                BLOCK_PREFIX + key));
-    }
+        @Override
+        public void resetAttempts(String key) {
+                redis.delete(List.of(
+                                ATTEMPTS_PREFIX + key,
+                                BLOCK_PREFIX + key));
+        }
 }
