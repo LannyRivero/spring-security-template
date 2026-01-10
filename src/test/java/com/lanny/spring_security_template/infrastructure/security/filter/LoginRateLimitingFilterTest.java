@@ -48,7 +48,7 @@ class LoginRateLimitingFilterTest {
 
     @Test
     @DisplayName("shouldNotFilter returns true when rate limiting disabled")
-    void shouldNotFilter_whenDisabled() {
+    void testShouldNotFilter_whenDisabled() {
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/auth/login");
         when(props.enabled()).thenReturn(false);
 
@@ -59,7 +59,7 @@ class LoginRateLimitingFilterTest {
 
     @Test
     @DisplayName("shouldNotFilter returns true when path differs")
-    void shouldNotFilter_whenPathDifferent() {
+    void testShouldNotFilter_whenPathDifferent() {
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/other");
         when(props.enabled()).thenReturn(true);
         when(props.loginPath()).thenReturn("/api/v1/auth/login");
@@ -71,7 +71,7 @@ class LoginRateLimitingFilterTest {
 
     @Test
     @DisplayName("shouldNotFilter returns true when method differs")
-    void shouldNotFilter_whenMethodDifferent() {
+    void testShouldNotFilter_whenMethodDifferent() {
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/v1/auth/login");
         when(props.enabled()).thenReturn(true);
         when(props.loginPath()).thenReturn("/api/v1/auth/login");
@@ -83,7 +83,7 @@ class LoginRateLimitingFilterTest {
 
     @Test
     @DisplayName("when allowed -> continues filter chain")
-    void doFilterInternal_whenAllowed_continuesChain() throws Exception {
+    void testShouldDoFilterInternal_whenAllowed_continuesChain() throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/auth/login");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -102,7 +102,7 @@ class LoginRateLimitingFilterTest {
 
     @Test
     @DisplayName("when blocked -> returns 429 and sets Retry-After header")
-    void doFilterInternal_whenBlocked_returns429() throws Exception {
+    void testDoFilterInternal_whenBlocked_returns429() throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/auth/login");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -124,13 +124,14 @@ class LoginRateLimitingFilterTest {
         verify(chain, never()).doFilter(req, res);
         org.junit.jupiter.api.Assertions.assertEquals(429, res.getStatus());
         org.junit.jupiter.api.Assertions.assertEquals("120", res.getHeader("Retry-After"));
-        org.junit.jupiter.api.Assertions.assertTrue(res.getContentType().startsWith("application/json"));
+        org.junit.jupiter.api.Assertions.assertNotNull(res.getContentType());
+        org.junit.jupiter.api.Assertions.assertTrue(res.getContentType() != null && res.getContentType().startsWith("application/json"));
         org.junit.jupiter.api.Assertions.assertTrue(res.getContentAsString().contains("Too many login attempts"));
     }
 
     @Test
     @DisplayName("when blocked with retryAfter=0 -> returns 429 without Retry-After header")
-    void doFilterInternal_whenBlockedNoRetryAfter_returns429WithoutHeader() throws Exception {
+    void testShouldDoFilterInternal_whenBlockedNoRetryAfter_returns429WithoutHeader() throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/auth/login");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
