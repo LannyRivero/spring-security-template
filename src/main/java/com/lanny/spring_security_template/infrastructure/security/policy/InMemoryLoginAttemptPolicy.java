@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptResult;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
+import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
 
 import lombok.RequiredArgsConstructor;
 
@@ -47,21 +48,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class InMemoryLoginAttemptPolicy implements LoginAttemptPolicy {
 
-    /**
-     * MaxAttempts semantics:
-     * -Attempts 1.MAX_ATTEMPTS are allowed
-     * -Attempt MAX_ATTEMPTS+1 triggers a temporary block
-     */
-
-    private static final int MAX_ATTEMPTS = 3;
-
-    /* Fixed tracking window for attempts */
-    private static final Duration WINDOW = Duration.ofMinutes(1);
-
-    /* How long the subject remain blocked after exceeding attempts */
-    private static final Duration BLOCK_DURATION = Duration.ofSeconds(60);
-
     private final ClockProvider clockProvider;
+    private final RateLimitingProperties props;
 
     private final Map<String, AttemptState> store = new ConcurrentHashMap<>();
 
@@ -70,8 +58,12 @@ public class InMemoryLoginAttemptPolicy implements LoginAttemptPolicy {
 
         Instant now = clockProvider.now();
 
+        int maxAttempts = props.maxAttempts();
+        Duration window = Duration.ofSeconds(props.window());
+        Duration blockDuration = Duration.ofSeconds(props.blockSeconds());
+
         AttemptState state = store.compute(key, (k, existing) -> {
-            if (existing == null || existing.isExpired(now)) {
+            if (existing == null || existing.isExpired(now, window)) {
                 return AttemptState.newWindow(now);
             }
             return existing.increment();
@@ -82,10 +74,10 @@ public class InMemoryLoginAttemptPolicy implements LoginAttemptPolicy {
             return LoginAttemptResult.blocked(state.secondsUntilUnblock(now));
         }
 
-        // If threshold exceeded -> create block and return block duration
-        if (state.attempts > MAX_ATTEMPTS) {
-            state.blockUntil = now.plus(BLOCK_DURATION);
-            return LoginAttemptResult.blocked(BLOCK_DURATION.getSeconds());
+        // attempts 1..maxAttempts allowed, attempt maxAttempts+1 triggers block
+        if (state.attempts > maxAttempts) {
+            state.blockUntil = now.plus(blockDuration);
+            return LoginAttemptResult.blocked(blockDuration.getSeconds());
         }
 
         return LoginAttemptResult.allowAccess();
@@ -118,8 +110,8 @@ public class InMemoryLoginAttemptPolicy implements LoginAttemptPolicy {
             return this;
         }
 
-        boolean isExpired(Instant now) {
-            return windowStart.plus(WINDOW).isBefore(now);
+        boolean isExpired(Instant now, Duration window) {
+            return windowStart.plus(window).isBefore(now);
         }
 
         boolean isBlocked(Instant now) {
@@ -127,8 +119,7 @@ public class InMemoryLoginAttemptPolicy implements LoginAttemptPolicy {
         }
 
         long secondsUntilUnblock(Instant now) {
-            if (blockUntil == null)
-                return 0;
+            if (blockUntil == null) return 0;
             long diff = blockUntil.getEpochSecond() - now.getEpochSecond();
             return Math.max(0, diff);
         }
