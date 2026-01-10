@@ -10,6 +10,9 @@ import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptResult;
+import com.lanny.spring_security_template.domain.time.ClockProvider;
+
+import lombok.RequiredArgsConstructor;
 
 /**
  * {@code InMemoryLoginAttemptPolicy}
@@ -41,18 +44,31 @@ import com.lanny.spring_security_template.application.auth.policy.LoginAttemptRe
  */
 @Component
 @Profile({ "dev", "test", "demo" })
+@RequiredArgsConstructor
 public class InMemoryLoginAttemptPolicy implements LoginAttemptPolicy {
 
+    /**
+     * MaxAttempts semantics:
+     * -Attempts 1.MAX_ATTEMPTS are allowed
+     * -Attempt MAX_ATTEMPTS+1 triggers a temporary block
+     */
+
     private static final int MAX_ATTEMPTS = 3;
+
+    /* Fixed tracking window for attempts */
     private static final Duration WINDOW = Duration.ofMinutes(1);
+
+    /* How long the subject remain blocked after exceeding attempts */
     private static final Duration BLOCK_DURATION = Duration.ofSeconds(60);
+
+    private final ClockProvider clockProvider;
 
     private final Map<String, AttemptState> store = new ConcurrentHashMap<>();
 
     @Override
     public LoginAttemptResult registerAttempt(String key) {
 
-        Instant now = Instant.now();
+        Instant now = clockProvider.now();
 
         AttemptState state = store.compute(key, (k, existing) -> {
             if (existing == null || existing.isExpired(now)) {
@@ -61,18 +77,18 @@ public class InMemoryLoginAttemptPolicy implements LoginAttemptPolicy {
             return existing.increment();
         });
 
+        // If already blocked -> return remaining TTL
         if (state.isBlocked(now)) {
-            return new LoginAttemptResult(
-                    true,
-                    state.secondsUntilUnblock(now));
+            return LoginAttemptResult.blocked(state.secondsUntilUnblock(now));
         }
 
+        // If threshold exceeded -> create block and return block duration
         if (state.attempts > MAX_ATTEMPTS) {
             state.blockUntil = now.plus(BLOCK_DURATION);
-            return new LoginAttemptResult(true, BLOCK_DURATION.getSeconds());
+            return LoginAttemptResult.blocked(BLOCK_DURATION.getSeconds());
         }
 
-        return new LoginAttemptResult(false, 0);
+        return LoginAttemptResult.allowAccess();
     }
 
     @Override
@@ -111,9 +127,10 @@ public class InMemoryLoginAttemptPolicy implements LoginAttemptPolicy {
         }
 
         long secondsUntilUnblock(Instant now) {
-            return blockUntil != null
-                    ? Math.max(0, blockUntil.getEpochSecond() - now.getEpochSecond())
-                    : 0;
+            if (blockUntil == null)
+                return 0;
+            long diff = blockUntil.getEpochSecond() - now.getEpochSecond();
+            return Math.max(0, diff);
         }
     }
 }
