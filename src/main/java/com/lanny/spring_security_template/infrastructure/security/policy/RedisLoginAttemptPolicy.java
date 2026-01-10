@@ -3,6 +3,7 @@ package com.lanny.spring_security_template.infrastructure.security.policy;
 import java.util.List;
 
 import org.springframework.context.annotation.Profile;
+import org.springframework.lang.NonNull;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -13,7 +14,6 @@ import com.lanny.spring_security_template.application.auth.policy.LoginAttemptRe
 import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
 import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
 
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -91,7 +91,8 @@ public class RedisLoginAttemptPolicy implements LoginAttemptPolicy {
          * to 0.
          * - We always set TTL on attemptsKey on first attempt.
          */
-        private final @NonNull RedisScript<Long> script = new DefaultRedisScript<>(
+        @NonNull
+        private final RedisScript<Long> script = new DefaultRedisScript<>(
                         """
                                         local attemptsKey = KEYS[1]
                                         local blockKey = KEYS[2]
@@ -124,6 +125,7 @@ public class RedisLoginAttemptPolicy implements LoginAttemptPolicy {
                                         """,
                         Long.class);
 
+        @SuppressWarnings("null")
         @Override
         public LoginAttemptResult registerAttempt(String key) {
 
@@ -146,6 +148,7 @@ public class RedisLoginAttemptPolicy implements LoginAttemptPolicy {
                 return LoginAttemptResult.allowAccess();
         }
 
+        @SuppressWarnings("null")
         @Override
         public void resetAttempts(String key) {
                 redis.delete(List.of(
