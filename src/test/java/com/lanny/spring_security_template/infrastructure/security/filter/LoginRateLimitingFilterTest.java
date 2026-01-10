@@ -3,9 +3,6 @@ package com.lanny.spring_security_template.infrastructure.security.filter;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -115,8 +112,7 @@ class LoginRateLimitingFilterTest {
         when(loginAttemptPolicy.registerAttempt("k")).thenReturn(LoginAttemptResult.blocked(120));
 
         when(errorFactory.create(eq(429), anyString(), eq(req))).thenReturn(
-                mock(ApiError.class)
-        );
+                mock(ApiError.class));
 
         // Ensure response writer exists (MockHttpServletResponse does)
         filter.doFilter(req, res, chain);
@@ -125,7 +121,8 @@ class LoginRateLimitingFilterTest {
         org.junit.jupiter.api.Assertions.assertEquals(429, res.getStatus());
         org.junit.jupiter.api.Assertions.assertEquals("120", res.getHeader("Retry-After"));
         org.junit.jupiter.api.Assertions.assertNotNull(res.getContentType());
-        org.junit.jupiter.api.Assertions.assertTrue(res.getContentType() != null && res.getContentType().startsWith("application/json"));
+        org.junit.jupiter.api.Assertions
+                .assertTrue(res.getContentType() != null && res.getContentType().startsWith("application/json"));
         org.junit.jupiter.api.Assertions.assertTrue(res.getContentAsString().contains("Too many login attempts"));
     }
 
@@ -144,8 +141,7 @@ class LoginRateLimitingFilterTest {
         when(loginAttemptPolicy.registerAttempt("k")).thenReturn(LoginAttemptResult.blocked(0));
 
         when(errorFactory.create(eq(429), anyString(), eq(req))).thenReturn(
-                mock(ApiError.class)
-        );
+                mock(ApiError.class));
 
         filter.doFilter(req, res, chain);
 
