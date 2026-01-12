@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.config.guard;
+package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard;
 
 import com.lanny.spring_security_template.infrastructure.config.validation.InvalidSecurityConfigurationException;
 import com.lanny.spring_security_template.infrastructure.security.network.NetworkSecurityProperties;

@@ -1,6 +1,6 @@
 package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.check;
 
-import com.lanny.spring_security_template.infrastructure.config.guard.NetworkSecurityProdGuard;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard.NetworkSecurityProdGuard;
 import com.lanny.spring_security_template.infrastructure.security.network.NetworkSecurityProperties;
 
 import org.springframework.core.env.Environment;

@@ -1,7 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.check;
 
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
-import com.lanny.spring_security_template.infrastructure.config.guard.RoleProviderProdGuardConfig;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard.RoleProviderProdGuardConfig;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
