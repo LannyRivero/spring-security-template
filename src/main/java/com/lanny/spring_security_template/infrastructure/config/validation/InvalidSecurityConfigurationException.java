@@ -26,7 +26,7 @@ public class InvalidSecurityConfigurationException extends RuntimeException {
     public InvalidSecurityConfigurationException(
             @NonNull String source,
             @NonNull String message,
-            @NonNull Throwable cause) {
+            Throwable cause) {
 
         super(message, cause);
         this.source = source;
