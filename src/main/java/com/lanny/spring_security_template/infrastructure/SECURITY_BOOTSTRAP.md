@@ -71,6 +71,7 @@ A ProdGuard answers the question:
 ---
 
 ## Execution Order
+<img width="529" height="726" alt="image" src="https://github.com/user-attachments/assets/8634fd7a-06d9-4eae-9585-652de4ce0cf0" />
 
 The bootstrap process follows a strict and intentional order:
 
