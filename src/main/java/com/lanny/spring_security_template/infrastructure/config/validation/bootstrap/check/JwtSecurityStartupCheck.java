@@ -1,7 +1,8 @@
-package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap;
+package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.check;
 
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.config.validation.SecurityJwtPropertiesValidator;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.SecurityStartupCheck;
 
 import org.springframework.stereotype.Component;
 

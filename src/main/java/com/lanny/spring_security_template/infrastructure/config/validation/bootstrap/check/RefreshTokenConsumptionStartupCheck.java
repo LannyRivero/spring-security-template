@@ -1,7 +1,8 @@
-package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap;
+package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.check;
 
-import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
-import com.lanny.spring_security_template.infrastructure.config.guard.RoleProviderProdGuardConfig;
+import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenConsumptionPort;
+import com.lanny.spring_security_template.infrastructure.config.guard.RefreshTokenConsumptionProdGuard;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.SecurityStartupCheck;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
@@ -12,33 +13,33 @@ import java.util.Set;
 
 /**
  * ============================================================
- * RoleProviderStartupCheck
+ * RefreshTokenConsumptionStartupCheck
  * ============================================================
  *
- * Security bootstrap check ensuring a production-grade RoleProvider
- * implementation is configured.
+ * Security bootstrap check ensuring atomic refresh token consumption
+ * is configured for production environments.
  *
  * <p>
- * This check is enforced only when running in {@code prod}-like environments.
+ * Enforced only when running under {@code prod}-like profiles.
  * </p>
  */
 @Component
-public final class RoleProviderStartupCheck implements SecurityStartupCheck {
+public final class RefreshTokenConsumptionStartupCheck implements SecurityStartupCheck {
 
-    private static final String CHECK_NAME = "role-provider";
+    private static final String CHECK_NAME = "refresh-token-consumption";
     private static final Set<String> PROD_PROFILES = Set.of("prod");
 
     private final ApplicationContext context;
     private final Environment environment;
-    private final RoleProviderProdGuardConfig guard;
+    private final RefreshTokenConsumptionProdGuard guard;
 
-    public RoleProviderStartupCheck(
+    public RefreshTokenConsumptionStartupCheck(
             ApplicationContext context,
             Environment environment) {
 
         this.context = context;
         this.environment = environment;
-        this.guard = new RoleProviderProdGuardConfig();
+        this.guard = new RefreshTokenConsumptionProdGuard();
     }
 
     @Override
@@ -48,20 +49,19 @@ public final class RoleProviderStartupCheck implements SecurityStartupCheck {
 
     @Override
     public int getOrder() {
-        return -80;
+        return -70; // after role-provider, before cors/network
     }
 
     @Override
     public void validate() {
 
         if (!isProductionProfileActive()) {
-            // Explicit skip outside prod
             return;
         }
 
-        Map<String, RoleProvider> providers = context.getBeansOfType(RoleProvider.class);
+        Map<String, RefreshTokenConsumptionPort> ports = context.getBeansOfType(RefreshTokenConsumptionPort.class);
 
-        guard.validate(providers);
+        guard.validate(ports);
     }
 
     private boolean isProductionProfileActive() {
