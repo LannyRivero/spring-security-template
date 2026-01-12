@@ -8,11 +8,13 @@ import org.springframework.core.Ordered;
  *
  * <p>
  * Implementations must:
+ * </p>
  * <ul>
- * <li>Fail fast by throwing a RuntimeException (typically
- * InvalidSecurityConfigurationException)</li>
- * <li>Never log or expose secrets, tokens, or raw key material</li>
- * <li>Be deterministic and side-effect free</li>
+ *   <li>Fail fast by throwing a RuntimeException
+ *       (preferably InvalidSecurityConfigurationException)</li>
+ *   <li>Never log or expose secrets, tokens, or raw key material</li>
+ *   <li>Be deterministic and side-effect free</li>
+ *   <li>Not depend on request context or runtime traffic</li>
  * </ul>
  */
 public interface SecurityStartupCheck extends Ordered {
@@ -28,10 +30,11 @@ public interface SecurityStartupCheck extends Ordered {
     void validate();
 
     /**
-     * Default order is "middle". Override if you need strict precedence.
+     * Default order is "middle". Override if strict precedence is required.
      */
     @Override
     default int getOrder() {
         return 0;
     }
 }
+
