@@ -2,40 +2,43 @@ package com.lanny.spring_security_template.infrastructure.config.validation;
 
 import com.lanny.spring_security_template.infrastructure.config.SecurityCorsProperties;
 
-import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Profile;
-import org.springframework.stereotype.Component;
-
 import java.util.List;
 
 /**
- * Validates CORS configuration for production environments.
+ * =====================================================================
+ * CorsSecurityValidator
+ * =====================================================================
+ *
+ * Stateless guard that validates CORS configuration for production
+ * environments.
  *
  * <p>
- * This validator enforces strict security guarantees and prevents
- * the application from starting with unsafe CORS settings.
+ * Prevents insecure CORS setups such as wildcard origins combined
+ * with credentialed requests.
  * </p>
  */
-@Component
-@Profile("prod")
-@RequiredArgsConstructor
-public class CorsSecurityValidator {
+public final class CorsSecurityValidator {
 
-    private final SecurityCorsProperties corsProperties;
-
-    @PostConstruct
-    public void validate() {
+    public void validate(SecurityCorsProperties corsProperties) {
 
         List<String> origins = corsProperties.allowedOrigins();
 
+        if (origins == null || origins.isEmpty()) {
+            throw new InvalidSecurityConfigurationException(
+                    "cors-configuration",
+                    "CORS allowedOrigins must not be empty in production");
+        }
+
         if (origins.contains("*")) {
             throw new InvalidSecurityConfigurationException(
+                    "cors-configuration",
                     "CORS wildcard '*' is not allowed in production");
         }
 
         if (corsProperties.allowCredentials() && origins.contains("*")) {
+
             throw new InvalidSecurityConfigurationException(
+                    "cors-configuration",
                     "CORS allowCredentials=true cannot be used with wildcard origins");
         }
     }

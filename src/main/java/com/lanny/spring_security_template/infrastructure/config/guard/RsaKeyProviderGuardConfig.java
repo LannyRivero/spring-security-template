@@ -2,91 +2,70 @@ package com.lanny.spring_security_template.infrastructure.config.guard;
 
 import com.lanny.spring_security_template.infrastructure.config.JwtAlgorithm;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
+import com.lanny.spring_security_template.infrastructure.config.validation.InvalidSecurityConfigurationException;
 import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
-import jakarta.annotation.PostConstruct;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Configuration;
 
 import java.util.Map;
 
 /**
  * =====================================================================
- * RsaKeyProviderGuardConfig
+ * RsaKeyProviderGuard
  * =====================================================================
  *
- * Fail-fast guard ensuring that exactly ONE {@link RsaKeyProvider}
+ * Stateless, fail-fast guard ensuring that exactly ONE {@link RsaKeyProvider}
  * is registered when JWT algorithm = RSA.
  *
- * This prevents:
- *  - zero providers (JWT signing impossible)
- *  - multiple providers (ambiguous signing/verification)
- *  - misconfigured rsa.source values
+ * <p>
+ * This guard enforces RSA signing/verification integrity and prevents
+ * ambiguous or missing key provider configurations.
+ * </p>
  *
- * Executed at application startup.
+ * <p>
+ * Any violation results in {@link InvalidSecurityConfigurationException}.
+ * </p>
  */
-@Configuration
-public class RsaKeyProviderGuardConfig {
+public final class RsaKeyProviderGuardConfig {
 
-    private final SecurityJwtProperties props;
-    private final ApplicationContext context;
-
-    public RsaKeyProviderGuardConfig(
+    public void validate(
             SecurityJwtProperties props,
-            ApplicationContext context) {
-
-        this.props = props;
-        this.context = context;
-    }
-
-    @PostConstruct
-    void validate() {
+            Map<String, RsaKeyProvider> providers) {
 
         if (props.algorithm() != JwtAlgorithm.RSA) {
             return;
         }
 
         if (props.rsa() == null || props.rsa().source() == null) {
-            throw new IllegalStateException("""
-                SECURITY FATAL ERROR:
-                JWT algorithm is RSA but rsa.source is not configured.
-
-                Expected property:
-                  security.jwt.rsa.source = filesystem | keystore | classpath
-                """);
+            throw new InvalidSecurityConfigurationException(
+                    "rsa-key-provider",
+                    """
+                            JWT algorithm is RSA but rsa.source is not configured.
+                            Expected property:
+                              security.jwt.rsa.source = filesystem | keystore | classpath
+                            """);
         }
 
-        Map<String, RsaKeyProvider> providers =
-                context.getBeansOfType(RsaKeyProvider.class);
-
         if (providers.isEmpty()) {
-            throw new IllegalStateException("""
-                SECURITY FATAL ERROR:
-                JWT algorithm is RSA but no RsaKeyProvider bean was found.
+            throw new InvalidSecurityConfigurationException(
 
-                rsa.source = %s
-
-                Expected exactly ONE provider.
-                Check:
-                  - security.jwt.rsa.source
-                  - provider @ConditionalOnProperty
-                """.formatted(props.rsa().source()));
+                    "rsa-key-provider",
+                    """
+                            JWT algorithm is RSA but no RsaKeyProvider bean was found.
+                            Expected exactly ONE provider.
+                            """);
         }
 
         if (providers.size() > 1) {
-            throw new IllegalStateException("""
-                SECURITY FATAL ERROR:
-                Multiple RsaKeyProvider beans detected.
 
-                rsa.source = %s
-                Providers found: %s
+            final String message = """
+                    Multiple RsaKeyProvider beans detected.
+                    Exactly ONE provider must be active.
+                    Providers found: %s
+                    """.formatted(providers.keySet());
 
-                Exactly ONE provider must be active.
-                """.formatted(
-                    props.rsa().source(),
-                    providers.keySet()
-                ));
+            throw new InvalidSecurityConfigurationException(
+                    "rsa-key-provider",
+                    message);
         }
+
     }
 }
-
-

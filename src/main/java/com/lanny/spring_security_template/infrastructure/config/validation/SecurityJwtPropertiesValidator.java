@@ -3,6 +3,8 @@ package com.lanny.spring_security_template.infrastructure.config.validation;
 import com.lanny.spring_security_template.infrastructure.config.JwtAlgorithm;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 
+import org.springframework.lang.NonNull;
+
 import java.net.URI;
 import java.util.Base64;
 import java.util.List;
@@ -68,6 +70,8 @@ public final class SecurityJwtPropertiesValidator {
     /** Minimum HMAC secret size (bytes) ≈ HS512 strength */
     private static final int MIN_HMAC_BYTES = 64;
 
+    private static final @NonNull String SOURCE = "security-jwt-properties";
+
     // ======================================================
     // ENTRY POINT
     // ======================================================
@@ -114,9 +118,10 @@ public final class SecurityJwtPropertiesValidator {
         if (props.accessTtl() == null ||
                 props.accessTtl().toMinutes() < MIN_ACCESS_TTL_MINUTES) {
 
-            throw invalid(
-                    "accessTtl must be at least %d minutes"
-                            .formatted(MIN_ACCESS_TTL_MINUTES));
+            final String msg = "accessTtl must be at least %d minutes"
+                    .formatted(MIN_ACCESS_TTL_MINUTES);
+
+            throw invalid(msg);
         }
 
         if (props.refreshTtl() == null ||
@@ -325,13 +330,15 @@ public final class SecurityJwtPropertiesValidator {
         return value != null && !value.isBlank();
     }
 
+    @SuppressWarnings("null")
     private static InvalidSecurityConfigurationException invalid(String msg) {
-        return new InvalidSecurityConfigurationException(msg);
+        return new InvalidSecurityConfigurationException(SOURCE, msg);
     }
 
+    @SuppressWarnings("null")
     private static InvalidSecurityConfigurationException invalid(
             String msg,
             Throwable cause) {
-        return new InvalidSecurityConfigurationException(msg, cause);
+        return new InvalidSecurityConfigurationException(SOURCE, msg, cause);
     }
 }

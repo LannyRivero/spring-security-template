@@ -2,7 +2,6 @@ package com.lanny.spring_security_template.infrastructure.security.policy;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.time.Duration;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,7 +15,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptResult;
 import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
 import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
-import com.lanny.spring_security_template.infrastructure.security.policy.RedisLoginAttemptPolicy;
 
 @Testcontainers
 class RedisLoginAttemptPolicyIT {
