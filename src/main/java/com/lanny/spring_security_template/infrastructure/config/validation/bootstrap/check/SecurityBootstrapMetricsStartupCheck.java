@@ -1,11 +1,11 @@
 package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.check;
 
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+
 import com.lanny.spring_security_template.infrastructure.config.validation.InvalidSecurityConfigurationException;
 import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.metrics.NoOpSecurityBootstrapMetrics;
 import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.metrics.SecurityBootstrapMetrics;
-
-import org.springframework.context.annotation.Profile;
-import org.springframework.stereotype.Component;
 
 /**
  * Startup check that enforces mandatory security observability
