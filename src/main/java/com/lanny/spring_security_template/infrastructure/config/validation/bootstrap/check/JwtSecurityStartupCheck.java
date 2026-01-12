@@ -1,9 +1,9 @@
 package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.check;
 
+import org.springframework.stereotype.Component;
+
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
 import com.lanny.spring_security_template.infrastructure.config.validation.SecurityJwtPropertiesValidator;
-
-import org.springframework.stereotype.Component;
 
 /**
  * ============================================================
@@ -35,11 +35,11 @@ public final class JwtSecurityStartupCheck implements SecurityStartupCheck {
 
     private static final String CHECK_NAME = "jwt-properties";
 
-    private final SecurityJwtProperties properties;
+    private final SecurityJwtProperties jwtProperties;
     private final SecurityJwtPropertiesValidator validator;
 
-    public JwtSecurityStartupCheck(SecurityJwtProperties properties) {
-        this.properties = properties;
+    public JwtSecurityStartupCheck(SecurityJwtProperties jwtProperties) {
+        this.jwtProperties = jwtProperties;
         this.validator = new SecurityJwtPropertiesValidator();
     }
 
@@ -64,6 +64,6 @@ public final class JwtSecurityStartupCheck implements SecurityStartupCheck {
 
     @Override
     public void validate() {
-        validator.validate(properties);
+        validator.validate(jwtProperties);
     }
 }
