@@ -10,6 +10,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.infrastructure.config.validation.InvalidSecurityConfigurationException;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.check.SecurityStartupCheck;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.metrics.SecurityBootstrapMetrics;
 
 /**
  * Executes all {@link SecurityStartupCheck} validations during bootstrap.

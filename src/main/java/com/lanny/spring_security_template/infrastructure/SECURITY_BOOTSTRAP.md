@@ -141,6 +141,22 @@ This bootstrap design is built on the following principles:
 Security misconfiguration is treated as a **deployment error**, not a runtime error.
 
 ---
+## Scope and Non-Goals
+
+This security bootstrap is intentionally limited to **security invariants**.
+
+Some production-critical requirements are **not security concerns by themselves**, but rather
+**operability or observability invariants**.
+
+For this reason, certain production-only constraints (such as mandatory metrics or auditing)
+are enforced directly via **Spring configuration guards**, instead of being part of the
+`SecurityBootstrapValidator`.
+
+This separation is intentional and ensures that:
+- Security bootstrap remains focused and explicit
+- Operational requirements are enforced at infrastructure level
+- Fail-fast behavior is preserved without mixing responsibilities
+---
 
 ## Why This Exists
 

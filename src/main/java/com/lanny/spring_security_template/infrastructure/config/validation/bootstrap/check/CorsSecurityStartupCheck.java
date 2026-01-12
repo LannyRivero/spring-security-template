@@ -1,7 +1,7 @@
-package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap;
+package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.check;
 
-import com.lanny.spring_security_template.infrastructure.config.guard.NetworkSecurityProdGuard;
-import com.lanny.spring_security_template.infrastructure.security.network.NetworkSecurityProperties;
+import com.lanny.spring_security_template.infrastructure.config.SecurityCorsProperties;
+import com.lanny.spring_security_template.infrastructure.config.validation.CorsSecurityValidator;
 
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
@@ -10,29 +10,29 @@ import java.util.Set;
 
 /**
  * ============================================================
- * NetworkSecurityStartupCheck
+ * CorsSecurityStartupCheck
  * ============================================================
  *
- * Security bootstrap check validating network security configuration
+ * Security bootstrap check validating CORS configuration
  * for production environments.
  */
 @Component
-public final class NetworkSecurityStartupCheck implements SecurityStartupCheck {
+public final class CorsSecurityStartupCheck implements SecurityStartupCheck {
 
-    private static final String CHECK_NAME = "network";
+    private static final String CHECK_NAME = "cors";
     private static final Set<String> PROD_PROFILES = Set.of("prod");
 
-    private final NetworkSecurityProperties properties;
+    private final SecurityCorsProperties corsProperties;
     private final Environment environment;
-    private final NetworkSecurityProdGuard guard;
+    private final CorsSecurityValidator guard;
 
-    public NetworkSecurityStartupCheck(
-            NetworkSecurityProperties properties,
+    public CorsSecurityStartupCheck(
+            SecurityCorsProperties corsProperties,
             Environment environment) {
 
-        this.properties = properties;
+        this.corsProperties = corsProperties;
         this.environment = environment;
-        this.guard = new NetworkSecurityProdGuard();
+        this.guard = new CorsSecurityValidator();
     }
 
     @Override
@@ -42,7 +42,7 @@ public final class NetworkSecurityStartupCheck implements SecurityStartupCheck {
 
     @Override
     public int getOrder() {
-        return -50; // last hard security check
+        return -60; // after refresh-token, before network
     }
 
     @Override
@@ -52,7 +52,7 @@ public final class NetworkSecurityStartupCheck implements SecurityStartupCheck {
             return;
         }
 
-        guard.validate(properties);
+        guard.validate(corsProperties);
     }
 
     private boolean isProductionProfileActive() {

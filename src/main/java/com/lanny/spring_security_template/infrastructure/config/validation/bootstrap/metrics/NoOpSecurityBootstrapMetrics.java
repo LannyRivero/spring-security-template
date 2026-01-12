@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap;
+package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.metrics;
 
 import org.springframework.stereotype.Component;
 
@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
  * during security bootstrap.
  */
 @Component
-class NoOpSecurityBootstrapMetrics implements SecurityBootstrapMetrics {
+public class NoOpSecurityBootstrapMetrics implements SecurityBootstrapMetrics {
 
     @Override
     public void bootstrapSucceeded(int checksCount) {
