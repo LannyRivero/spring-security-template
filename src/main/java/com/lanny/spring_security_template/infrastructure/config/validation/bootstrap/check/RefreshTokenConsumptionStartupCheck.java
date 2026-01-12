@@ -1,32 +1,47 @@
 package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.check;
 
-import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenConsumptionPort;
-import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard.RefreshTokenConsumptionProdGuard;
+import java.util.Map;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-import java.util.Set;
+import com.lanny.spring_security_template.application.auth.port.out.RefreshTokenConsumptionPort;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard.RefreshTokenConsumptionProdGuard;
 
 /**
  * ============================================================
  * RefreshTokenConsumptionStartupCheck
  * ============================================================
  *
- * Security bootstrap check ensuring atomic refresh token consumption
- * is configured for production environments.
+ * Security bootstrap check ensuring that refresh token consumption
+ * is performed atomically and securely in production environments.
  *
  * <p>
- * Enforced only when running under {@code prod}-like profiles.
+ * This check prevents unsafe refresh token reuse and replay attacks
+ * by enforcing the presence of a single, production-grade consumption
+ * engine (e.g. Redis-based atomic consume).
+ * </p>
+ *
+ * <p>
+ * Security rationale:
+ * </p>
+ * <ul>
+ *   <li>Refresh token replay must be detected and blocked</li>
+ *   <li>No-op or in-memory consumers are forbidden in production</li>
+ *   <li>Exactly one consumption engine must be configured</li>
+ * </ul>
+ *
+ * <p>
+ * If this check fails, application startup is aborted immediately.
+ * There are no fallbacks or relaxed defaults in production.
  * </p>
  */
 @Component
 public final class RefreshTokenConsumptionStartupCheck implements SecurityStartupCheck {
 
     private static final String CHECK_NAME = "refresh-token-consumption";
-    private static final Set<String> PROD_PROFILES = Set.of("prod");
 
     private final ApplicationContext context;
     private final Environment environment;
@@ -48,7 +63,7 @@ public final class RefreshTokenConsumptionStartupCheck implements SecurityStartu
 
     @Override
     public int getOrder() {
-        return -70; // after role-provider, before cors/network
+        return -70; // after role-provider, before cors and network checks
     }
 
     @Override
@@ -58,17 +73,14 @@ public final class RefreshTokenConsumptionStartupCheck implements SecurityStartu
             return;
         }
 
-        Map<String, RefreshTokenConsumptionPort> ports = context.getBeansOfType(RefreshTokenConsumptionPort.class);
+        Map<String, RefreshTokenConsumptionPort> consumptionPorts =
+                context.getBeansOfType(RefreshTokenConsumptionPort.class);
 
-        guard.validate(ports);
+        guard.validate(consumptionPorts);
     }
 
     private boolean isProductionProfileActive() {
-        for (String profile : environment.getActiveProfiles()) {
-            if (PROD_PROFILES.contains(profile)) {
-                return true;
-            }
-        }
-        return false;
+        return environment.acceptsProfiles(Profiles.of("prod"));
     }
 }
+
