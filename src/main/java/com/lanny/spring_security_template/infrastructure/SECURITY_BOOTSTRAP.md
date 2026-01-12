@@ -140,23 +140,52 @@ This bootstrap design is built on the following principles:
 Security misconfiguration is treated as a **deployment error**, not a runtime error.
 
 ---
+
 ## Scope and Non-Goals
 
 This security bootstrap is intentionally limited to **security invariants**.
 
 Some production-critical requirements are **not security concerns by themselves**, but rather
-**operability or observability invariants**.
+**operability or environment-specific concerns**.
 
-For this reason, certain production-only constraints (such as mandatory metrics or auditing)
-are enforced directly via **Spring configuration guards**, instead of being part of the
+For this reason, certain production-only constraints (such as observability requirements)
+are enforced directly via Spring configuration guards instead of being part of the
 `SecurityBootstrapValidator`.
 
 This separation is intentional and ensures that:
 - Security bootstrap remains focused and explicit
 - Operational requirements are enforced at infrastructure level
 - Fail-fast behavior is preserved without mixing responsibilities
+
 ---
 
+## Environment-Specific Adapters
+
+Certain infrastructure adapters are intentionally enabled only in specific
+non-production environments.
+
+### Development-only Registration Adapter
+
+The `DevRegisterTransactionalAdapter` is intentionally enabled only for the
+`dev` and `demo` profiles.
+
+The `local` profile is deliberately excluded.
+
+**Rationale:**
+
+- The `local` profile is treated as a production-like environment
+  for security-sensitive flows.
+- Developers working locally are expected to use the same controlled
+  authentication and registration mechanisms as production whenever possible.
+- This prevents accidental reliance on development-only shortcuts
+  that could hide real-world security or integration issues.
+
+By restricting this adapter to `dev` and `demo`, the system enforces
+a clear separation between:
+- development conveniences, and
+- realistic, production-aligned local testing.
+
+---
 ## Why This Exists
 
 Most security incidents do not happen because of complex exploits.  
