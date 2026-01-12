@@ -1,5 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.aop;
 
+import static com.lanny.spring_security_template.infrastructure.observability.MdcKeys.*;
+
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.AfterThrowing;
@@ -15,41 +17,39 @@ import com.lanny.spring_security_template.application.auth.audit.AuditEvent;
 import com.lanny.spring_security_template.application.auth.audit.AuditReason;
 import com.lanny.spring_security_template.application.auth.audit.Auditable;
 
-import static com.lanny.spring_security_template.infrastructure.observability.MdcKeys.*;
-
 /**
  * {@code SecurityAuditAspect}
  *
  * <p>
  * Banking-grade security audit aspect.
  * </p>
- *
+//  *
  * <h2>Responsibilities</h2>
  * <ul>
- *   <li>Emit structured security audit events for explicitly annotated use cases</li>
- *   <li>Never infer events from method names</li>
- *   <li>Never log free-text exception messages</li>
+ * <li>Emit structured security audit events for explicitly annotated use
+ * cases</li>
+ * <li>Never infer events from method names</li>
+ * <li>Never log free-text exception messages</li>
  * </ul>
  *
  * <h2>Scope</h2>
  * <ul>
- *   <li>Application-layer use cases annotated with {@link Auditable}</li>
- *   <li>HTTP-bound execution relying on MDC context populated by filters</li>
+ * <li>Application-layer use cases annotated with {@link Auditable}</li>
+ * <li>HTTP-bound execution relying on MDC context populated by filters</li>
  * </ul>
  *
  * <h2>Security guarantees</h2>
  * <ul>
- *   <li>Finite, auditable reasons only</li>
- *   <li>No PII leakage</li>
- *   <li>Correlation-safe logging</li>
+ * <li>Finite, auditable reasons only</li>
+ * <li>No PII leakage</li>
+ * <li>Correlation-safe logging</li>
  * </ul>
  */
 @Aspect
 @Component
 public class SecurityAuditAspect {
 
-    private static final Logger AUDIT_LOG =
-            LoggerFactory.getLogger("SECURITY_AUDIT");
+    private static final Logger AUDIT_LOG = LoggerFactory.getLogger("SECURITY_AUDIT");
 
     // ==========
     // SUCCESS
@@ -91,13 +91,11 @@ public class SecurityAuditAspect {
         if (reason == AuditReason.SUCCESS) {
             AUDIT_LOG.info(
                     "event={} reason={} user={} path={} correlationId={}",
-                    event, reason, username, requestPath, correlationId
-            );
+                    event, reason, username, requestPath, correlationId);
         } else {
             AUDIT_LOG.warn(
                     "event={} reason={} user={} path={} correlationId={}",
-                    event, reason, username, requestPath, correlationId
-            );
+                    event, reason, username, requestPath, correlationId);
         }
     }
 
@@ -108,8 +106,8 @@ public class SecurityAuditAspect {
      * IMPORTANT:
      * </p>
      * <ul>
-     *   <li>Never log raw exception messages</li>
-     *   <li>Reasons must be finite and auditable</li>
+     * <li>Never log raw exception messages</li>
+     * <li>Reasons must be finite and auditable</li>
      * </ul>
      */
     private AuditReason mapExceptionToReason(Exception ex) {
@@ -129,8 +127,8 @@ public class SecurityAuditAspect {
      * Banking rule:
      * </p>
      * <ul>
-     *   <li>Audit must never rely on request parameters</li>
-     *   <li>Username must be propagated explicitly via MDC</li>
+     * <li>Audit must never rely on request parameters</li>
+     * <li>Username must be propagated explicitly via MDC</li>
      * </ul>
      *
      * <p>
@@ -144,4 +142,3 @@ public class SecurityAuditAspect {
                 : "anonymous";
     }
 }
-

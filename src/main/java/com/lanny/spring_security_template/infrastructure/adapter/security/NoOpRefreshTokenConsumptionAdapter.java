@@ -31,6 +31,12 @@ import com.lanny.spring_security_template.application.auth.port.out.RefreshToken
  * This implementation provides NO protection against refresh token
  * replay attacks and MUST NEVER be enabled in production.
  * </p>
+ * 
+ * <p>
+ * NoOpRefreshTokenConsumptionAdapter is enabled only in non-production profiles
+ * and must never
+ * be used in production-like environments.
+ * </p>
  *
  * <h2>Profiles</h2>
  * <ul>
