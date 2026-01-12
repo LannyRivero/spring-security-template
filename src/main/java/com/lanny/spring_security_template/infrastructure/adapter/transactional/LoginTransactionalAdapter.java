@@ -10,13 +10,29 @@ import com.lanny.spring_security_template.application.auth.result.JwtResult;
 import com.lanny.spring_security_template.application.auth.service.LoginService;
 
 import lombok.RequiredArgsConstructor;
+
 /**
- * Transactional adapter fot login use case
- * 
- * -Independent transaction boundary
- * Atomic istence of refresh token and session state
- * -No propagation of external transactions
- * 
+ * Transactional adapter for the login use case.
+ *
+ * <p>
+ * This adapter defines an explicit and independent transactional boundary
+ * around the login flow.
+ * </p>
+ *
+ * <p>
+ * Security rationale:
+ * </p>
+ * <ul>
+ * <li>Ensure atomic creation of refresh tokens and session state</li>
+ * <li>Prevent partial login side effects</li>
+ * <li>Isolate login execution from external transactional contexts</li>
+ * </ul>
+ *
+ * <p>
+ * The use of {@code Propagation.REQUIRES_NEW} ensures that the login process
+ * is always executed in a dedicated transaction, even if an outer transaction
+ * exists.
+ * </p>
  */
 
 @Service
