@@ -9,6 +9,8 @@ import org.springframework.context.SmartLifecycle;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+import com.lanny.spring_security_template.infrastructure.config.validation.InvalidSecurityConfigurationException;
+
 /**
  * Executes all {@link SecurityStartupCheck} validations during bootstrap.
  *
@@ -31,15 +33,20 @@ public final class SecurityBootstrapValidator implements SmartLifecycle {
     private static final Logger log = LoggerFactory.getLogger(SecurityBootstrapValidator.class);
 
     private final List<SecurityStartupCheck> checks;
+    private final SecurityBootstrapMetrics metrics;
+
     private volatile boolean running = false;
 
-    public SecurityBootstrapValidator(List<SecurityStartupCheck> checks) {
+    public SecurityBootstrapValidator(
+            List<SecurityStartupCheck> checks,
+            SecurityBootstrapMetrics metrics) {
+
         this.checks = checks;
+        this.metrics = metrics;
     }
 
     @Override
     public void start() {
-        // Ensure execution happens only once
         if (running) {
             return;
         }
@@ -49,19 +56,31 @@ public final class SecurityBootstrapValidator implements SmartLifecycle {
                     "No SecurityStartupCheck beans registered — security bootstrap validation is mandatory");
         }
 
-        checks.stream()
-                .sorted(Comparator.comparingInt(SecurityStartupCheck::getOrder))
-                .forEach(check -> {
-                    log.info("Security bootstrap check [{}] starting", check.name());
-                    check.validate(); // must throw on failure
-                    log.info("Security bootstrap check [{}] OK", check.name());
-                });
+        try {
+            checks.stream()
+                    .sorted(Comparator.comparingInt(SecurityStartupCheck::getOrder))
+                    .forEach(check -> {
+                        log.info("Security bootstrap check [{}] starting", check.name());
+                        check.validate(); // must throw on failure
+                        log.info("Security bootstrap check [{}] OK", check.name());
+                    });
 
-        running = true;
+            metrics.bootstrapSucceeded(checks.size());
+            running = true;
 
-        log.info(
-                "Security bootstrap validation completed successfully (checks={})",
-                checks.size());
+            log.info(
+                    "Security bootstrap validation completed successfully (checks={})",
+                    checks.size());
+
+        } catch (RuntimeException ex) {
+            // Emit failure metric with the logical check name if possible
+            if (ex instanceof InvalidSecurityConfigurationException isc) {
+                metrics.bootstrapFailed(isc.getSource());
+            } else {
+                metrics.bootstrapFailed("unknown");
+            }
+            throw ex; // FAIL FAST — never swallow
+        }
     }
 
     @Override
