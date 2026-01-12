@@ -25,16 +25,20 @@ public final class CorsSecurityValidator {
 
         if (origins == null || origins.isEmpty()) {
             throw new InvalidSecurityConfigurationException(
+                    "cors-configuration",
                     "CORS allowedOrigins must not be empty in production");
         }
 
         if (origins.contains("*")) {
             throw new InvalidSecurityConfigurationException(
+                    "cors-configuration",
                     "CORS wildcard '*' is not allowed in production");
         }
 
         if (corsProperties.allowCredentials() && origins.contains("*")) {
+
             throw new InvalidSecurityConfigurationException(
+                    "cors-configuration",
                     "CORS allowCredentials=true cannot be used with wildcard origins");
         }
     }

@@ -23,6 +23,7 @@ public final class NetworkSecurityProdGuard {
                 || props.trustedProxyPrefixes().isEmpty()) {
 
             throw new InvalidSecurityConfigurationException(
+                    "network-security",
                     "No trusted proxy prefixes configured. " +
                             "Configure 'security.network.trusted-proxy-prefixes' for production.");
         }

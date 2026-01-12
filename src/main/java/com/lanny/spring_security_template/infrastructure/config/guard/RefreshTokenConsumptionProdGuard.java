@@ -24,11 +24,9 @@ public final class RefreshTokenConsumptionProdGuard {
 
         if (ports.isEmpty()) {
             throw new InvalidSecurityConfigurationException(
-                "No RefreshTokenConsumptionPort configured. " +
-                "Atomic refresh token consumption is mandatory in production."
-            );
+                    "refresh-token-consumption",
+                    "No RefreshTokenConsumptionPort configured. " +
+                            "Atomic refresh token consumption is mandatory in production.");
         }
     }
 }
-
-

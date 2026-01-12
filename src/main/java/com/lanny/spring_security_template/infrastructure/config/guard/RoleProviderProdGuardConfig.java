@@ -23,6 +23,7 @@ public final class RoleProviderProdGuardConfig {
 
         if (providers.isEmpty()) {
             throw new InvalidSecurityConfigurationException(
+                    "role-provider",
                     "No RoleProvider bean configured. At least one production provider is required.");
         }
 
@@ -33,6 +34,7 @@ public final class RoleProviderProdGuardConfig {
 
         if (!hasProductionProvider) {
             throw new InvalidSecurityConfigurationException(
+                    "role-provider",
                     "Only in-memory RoleProvider implementations detected. " +
                             "In-memory providers are not allowed in production.");
         }

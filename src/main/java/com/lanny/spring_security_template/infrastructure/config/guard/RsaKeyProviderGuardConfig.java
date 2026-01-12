@@ -35,26 +35,37 @@ public final class RsaKeyProviderGuardConfig {
         }
 
         if (props.rsa() == null || props.rsa().source() == null) {
-            throw new InvalidSecurityConfigurationException("""
-                    JWT algorithm is RSA but rsa.source is not configured.
-                    Expected property:
-                      security.jwt.rsa.source = filesystem | keystore | classpath
-                    """);
+            throw new InvalidSecurityConfigurationException(
+                    "rsa-key-provider",
+                    """
+                            JWT algorithm is RSA but rsa.source is not configured.
+                            Expected property:
+                              security.jwt.rsa.source = filesystem | keystore | classpath
+                            """);
         }
 
         if (providers.isEmpty()) {
-            throw new InvalidSecurityConfigurationException("""
-                    JWT algorithm is RSA but no RsaKeyProvider bean was found.
-                    Expected exactly ONE provider.
-                    """);
+            throw new InvalidSecurityConfigurationException(
+
+                    "rsa-key-provider",
+                    """
+                            JWT algorithm is RSA but no RsaKeyProvider bean was found.
+                            Expected exactly ONE provider.
+                            """);
         }
 
         if (providers.size() > 1) {
-            throw new InvalidSecurityConfigurationException("""
+
+            final String message = """
                     Multiple RsaKeyProvider beans detected.
                     Exactly ONE provider must be active.
                     Providers found: %s
-                    """.formatted(providers.keySet()));
+                    """.formatted(providers.keySet());
+
+            throw new InvalidSecurityConfigurationException(
+                    "rsa-key-provider",
+                    message);
         }
+
     }
 }

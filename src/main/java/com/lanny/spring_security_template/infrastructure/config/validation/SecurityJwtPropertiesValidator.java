@@ -326,12 +326,12 @@ public final class SecurityJwtPropertiesValidator {
     }
 
     private static InvalidSecurityConfigurationException invalid(String msg) {
-        return new InvalidSecurityConfigurationException(msg);
+        return new InvalidSecurityConfigurationException("security-jwt-properties", msg);
     }
 
     private static InvalidSecurityConfigurationException invalid(
             String msg,
             Throwable cause) {
-        return new InvalidSecurityConfigurationException(msg, cause);
+        return new InvalidSecurityConfigurationException("security-jwt-properties", msg, cause);
     }
 }
