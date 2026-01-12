@@ -3,7 +3,7 @@ package com.lanny.spring_security_template.infrastructure.metrics;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.SecurityBootstrapMetrics;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.metrics.SecurityBootstrapMetrics;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;

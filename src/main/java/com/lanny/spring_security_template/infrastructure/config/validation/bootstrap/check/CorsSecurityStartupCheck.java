@@ -2,7 +2,6 @@ package com.lanny.spring_security_template.infrastructure.config.validation.boot
 
 import com.lanny.spring_security_template.infrastructure.config.SecurityCorsProperties;
 import com.lanny.spring_security_template.infrastructure.config.validation.CorsSecurityValidator;
-import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.SecurityStartupCheck;
 
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;

@@ -1,4 +1,4 @@
-package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap;
+package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.metrics;
 
 /**
  * Metrics emitted during security bootstrap validation.
