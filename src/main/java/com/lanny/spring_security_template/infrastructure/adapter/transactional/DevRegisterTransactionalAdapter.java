@@ -14,17 +14,25 @@ import lombok.RequiredArgsConstructor;
  * Transactional adapter for DevRegisterService.
  *
  * <p>
- * This adapter exists only for development/demo environments.
+ * This adapter exists exclusively for development and demo environments.
  * Its purpose is to provide a transactional boundary around the
- * application-layer DevRegisterService, which must remain pure
+ * application-layer {@link DevRegisterService}, which must remain pure
  * and free of Spring infrastructure concerns.
  * </p>
  *
  * <p>
- * In production this bean is not loaded, ensuring that
- * development-only registration flows cannot be used.
+ * This adapter must <strong>never</strong> be enabled in production
+ * environments.
+ * In production, all user registration flows are expected to be controlled,
+ * audited, and explicitly designed for security and compliance.
+ * </p>
+ *
+ * <p>
+ * The absence of this adapter in production profiles is an intentional
+ * security decision.
  * </p>
  */
+
 @Service
 @Profile({ "dev", "demo" })
 @RequiredArgsConstructor
@@ -33,8 +41,15 @@ public class DevRegisterTransactionalAdapter implements DevRegisterPort {
     private final DevRegisterService delegate;
 
     /**
-     * Executes the register command inside a transactional boundary.
+     * Executes a development-only registration command inside
+     * a transactional boundary.
+     *
+     * <p>
+     * This method is intended solely for non-production environments
+     * to simplify development and demonstration workflows.
+     * </p>
      */
+
     @Transactional
     public void register(RegisterCommand cmd) {
         delegate.register(cmd);
