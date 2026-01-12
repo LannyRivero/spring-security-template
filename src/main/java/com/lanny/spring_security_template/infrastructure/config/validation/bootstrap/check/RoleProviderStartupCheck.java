@@ -1,14 +1,14 @@
 package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.check;
 
-import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
-import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard.RoleProviderProdGuardConfig;
+import java.util.Map;
+import java.util.Set;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-import java.util.Set;
+import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard.RoleProviderProdGuardConfig;
 
 /**
  * ============================================================
