@@ -5,12 +5,16 @@ import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.NotNull;
+
+import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitStrategy;
 
 /**
  * Strongly-typed configuration for login rate limiting.
  *
- * All values are validated at startup to ensure safe, predictable behavior.
+ * <p>
+ * All values are validated at startup to ensure safe and predictable behavior.
+ * </p>
  */
 @Validated
 @ConfigurationProperties(prefix = "rate-limiting")
@@ -20,7 +24,7 @@ public record RateLimitingProperties(
         boolean enabled,
 
         /** Strategy used to build the rate-limiting key. */
-        @NotBlank(message = "strategy cannot be blank") @Pattern(regexp = "IP|USER|IP_USER", message = "strategy must be one of: IP, USER, IP_USER") String strategy,
+        @NotNull(message = "strategy must be specified") RateLimitStrategy strategy,
 
         /** Max allowed failed attempts. */
         @Min(value = 1, message = "maxAttempts must be >= 1") int maxAttempts,
@@ -35,7 +39,7 @@ public record RateLimitingProperties(
         @Min(value = 1, message = "retryAfter must be >= 1") long retryAfter,
 
         /** Login endpoint to protect. */
-        @NotBlank(message = "loginPath cannot be blank") @Pattern(regexp = "^/.*$", message = "loginPath must start with '/'") String loginPath) {
+        @NotBlank(message = "loginPath cannot be blank") String loginPath) {
 
     public RateLimitingProperties {
         // --- Cross-field validation ---

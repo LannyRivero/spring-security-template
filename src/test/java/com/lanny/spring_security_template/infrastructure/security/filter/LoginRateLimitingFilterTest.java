@@ -18,6 +18,7 @@ import com.lanny.spring_security_template.infrastructure.config.RateLimitingProp
 import com.lanny.spring_security_template.infrastructure.security.handler.ApiError;
 import com.lanny.spring_security_template.infrastructure.security.handler.ApiErrorFactory;
 import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitKeyResolver;
+import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitStrategy;
 
 import jakarta.servlet.FilterChain;
 
@@ -106,7 +107,7 @@ class LoginRateLimitingFilterTest {
 
         when(props.enabled()).thenReturn(true);
         when(props.loginPath()).thenReturn("/api/v1/auth/login");
-        when(props.strategy()).thenReturn("IP_USER");
+        when(props.strategy()).thenReturn(RateLimitStrategy.IP_USER);
 
         when(keyResolver.resolveKey(req)).thenReturn("k");
         when(loginAttemptPolicy.registerAttempt("k")).thenReturn(LoginAttemptResult.blocked(120));
@@ -120,9 +121,9 @@ class LoginRateLimitingFilterTest {
         verify(chain, never()).doFilter(req, res);
         org.junit.jupiter.api.Assertions.assertEquals(429, res.getStatus());
         org.junit.jupiter.api.Assertions.assertEquals("120", res.getHeader("Retry-After"));
-        org.junit.jupiter.api.Assertions.assertNotNull(res.getContentType());
-        org.junit.jupiter.api.Assertions
-                .assertTrue(res.getContentType() != null && res.getContentType().startsWith("application/json"));
+        String contentType = res.getContentType();
+        org.junit.jupiter.api.Assertions.assertNotNull(contentType);
+        org.junit.jupiter.api.Assertions.assertTrue(contentType.startsWith("application/json"));
         org.junit.jupiter.api.Assertions.assertTrue(res.getContentAsString().contains("Too many login attempts"));
     }
 
@@ -135,7 +136,7 @@ class LoginRateLimitingFilterTest {
 
         when(props.enabled()).thenReturn(true);
         when(props.loginPath()).thenReturn("/api/v1/auth/login");
-        when(props.strategy()).thenReturn("IP");
+        when(props.strategy()).thenReturn(RateLimitStrategy.IP);
 
         when(keyResolver.resolveKey(req)).thenReturn("k");
         when(loginAttemptPolicy.registerAttempt("k")).thenReturn(LoginAttemptResult.blocked(0));

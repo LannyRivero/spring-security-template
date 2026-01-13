@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptResult;
 import com.lanny.spring_security_template.domain.time.ClockProvider;
 import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
+import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitStrategy;
 
 class InMemoryLoginAttemptPolicyTest {
 
@@ -28,7 +29,7 @@ class InMemoryLoginAttemptPolicyTest {
 
         RateLimitingProperties props = new RateLimitingProperties(
                 true,
-                "IP",
+                RateLimitStrategy.IP,
                 3,      // maxAttempts
                 60,     // window seconds
                 60,     // blockSeconds
@@ -68,7 +69,7 @@ class InMemoryLoginAttemptPolicyTest {
         MutableClock clock = new MutableClock(Instant.parse("2026-01-10T10:00:00Z"));
 
         RateLimitingProperties props = new RateLimitingProperties(
-                true, "IP", 3, 60, 60, 60, "/api/v1/auth/login"
+                true, RateLimitStrategy.IP, 3, 60, 60, 60, "/api/v1/auth/login"
         );
 
         InMemoryLoginAttemptPolicy policy = new InMemoryLoginAttemptPolicy(clock, props);
@@ -90,7 +91,7 @@ class InMemoryLoginAttemptPolicyTest {
         MutableClock clock = new MutableClock(Instant.parse("2026-01-10T10:00:00Z"));
 
         RateLimitingProperties props = new RateLimitingProperties(
-                true, "IP", 3, 60, 60, 60, "/api/v1/auth/login"
+                true, RateLimitStrategy.IP, 3, 60, 60, 60, "/api/v1/auth/login"
         );
 
         InMemoryLoginAttemptPolicy policy = new InMemoryLoginAttemptPolicy(clock, props);

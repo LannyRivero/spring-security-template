@@ -9,6 +9,7 @@ import com.lanny.spring_security_template.infrastructure.config.RateLimitingProp
 import com.lanny.spring_security_template.infrastructure.security.filter.LoginRateLimitingFilter;
 import com.lanny.spring_security_template.infrastructure.security.handler.ApiErrorFactory;
 import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitKeyResolver;
+import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitKeyResolverFactory;
 
 /**
  * ============================================================
@@ -52,13 +53,16 @@ public class LoginRateLimitingFilterConfig {
     @Bean
     public LoginRateLimitingFilter loginRateLimitingFilter(
             RateLimitingProperties props,
-            RateLimitKeyResolver keyResolver,
+            RateLimitKeyResolverFactory resolverFactory,
             ObjectMapper mapper,
             LoginAttemptPolicy loginAttemptPolicy,
             ApiErrorFactory apiErrorFactory) {
-        return new LoginRateLimitingFilter(
+
+                RateLimitKeyResolver resolver =
+                resolverFactory.get(props.strategy()); 
+                        return new LoginRateLimitingFilter(
                 props,
-                keyResolver,
+                resolver,
                 mapper,
                 loginAttemptPolicy,
                 apiErrorFactory);
