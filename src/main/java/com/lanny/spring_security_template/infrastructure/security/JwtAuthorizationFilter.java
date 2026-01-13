@@ -1,5 +1,20 @@
 package com.lanny.spring_security_template.infrastructure.security;
 
+import static com.lanny.spring_security_template.infrastructure.observability.MdcKeys.*;
+
+import java.io.IOException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.http.HttpHeaders;
+import org.springframework.lang.NonNull;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
 import com.lanny.spring_security_template.application.auth.port.out.JwtValidator;
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
@@ -13,21 +28,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
-import org.springframework.http.HttpHeaders;
-import org.springframework.lang.NonNull;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-import org.springframework.web.filter.OncePerRequestFilter;
-
-import java.io.IOException;
-
-import static com.lanny.spring_security_template.infrastructure.observability.MdcKeys.*;
 
 /**
  * {@code JwtAuthorizationFilter}
@@ -51,6 +51,9 @@ import static com.lanny.spring_security_template.infrastructure.observability.Md
  * <li>No tokens are logged</li>
  * <li>No PII leakage</li>
  * <li>Fail-safe: authentication is NEVER partially set</li>
+ * <li>Malformed or invalid JWT claims are treated as authorization
+ * failures</li>
+ * 
  * </ul>
  *
  * <h2>Observability</h2>
@@ -59,6 +62,15 @@ import static com.lanny.spring_security_template.infrastructure.observability.Md
  * <li>Method + path always present</li>
  * <li>Controlled failure reasons (finite enum)</li>
  * </ul>
+ * 
+ * <h2>Failure behavior</h2>
+ * <p>
+ * This filter never sends HTTP responses directly.
+ * On authorization failure, the {@link SecurityContextHolder} remains empty
+ * and the request is handled downstream by Spring Security's
+ * authentication entry point or access denied handler.
+ * </p>
+ * 
  */
 @Component
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
