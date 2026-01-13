@@ -1,30 +1,73 @@
 package com.lanny.spring_security_template.infrastructure.security.policy;
 
-
-import com.lanny.spring_security_template.domain.model.Role;
-import com.lanny.spring_security_template.domain.model.Scope;
-import com.lanny.spring_security_template.domain.policy.ScopePolicy;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+import com.lanny.spring_security_template.domain.model.Role;
+import com.lanny.spring_security_template.domain.model.Scope;
+import com.lanny.spring_security_template.domain.policy.ScopePolicy;
 
 /**
- * Enterprise implementation of ScopePolicy.
+ * ============================================================
+ * DefaultScopePolicy
+ * ============================================================
  *
- * Responsibilities:
- * - Resolve effective scopes for a given set of roles.
- * - Apply implicit rules (ADMIN, SYSTEM, etc.).
- * - Answer fine-grained permission checks (can / hasScope).
+ * <p>
+ * Default enterprise-grade implementation of {@link ScopePolicy}
+ * responsible for resolving effective authorization scopes
+ * from a set of domain {@link Role} objects.
+ * </p>
  *
- * This implementation is fully in-memory and declarative,
- * but can be replaced by a DB/remote-policy-based implementation
- * without impacting the application layer.
+ * <h2>Responsibilities</h2>
+ * <ul>
+ *   <li>Resolve effective scopes derived from roles</li>
+ *   <li>Apply implicit authorization rules (ADMIN, SYSTEM)</li>
+ *   <li>Answer fine-grained authorization checks</li>
+ * </ul>
+ *
+ * <h2>Authorization model</h2>
+ * <ul>
+ *   <li><b>USER</b>: receives scopes explicitly defined in roles</li>
+ *   <li><b>ADMIN</b>: receives declared scopes plus implicit admin scopes</li>
+ *   <li><b>SYSTEM</b>: receives all known scopes defined by policy</li>
+ * </ul>
+ *
+ * <p>
+ * SYSTEM access represents <b>maximum known privileges</b>
+ * defined by the policy, not an unbounded wildcard.
+ * </p>
+ *
+ * <h2>Design characteristics</h2>
+ * <ul>
+ *   <li>Deterministic and side-effect free</li>
+ *   <li>No exceptions thrown for authorization checks</li>
+ *   <li>Thread-safe and stateless from caller perspective</li>
+ *   <li>Optional in-memory caching for performance</li>
+ * </ul>
+ *
+ * <h2>Extensibility</h2>
+ * <p>
+ * This implementation can be safely replaced by:
+ * </p>
+ * <ul>
+ *   <li>Database-backed policies</li>
+ *   <li>Tenant-aware authorization engines</li>
+ *   <li>External IAM / PDP integrations</li>
+ * </ul>
+ *
+ * <p>
+ * Without impacting the application or domain layers.
+ * </p>
  */
+
 @Component
 @Primary
 @Profile({ "dev", "prod" })
