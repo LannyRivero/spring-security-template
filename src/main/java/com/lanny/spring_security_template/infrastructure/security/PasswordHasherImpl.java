@@ -1,8 +1,9 @@
 package com.lanny.spring_security_template.infrastructure.security;
 
-import com.lanny.spring_security_template.domain.service.PasswordHasher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+
+import com.lanny.spring_security_template.domain.service.PasswordHasher;
 
 /**
  * Infrastructure-level implementation of the {@link PasswordHasher} domain
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
  * <p>
  * This component delegates password hashing and verification to Spring
  * Security's
+ * 
  * {@link PasswordEncoder}, allowing the application to use strong, adaptive
  * hashing algorithms without coupling the domain to a specific implementation.
  * </p>
@@ -41,6 +43,9 @@ import org.springframework.stereotype.Component;
  * <li>Raw passwords are never persisted or logged.</li>
  * <li>Password verification is performed using constant-time comparisons
  * provided by the underlying encoder.</li>
+ * <li>This component MUST NOT log raw or hashed passwords under any
+ * circumstances.</li>
+ * 
  * </ul>
  *
  * <p>
@@ -63,6 +68,9 @@ public class PasswordHasherImpl implements PasswordHasher {
      * @param rawPassword the plaintext password provided by the user
      * @return a securely hashed representation of the password, including
      *         the algorithm identifier prefix
+     * @throws IllegalArgumentException if the provided password is null
+     *                                  or the hash format is invalid
+     * 
      */
     @Override
     public String hash(String rawPassword) {
@@ -76,6 +84,9 @@ public class PasswordHasherImpl implements PasswordHasher {
      * @param hashedPassword the stored password hash
      * @return {@code true} if the password matches the hash; {@code false}
      *         otherwise
+     * @throws IllegalArgumentException if the provided password is null
+     *                                  or the hash format is invalid
+     * 
      */
     @Override
     public boolean matches(String rawPassword, String hashedPassword) {
