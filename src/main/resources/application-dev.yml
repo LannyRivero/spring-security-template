@@ -90,8 +90,10 @@ security:
       public-keys:
         dev-rsa-1: keys/rsa-public.pem
   network:
-    trusted-proxy-prefixes:
-      - "127.0.0.1"
+    trusted-proxy-cidrs:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
 
   cors:
     allowed-origins:
