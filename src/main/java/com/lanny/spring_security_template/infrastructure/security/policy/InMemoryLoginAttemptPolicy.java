@@ -119,7 +119,8 @@ public class InMemoryLoginAttemptPolicy implements LoginAttemptPolicy {
         }
 
         long secondsUntilUnblock(Instant now) {
-            if (blockUntil == null) return 0;
+            if (blockUntil == null)
+                return 0;
             long diff = blockUntil.getEpochSecond() - now.getEpochSecond();
             return Math.max(0, diff);
         }
