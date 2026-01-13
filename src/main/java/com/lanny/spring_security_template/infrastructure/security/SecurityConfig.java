@@ -150,8 +150,20 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, AUTH_ENDPOINTS).permitAll()
                         .anyRequest().authenticated());
 
-        // ---Filter order: explicit & documented--
+        // ----------------------------------------------------
+        // Filter order: explicit & documented
+        // ----------------------------------------------------
+        //
+        // NOTE:
+        // UsernamePasswordAuthenticationFilter is used ONLY as a stable anchor point.
+        // This application is fully stateless and does NOT rely on form login or
+        // sessions.
+        // Spring Security requires a filter with a registered order to attach custom
+        // filters.
+        //
         http.addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class);
+
+        // Security headers must be applied as early as possible
         http.addFilterAfter(securityHeadersFilter, CorrelationIdFilter.class);
 
         // IMPORTANT:
@@ -159,10 +171,10 @@ public class SecurityConfig {
         // This configuration assumes that behavior by contract.
         http.addFilterAfter(loginRateLimitingFilter, SecurityHeadersFilter.class);
 
-        // --JWT auth
+        // JWT authentication and SecurityContext population
         http.addFilterAfter(jwtAuthz, LoginRateLimitingFilter.class);
 
-        // Disable caching for authenticated responses
+        // Disable client-side caching ONLY for authenticated responses
         http.addFilterAfter(authNoCacheFilter, JwtAuthorizationFilter.class);
 
         return http.build();
