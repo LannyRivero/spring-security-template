@@ -3,10 +3,10 @@ package com.lanny.spring_security_template.infrastructure.security.policy;
 import java.util.List;
 
 import org.springframework.context.annotation.Profile;
-import org.springframework.lang.NonNull;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptPolicy;
@@ -17,57 +17,36 @@ import com.lanny.spring_security_template.infrastructure.config.RateLimitingProp
 import lombok.RequiredArgsConstructor;
 
 /**
- * {@code RedisLoginAttemptPolicy}
+ * ============================================================
+ * RedisLoginAttemptPolicy
+ * ============================================================
  *
- * <h2>Purpose</h2>
- * Redis-backed implementation of {@link LoginAttemptPolicy} used to detect and
- * mitigate
- * brute-force attacks against the login endpoint in distributed deployments.
+ * <p>
+ * Redis-backed implementation of {@link LoginAttemptPolicy} providing
+ * distributed, atomic rate limiting for authentication endpoints.
+ * </p>
  *
- * <h2>Why Redis</h2>
- * In a multi-instance (multi-pod) architecture, in-memory counters do not
- * provide
- * consistent enforcement. Redis provides a shared, low-latency store suitable
- * for
- * rate-limiting and temporary lockouts.
- *
- * <h2>Security guarantees</h2>
+ * <h2>Execution guarantees</h2>
  * <ul>
- * <li><b>Atomicity</b>: increments, TTL assignment, and lockout creation are
- * executed
- * atomically via a Lua script to prevent race conditions (e.g., INCR without
- * EXPIRE).</li>
- * <li><b>Predictable lockout</b>: lockout TTL returned to callers is the real
- * TTL from Redis,
- * avoiding drift between configuration and actual lock duration.</li>
- * <li><b>PII-safe</b>: this policy does not assume the key contains raw
- * usernames; callers should
- * hash any user identifiers before building the key.</li>
+ * <li>Atomic enforcement via Lua script</li>
+ * <li>Consistent behavior across multiple application instances</li>
+ * <li>No partial state updates</li>
+ * <li>Never returns {@code null}</li>
  * </ul>
  *
- * <h2>Algorithm overview</h2>
- * Given a rate-limit key (IP/USER/IP_USER), the policy maintains two Redis
- * keys:
+ * <h2>Failure model</h2>
  * <ul>
- * <li>{@code login:attempts:{key}}: counter with TTL = window</li>
- * <li>{@code login:block:{key}}: lockout flag with TTL = blockSeconds</li>
+ * <li>If Redis is unavailable, the exception propagates</li>
+ * <li>Fail-fast behavior is intentional for security consistency</li>
+ * <li>No silent bypass of rate limiting in production</li>
  * </ul>
  *
- * Steps performed atomically:
- * <ol>
- * <li>If block key exists with TTL &gt; 0: return TTL (blocked).</li>
- * <li>INCR attempts counter; if first attempt, set EXPIRE(windowSeconds).</li>
- * <li>If attempts exceeds maxAttempts: SET block key with EX(blockSeconds), DEL
- * attempts key,
- * return blockSeconds (blocked).</li>
- * <li>Otherwise: return 0 (allowed).</li>
- * </ol>
- *
- * <h2>Profiles</h2>
- * Enabled only under {@code prod}. Non-production profiles should use a
- * dedicated
- * no-op or in-memory implementation depending on your threat model for
- * dev/test.
+ * <h2>Security constraints</h2>
+ * <ul>
+ * <li>Rate-limit keys must be PII-safe (hashed upstream)</li>
+ * <li>TTL values returned reflect real Redis state</li>
+ * <li>No assumptions about request content</li>
+ * </ul>
  */
 @Component
 @Profile("prod")
@@ -83,13 +62,19 @@ public class RedisLoginAttemptPolicy implements LoginAttemptPolicy {
 
         /**
          * Lua script return contract:
-         * - 0 -> allowed
-         * - >0 -> blocked, return TTL seconds
+         * <ul>
+         * <li>{@code 0} → access allowed</li>
+         * <li>{@code >0} → blocked, value represents remaining block TTL (seconds)</li>
+         * </ul>
          *
-         * Notes:
-         * - If blockKey exists but TTL is -1 (no expiry) or -2 (missing), we normalize
-         * to 0.
-         * - We always set TTL on attemptsKey on first attempt.
+         * <p>
+         * Script invariants:
+         * </p>
+         * <ul>
+         * <li>Attempts counter always has a TTL</li>
+         * <li>Block key is always created with TTL</li>
+         * <li>No negative TTLs are propagated</li>
+         * </ul>
          */
         @NonNull
         private final RedisScript<Long> script = new DefaultRedisScript<>(
@@ -103,22 +88,20 @@ public class RedisLoginAttemptPolicy implements LoginAttemptPolicy {
 
                                         local blockTtl = redis.call("TTL", blockKey)
 
-                                        -- TTL meanings:
-                                        -- -2: key does not exist
-                                        -- -1: key exists but no expiry (unsafe for lockout keys)
+                                        -- Active block → return remaining TTL
                                         if blockTtl > 0 then
-                                          return blockTtl
+                                            return blockTtl
                                         end
 
                                         local attempts = redis.call("INCR", attemptsKey)
                                         if attempts == 1 then
-                                          redis.call("EXPIRE", attemptsKey, windowSeconds)
+                                            redis.call("EXPIRE", attemptsKey, windowSeconds)
                                         end
 
                                         if attempts > maxAttempts then
-                                          redis.call("SET", blockKey, "1", "EX", blockSeconds)
-                                          redis.call("DEL", attemptsKey)
-                                          return blockSeconds
+                                            redis.call("SET", blockKey, "1", "EX", blockSeconds)
+                                            redis.call("DEL", attemptsKey)
+                                            return blockSeconds
                                         end
 
                                         return 0
@@ -129,20 +112,22 @@ public class RedisLoginAttemptPolicy implements LoginAttemptPolicy {
         @Override
         public LoginAttemptResult registerAttempt(String key) {
 
-                final List<String> keys = List.of(
+                List<String> keys = List.of(
                                 ATTEMPTS_PREFIX + key,
                                 BLOCK_PREFIX + key);
 
-                Long retryAfterSeconds = redis.execute(
+                Long result = redis.execute(
                                 script,
                                 keys,
                                 String.valueOf(props.maxAttempts()),
                                 String.valueOf(props.window()),
                                 String.valueOf(props.blockSeconds()));
 
-                if (retryAfterSeconds != null && retryAfterSeconds > 0) {
+                long retryAfter = (result != null && result > 0) ? result : 0;
+
+                if (retryAfter > 0) {
                         metrics.recordBruteForceDetected();
-                        return LoginAttemptResult.blocked(retryAfterSeconds);
+                        return LoginAttemptResult.blocked(retryAfter);
                 }
 
                 return LoginAttemptResult.allowAccess();
