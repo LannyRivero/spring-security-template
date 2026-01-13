@@ -36,6 +36,21 @@ import org.springframework.web.cors.*;
  * <li>Authorization is enforced via roles and scopes, evaluated at
  * both filter and method levels.</li>
  * <li>No HTTP session is created or used
+ * *
+ * <p>
+ * This configuration intentionally does NOT enable:
+ * </p>
+ * <ul>
+ * <li>Form login</li>
+ * <li>HTTP sessions</li>
+ * <li>Remember-me authentication</li>
+ * </ul>
+ *
+ * <p>
+ * All authentication state is derived exclusively from validated JWT tokens
+ * on each request.
+ * </p>
+ * 
  * ({@link SessionCreationPolicy#STATELESS}).</li>
  * </ul>
  *
@@ -66,6 +81,12 @@ import org.springframework.web.cors.*;
  * <h2>CORS</h2>
  * <p>
  * Cross-Origin Resource Sharing (CORS) is configured via
+ * 
+ * <p>
+ * NOTE: CORS configuration is validated during security bootstrap.
+ * This component assumes validated, production-safe values.
+ * </p>
+ * 
  * {@link SecurityCorsProperties} and supports credentialed requests when
  * explicitly allowed by configuration.
  * </p>
@@ -213,6 +234,11 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
+
+    /**
+     * Delegating password encoder allowing transparent algorithm upgrades
+     * (e.g. bcrypt → argon2) without invalidating existing credentials.
+     */
 
     @Bean
     public PasswordEncoder passwordEncoder() {
