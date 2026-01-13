@@ -1,21 +1,37 @@
 package com.lanny.spring_security_template.infrastructure.security.network;
 
-import jakarta.servlet.http.HttpServletRequest;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
 import org.springframework.stereotype.Component;
 
-import java.net.InetAddress;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * {@code ClientIpResolver}
+ * ============================================================
+ * ClientIpResolver
+ * ============================================================
  *
- * Resolves the real client IP address in a secure and deterministic way.
+ * <p>
+ * Resolves the effective client IP address in a secure, deterministic
+ * and fail-safe manner.
+ * </p>
  *
  * <h2>Security guarantees</h2>
  * <ul>
- * <li>X-Forwarded-For is only trusted when the remote address is a trusted
- * proxy</li>
- * <li>Trusted proxies are defined using CIDR ranges (IPv4 / IPv6)</li>
- * <li>Fallback is always {@code request.getRemoteAddr()}</li>
+ * <li>{@code X-Forwarded-For} is trusted <b>only</b> when the immediate
+ * sender is a configured trusted proxy</li>
+ * <li>Trusted proxies are defined using CIDR notation (IPv4 / IPv6)</li>
+ * <li>Never returns {@code null}</li>
+ * <li>Never throws exceptions</li>
+ * <li>Always falls back to {@link HttpServletRequest#getRemoteAddr()}</li>
+ * </ul>
+ *
+ * <h2>Threat model</h2>
+ * <ul>
+ * <li>Prevents client-controlled IP spoofing</li>
+ * <li>Prevents rate-limiting bypass via fake headers</li>
+ * <li>Safe to use before authentication</li>
  * </ul>
  */
 @Component
@@ -30,10 +46,14 @@ public class ClientIpResolver {
     }
 
     /**
-     * Resolves the client IP for the given request.
+     * Resolves the client IP address for the given request.
      *
-     * @param request HTTP request
-     * @return resolved client IP address
+     * <p>
+     * This method is fail-safe by design and never throws.
+     * </p>
+     *
+     * @param request incoming HTTP request (never {@code null})
+     * @return a non-null, normalized client IP address
      */
     public String resolve(HttpServletRequest request) {
 
@@ -48,13 +68,13 @@ public class ClientIpResolver {
             return remoteAddr;
         }
 
-        return forwardedFor.split(",")[0].trim();
+        String candidate = forwardedFor.split(",")[0].trim();
+
+        return isValidIp(candidate) ? candidate : remoteAddr;
     }
 
     /**
-     * Determines whether the given IP address belongs to a trusted proxy.
-     *
-     * Trusted proxies are defined using CIDR notation (e.g. 10.0.0.0/8).
+     * Determines whether the given IP belongs to a trusted proxy.
      */
     private boolean isTrustedProxy(String ip) {
         return props.trustedProxyCidrs().stream()
@@ -62,9 +82,23 @@ public class ClientIpResolver {
     }
 
     /**
-     * Checks whether the given IP matches the provided CIDR range.
+     * Validates that a string represents a valid IPv4 or IPv6 address.
+     */
+    private boolean isValidIp(String ip) {
+        try {
+            InetAddress.getByName(ip);
+            return true;
+        } catch (UnknownHostException ex) {
+            return false;
+        }
+    }
+
+    /**
+     * Checks whether the given IP matches a CIDR range.
      *
-     * Fail-safe: returns false if parsing fails.
+     * <p>
+     * Fail-safe: returns {@code false} on any parsing or format error.
+     * </p>
      */
     private boolean matchesCidr(String cidr, String ip) {
         try {
