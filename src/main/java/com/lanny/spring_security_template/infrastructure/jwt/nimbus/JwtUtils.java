@@ -1,16 +1,5 @@
 package com.lanny.spring_security_template.infrastructure.jwt.nimbus;
 
-import com.lanny.spring_security_template.domain.time.ClockProvider;
-import com.lanny.spring_security_template.infrastructure.config.JwtAlgorithm;
-import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
-import com.lanny.spring_security_template.infrastructure.jwt.exception.JwtValidationException;
-import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
-import com.nimbusds.jose.*;
-import com.nimbusds.jose.crypto.*;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
-import org.springframework.stereotype.Component;
-
 import java.nio.charset.StandardCharsets;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
@@ -19,6 +8,27 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.stereotype.Component;
+
+import com.lanny.spring_security_template.domain.time.ClockProvider;
+import com.lanny.spring_security_template.infrastructure.config.JwtAlgorithm;
+import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
+import com.lanny.spring_security_template.infrastructure.jwt.exception.JwtValidationException;
+import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JOSEObjectType;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.JWSVerifier;
+import com.nimbusds.jose.KeyLengthException;
+import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jose.crypto.MACVerifier;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.crypto.RSASSAVerifier;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 
 /**
  * JwtUtils
@@ -56,6 +66,7 @@ public final class JwtUtils {
 
     private static final String CLAIM_ROLES = "roles";
     private static final String CLAIM_SCOPES = "scopes";
+    private static final String ROLE_PREFIX = "ROLE_";
 
     private final RsaKeyProvider keyProvider;
     private final SecurityJwtProperties props;
@@ -106,15 +117,17 @@ public final class JwtUtils {
 
             JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
                     .subject(subject)
-                    .issuer(props.issuer()) // issuer se INCLUYE, pero NO se valida aquí
+                    .issuer(props.issuer())
                     .issueTime(Date.from(now))
                     .expirationTime(Date.from(expiration))
                     .jwtID(UUID.randomUUID().toString())
                     .claim(CLAIM_TOKEN_USE, refresh ? TOKEN_USE_REFRESH : TOKEN_USE_ACCESS);
 
             if (!refresh) {
-                claims.claim(CLAIM_ROLES, roles);
-                claims.claim(CLAIM_SCOPES, scopes);
+                // Enforce authorities contract at the issuaer boundary
+                // role MUST travel as ROLE_*
+                claims.claim(CLAIM_ROLES, normalizeRoles(roles));
+                claims.claim(CLAIM_SCOPES, normalizeScopes(scopes));
             }
 
             JWSHeader header = new JWSHeader.Builder(resolveJwsAlgorithm())
@@ -130,6 +143,35 @@ public final class JwtUtils {
         } catch (Exception ex) {
             throw new IllegalStateException("JWT generation failed", ex);
         }
+    }
+
+    // ======================================================
+    // CLAIM NORMALIZATION(issuer boundary)
+    // ======================================================
+    private List<String> normalizeRoles(List<String> roles) {
+        if (roles == null || roles.isEmpty()) {
+            return List.of();
+        }
+
+        return roles.stream()
+                .filter(r -> r != null && !r.isBlank())
+                .map(String::trim)
+                .map(r -> r.startsWith(ROLE_PREFIX) ? r : ROLE_PREFIX + r)
+                .distinct()
+                .toList();
+    }
+
+    private List<String> normalizeScopes(List<String> scopes) {
+        if (scopes == null || scopes.isEmpty()) {
+            return List.of();
+        }
+
+        return scopes.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+
     }
 
     // ======================================================

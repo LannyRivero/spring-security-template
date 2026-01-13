@@ -2,8 +2,6 @@ package com.lanny.spring_security_template.infrastructure.security.filter;
 
 import java.io.IOException;
 
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
@@ -61,7 +59,6 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 30)
 public class LoginRateLimitingFilter extends OncePerRequestFilter {
 
     private final RateLimitingProperties props;
@@ -103,6 +100,14 @@ public class LoginRateLimitingFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String key = keyResolver.resolveKey(request);
+
+        // Defensive safeguard
+        // If key resolution fails, do NOT block authentication globally
+        if (key == null || key.isBlank()) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         LoginAttemptResult result = loginAttemptPolicy.registerAttempt(key);
 
         if (!result.allowed()) {
