@@ -1,35 +1,50 @@
 package com.lanny.spring_security_template.infrastructure.security.ratelimit;
 
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.stereotype.Component;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Base64;
 
+import org.springframework.stereotype.Component;
+
 import com.lanny.spring_security_template.infrastructure.security.network.ClientIpResolver;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 /**
- * {@code IpUserRateLimitKeyResolver}
+ * ============================================================
+ * IpUserRateLimitKeyResolver
+ * ============================================================
  *
  * <p>
- * Builds rate-limiting keys based on:
+ * Builds deterministic rate-limiting keys based on the resolved client IP
+ * address and, when available, a hashed username.
  * </p>
+ *
+ * <h2>Key strategy</h2>
  * <ul>
- * <li>Resolved client IP address</li>
- * <li>Hashed username when available</li>
+ * <li>IP-only key when username is unavailable</li>
+ * <li>IP + hashed username when username is present</li>
  * </ul>
  *
  * <h2>Security guarantees</h2>
  * <ul>
- * <li>No blind trust in forwarded headers</li>
- * <li>No PII leakage (hashed usernames)</li>
- * <li>Stable, deterministic keys</li>
- * <li>Fail-safe behavior (never breaks login flow)</li>
+ * <li>No blind trust in forwarded headers (delegated to
+ * {@link ClientIpResolver})</li>
+ * <li>No PII leakage (usernames are hashed)</li>
+ * <li>Fail-safe behavior: key resolution never blocks authentication</li>
+ * </ul>
+ *
+ * <h2>Design notes</h2>
+ * <ul>
+ * <li>This resolver does not parse request bodies</li>
+ * <li>JSON-based login flows are expected to fall back to IP-only limiting</li>
+ * <li>Errors during hashing never propagate</li>
  * </ul>
  */
 @Component
 public class IpUserRateLimitKeyResolver implements RateLimitKeyResolver {
+
+    private static final String KEY_PREFIX = "security:ratelimit:v1:";
 
     private final ClientIpResolver ipResolver;
 
@@ -43,11 +58,11 @@ public class IpUserRateLimitKeyResolver implements RateLimitKeyResolver {
         String ip = ipResolver.resolve(request);
         String username = extractUsernameSafely(request);
 
-        if (username == null || username.isBlank()) {
-            return "IP:" + ip;
+        if (username == null) {
+            return KEY_PREFIX + "ip:" + ip;
         }
 
-        return "IP_USER:" + ip + "|" + hashUser(username);
+        return KEY_PREFIX + "ip-user:" + ip + ":" + hashUser(username);
     }
 
     // ======================================================
@@ -55,26 +70,29 @@ public class IpUserRateLimitKeyResolver implements RateLimitKeyResolver {
     // ======================================================
 
     /**
-     * Extracts username safely from request parameters.
+     * Extracts the username from request parameters, if present.
      *
      * <p>
-     * NOTE:
-     * <ul>
-     * <li>Works for form-based login</li>
-     * <li>Returns null for JSON login (EXPECTED)</li>
-     * </ul>
+     * This method intentionally does not parse JSON bodies to keep
+     * key resolution fast, safe and side-effect free.
      * </p>
      */
     private String extractUsernameSafely(HttpServletRequest request) {
-        return request.getParameter("username");
+        String raw = request.getParameter("username");
+        if (raw == null) {
+            return null;
+        }
+
+        String normalized = raw.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     /**
-     * Hashes username to avoid PII leakage.
+     * Hashes the username to avoid PII leakage.
      *
      * <p>
-     * Fail-safe by design: hashing errors must never
-     * break authentication or rate limiting.
+     * Fail-safe by design: any hashing error results in a deterministic,
+     * non-PII fallback value.
      * </p>
      */
     private String hashUser(String username) {
@@ -86,7 +104,6 @@ public class IpUserRateLimitKeyResolver implements RateLimitKeyResolver {
                     .encodeToString(hash)
                     .substring(0, 16);
         } catch (Exception ex) {
-            // Defensive fallback (deterministic, non-PII)
             return "hash_error";
         }
     }
