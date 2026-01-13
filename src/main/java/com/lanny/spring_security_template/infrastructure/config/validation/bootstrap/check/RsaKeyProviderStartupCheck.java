@@ -6,7 +6,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
-import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard.RsaKeyProviderGuardConfig;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard.RsaKeyProviderGuard;
 import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
 
 /**
@@ -38,7 +38,7 @@ public final class RsaKeyProviderStartupCheck implements SecurityStartupCheck {
 
     private final SecurityJwtProperties properties;
     private final ApplicationContext context;
-    private final RsaKeyProviderGuardConfig guard;
+    private final RsaKeyProviderGuard guard;
 
     public RsaKeyProviderStartupCheck(
             SecurityJwtProperties properties,
@@ -46,7 +46,7 @@ public final class RsaKeyProviderStartupCheck implements SecurityStartupCheck {
 
         this.properties = properties;
         this.context = context;
-        this.guard = new RsaKeyProviderGuardConfig();
+        this.guard = new RsaKeyProviderGuard();
     }
 
     @Override

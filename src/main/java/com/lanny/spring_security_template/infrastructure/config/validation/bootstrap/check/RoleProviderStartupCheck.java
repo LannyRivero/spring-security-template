@@ -8,7 +8,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
-import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard.RoleProviderProdGuardConfig;
+import com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard.RoleProviderProdGuard;
 
 /**
  * ============================================================
@@ -30,7 +30,7 @@ public final class RoleProviderStartupCheck implements SecurityStartupCheck {
 
     private final ApplicationContext context;
     private final Environment environment;
-    private final RoleProviderProdGuardConfig guard;
+    private final RoleProviderProdGuard guard;
 
     public RoleProviderStartupCheck(
             ApplicationContext context,
@@ -38,7 +38,7 @@ public final class RoleProviderStartupCheck implements SecurityStartupCheck {
 
         this.context = context;
         this.environment = environment;
-        this.guard = new RoleProviderProdGuardConfig();
+        this.guard = new RoleProviderProdGuard();
     }
 
     @Override
