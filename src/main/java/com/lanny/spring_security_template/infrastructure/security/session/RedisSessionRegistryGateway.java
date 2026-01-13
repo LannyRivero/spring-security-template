@@ -1,43 +1,48 @@
 package com.lanny.spring_security_template.infrastructure.security.session;
 
-import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
-import org.springframework.context.annotation.Profile;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.lang.NonNull;
-import org.springframework.stereotype.Component;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import org.springframework.context.annotation.Profile;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Component;
+
+import com.lanny.spring_security_template.application.auth.port.out.SessionRegistryGateway;
+
 /**
+ * ============================================================
  * RedisSessionRegistryGateway
+ * ============================================================
  *
  * <p>
- * Redis-backed implementation of {@link SessionRegistryGateway}.
+ * Redis-backed implementation of {@link SessionRegistryGateway} used in
+ * production environments to track active user sessions.
  * </p>
  *
+ * <h2>Data model</h2>
  * <p>
- * Active sessions are stored in a Redis ZSET where:
+ * Sessions are stored in a Redis ZSET where:
  * </p>
  * <ul>
- * <li><b>member</b> = JWT ID (jti)</li>
- * <li><b>score</b> = expiration timestamp (epoch seconds)</li>
+ * <li><b>Key</b>: {@code security:sessions:v1:{username}}</li>
+ * <li><b>Member</b>: JWT identifier (jti)</li>
+ * <li><b>Score</b>: expiration timestamp (epoch seconds)</li>
  * </ul>
  *
+ * <h2>Expiration strategy</h2>
  * <p>
  * Expired sessions are removed using a <b>lazy cleanup strategy</b>
- * before read operations to guarantee consistency and correctness.
+ * before read and count operations.
  * </p>
  *
- * <p>
- * This design avoids background schedulers while ensuring that:
- * </p>
+ * <h2>Concurrency guarantees</h2>
  * <ul>
+ * <li>Redis ZSET operations are atomic</li>
+ * <li>No background schedulers are required</li>
  * <li>Expired sessions are never returned</li>
- * <li>Session counts remain accurate</li>
- * <li>No stale security state leaks</li>
  * </ul>
  *
  * <p>
@@ -48,6 +53,8 @@ import java.util.Set;
 @Profile({ "prod", "demo" })
 public class RedisSessionRegistryGateway implements SessionRegistryGateway {
 
+    private static final String KEY_PREFIX = "security:sessions:v1:";
+
     private final RedisTemplate<String, String> redis;
 
     public RedisSessionRegistryGateway(RedisTemplate<String, String> redis) {
@@ -55,16 +62,9 @@ public class RedisSessionRegistryGateway implements SessionRegistryGateway {
     }
 
     private @NonNull String key(@NonNull String username) {
-        return "sessions:" + username;
+        return KEY_PREFIX + username;
     }
 
-    /**
-     * Registers a new active session for a user.
-     *
-     * @param username  authenticated username
-     * @param jti       JWT identifier
-     * @param expiresAt token expiration instant
-     */
     @Override
     @SuppressWarnings("null") // RedisTemplate returns nullable types
     public void registerSession(String username, String jti, Instant expiresAt) {
@@ -72,13 +72,6 @@ public class RedisSessionRegistryGateway implements SessionRegistryGateway {
                 .add(key(username), jti, expiresAt.getEpochSecond());
     }
 
-    /**
-     * Returns all currently active sessions for a user.
-     *
-     * <p>
-     * Expired sessions are removed before retrieval.
-     * </p>
-     */
     @Override
     @SuppressWarnings("null")
     public List<String> getActiveSessions(String username) {
@@ -100,32 +93,18 @@ public class RedisSessionRegistryGateway implements SessionRegistryGateway {
                 .toList();
     }
 
-    /**
-     * Removes a specific session for a user.
-     */
     @Override
     @SuppressWarnings("null")
     public void removeSession(String username, String jti) {
         redis.opsForZSet().remove(key(username), jti);
     }
 
-    /**
-     * Removes all sessions for a user.
-     */
     @Override
     @SuppressWarnings("null")
     public void removeAllSessions(String username) {
         redis.delete(key(username));
     }
 
-    /**
-     * Returns the number of active sessions for a user.
-     *
-     * <p>
-     * Performs lazy cleanup before counting to avoid
-     * expired session leakage.
-     * </p>
-     */
     @Override
     @SuppressWarnings("null")
     public int countSessions(String username) {

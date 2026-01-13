@@ -17,23 +17,30 @@ import com.lanny.spring_security_template.infrastructure.config.SecurityJwtPrope
  * RedisRefreshTokenConsumer
  * ============================================================
  *
- * Redis-based, atomic refresh token consumer used to prevent
- * refresh token replay attacks in distributed environments.
- *
  * <p>
- * Guarantees:
+ * Redis-based, atomic refresh token consumer used to prevent refresh token
+ * replay attacks in distributed environments.
  * </p>
+ *
+ * <h2>Security guarantees</h2>
  * <ul>
- * <li>Atomic check-and-set semantics (Lua)</li>
+ * <li>Atomic check-and-set semantics via Redis Lua scripting</li>
  * <li>First-consumer-wins behavior</li>
- * <li>Race-condition safety across multiple pods</li>
+ * <li>Safe under concurrent, multi-instance deployments</li>
  * </ul>
  *
  * <h2>Key lifecycle</h2>
  * <p>
- * The consumption marker key is stored with a TTL equal to the remaining
- * lifetime of the refresh token. Redis handles cleanup automatically.
+ * A consumption marker key is stored with a TTL equal to the remaining lifetime
+ * of the refresh token. Redis automatically removes expired markers.
  * </p>
+ *
+ * <h2>Design notes</h2>
+ * <ul>
+ * <li>This component only marks consumption</li>
+ * <li>Token family revocation and reactions are handled elsewhere</li>
+ * <li>No background jobs or schedulers are required</li>
+ * </ul>
  *
  * <h2>Profiles</h2>
  * <ul>
@@ -48,10 +55,6 @@ public class RedisRefreshTokenConsumer {
     /**
      * Redis key prefix for consumed refresh tokens.
      *
-     * <p>
-     * Namespaced by issuer to avoid collisions across services/environments.
-     * </p>
-     *
      * <pre>
      * security:{issuer}:refresh:consumed:{jti}
      * </pre>
@@ -65,6 +68,7 @@ public class RedisRefreshTokenConsumer {
     public RedisRefreshTokenConsumer(
             StringRedisTemplate redis,
             SecurityJwtProperties props) {
+
         this.redis = redis;
         this.issuer = props.issuer();
         this.consumeScript = buildScript();
@@ -73,16 +77,20 @@ public class RedisRefreshTokenConsumer {
     /**
      * Attempts to consume a refresh token atomically.
      *
-     * @param jti unique refresh token identifier
+     * @param jti unique refresh token identifier (must not be null or blank)
      * @param ttl remaining lifetime of the refresh token
      *
-     * @return {@code true} → first successful consumption (valid token)
-     *         {@code false} → token already consumed (replay attempt)
+     * @return {@code true} if this call successfully consumed the token
+     *         {@code false} if the token was already consumed
      *
-     * @throws IllegalArgumentException if ttl is null, zero or negative
-     *                                  (indicates an upstream bug)
+     * @throws IllegalArgumentException if {@code jti} is null or blank,
+     *                                  or if {@code ttl} is null, zero or negative
      */
     public boolean consume(String jti, Duration ttl) {
+
+        if (jti == null || jti.isBlank()) {
+            throw new IllegalArgumentException("Refresh token JTI must not be null or blank");
+        }
 
         if (ttl == null || ttl.isZero() || ttl.isNegative()) {
             throw new IllegalArgumentException("Refresh token TTL must be positive");
@@ -105,20 +113,18 @@ public class RedisRefreshTokenConsumer {
      * <p>
      * Script semantics:
      * </p>
-     *
      * <ol>
-     * <li>If key already exists → return 0</li>
-     * <li>Otherwise → SET key with TTL → return 1</li>
+     * <li>If the key already exists → return 0</li>
+     * <li>Otherwise → SET key with TTL (NX) → return 1</li>
      * </ol>
      */
     private RedisScript<Long> buildScript() {
 
         String lua = """
-                if redis.call('EXISTS', KEYS[1]) == 1 then
-                    return 0
+                if redis.call('SET', KEYS[1], '1', 'EX', ARGV[1], 'NX') then
+                    return 1
                 end
-                redis.call('SET', KEYS[1], '1', 'EX', ARGV[1])
-                return 1
+                return 0
                 """;
 
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
