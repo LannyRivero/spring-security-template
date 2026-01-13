@@ -42,23 +42,23 @@ public final class NetworkSecurityProdGuard {
                             "Production requires explicit network security configuration.");
         }
 
-        if (props.trustedProxyPrefixes() == null
-                || props.trustedProxyPrefixes().isEmpty()) {
+        if (props.trustedProxyCidrs() == null
+                || props.trustedProxyCidrs().isEmpty()) {
 
             throw new InvalidSecurityConfigurationException(
                     SOURCE,
-                    "No trusted proxy prefixes configured. " +
+                    "No trusted proxy CIDRs configured. " +
                             "Configure 'security.network.trusted-proxy-prefixes' for production.");
         }
 
-        boolean hasValidPrefix = props.trustedProxyPrefixes().stream()
-                .anyMatch(prefix -> prefix != null && !prefix.isBlank());
+        boolean hasValidCidrs = props.trustedProxyCidrs().stream()
+                .anyMatch(cidr -> cidr != null && !cidr.isBlank());
 
-        if (!hasValidPrefix) {
+        if (!hasValidCidrs) {
             throw new InvalidSecurityConfigurationException(
                     SOURCE,
-                    "Trusted proxy prefixes are empty or invalid. " +
-                            "At least one non-blank proxy prefix must be configured for production.");
+                    "Trusted proxy CIDRs are empty or invalid. " +
+                            "At least one non-blank proxy CIDR must be configured for production.");
         }
     }
 }

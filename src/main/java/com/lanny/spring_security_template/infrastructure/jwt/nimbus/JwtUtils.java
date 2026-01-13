@@ -49,12 +49,12 @@ import com.nimbusds.jwt.SignedJWT;
  * <li>Issuer validation (iss)</li>
  * <li>Audience validation (aud)</li>
  * <li>token_use semantics</li>
- * <li>Authorization or role validation</li>
+ * <li>Authorization or role semantics</li>
  * </ul>
  *
  * <p>
- * Semantic and domain-level validation MUST be handled by
- * {@code StrictJwtValidator}.
+ * Role and scope normalization to framework-specific authorities
+ * MUST be handled by the consumer layer (e.g. {@code JwtAuthoritiesMapper}).
  * </p>
  */
 @Component
@@ -66,7 +66,6 @@ public final class JwtUtils {
 
     private static final String CLAIM_ROLES = "roles";
     private static final String CLAIM_SCOPES = "scopes";
-    private static final String ROLE_PREFIX = "ROLE_";
 
     private final RsaKeyProvider keyProvider;
     private final SecurityJwtProperties props;
@@ -124,10 +123,8 @@ public final class JwtUtils {
                     .claim(CLAIM_TOKEN_USE, refresh ? TOKEN_USE_REFRESH : TOKEN_USE_ACCESS);
 
             if (!refresh) {
-                // Enforce authorities contract at the issuaer boundary
-                // role MUST travel as ROLE_*
-                claims.claim(CLAIM_ROLES, normalizeRoles(roles));
-                claims.claim(CLAIM_SCOPES, normalizeScopes(scopes));
+                claims.claim(CLAIM_ROLES, sanitizeValues(roles));
+                claims.claim(CLAIM_SCOPES, sanitizeValues(scopes));
             }
 
             JWSHeader header = new JWSHeader.Builder(resolveJwsAlgorithm())
@@ -146,32 +143,19 @@ public final class JwtUtils {
     }
 
     // ======================================================
-    // CLAIM NORMALIZATION(issuer boundary)
+    // CLAIM SANITIZATION (SEMANTIC ONLY)
     // ======================================================
-    private List<String> normalizeRoles(List<String> roles) {
-        if (roles == null || roles.isEmpty()) {
+
+    private List<String> sanitizeValues(List<String> values) {
+        if (values == null || values.isEmpty()) {
             return List.of();
         }
 
-        return roles.stream()
-                .filter(r -> r != null && !r.isBlank())
-                .map(String::trim)
-                .map(r -> r.startsWith(ROLE_PREFIX) ? r : ROLE_PREFIX + r)
-                .distinct()
-                .toList();
-    }
-
-    private List<String> normalizeScopes(List<String> scopes) {
-        if (scopes == null || scopes.isEmpty()) {
-            return List.of();
-        }
-
-        return scopes.stream()
-                .filter(s -> s != null && !s.isBlank())
+        return values.stream()
+                .filter(v -> v != null && !v.isBlank())
                 .map(String::trim)
                 .distinct()
                 .toList();
-
     }
 
     // ======================================================
