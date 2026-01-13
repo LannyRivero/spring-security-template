@@ -17,7 +17,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -62,7 +61,6 @@ import static com.lanny.spring_security_template.infrastructure.observability.Md
  * </ul>
  */
 @Component
-@Order(80)
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
   private static final Logger log = LoggerFactory.getLogger(JwtAuthorizationFilter.class);
@@ -120,8 +118,8 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
       MDC.put(USERNAME, claims.sub());
 
-    } catch (Exception ex) {
-
+    } catch (
+        InvalidTokenTypeException | TokenRevokedException | NoAuthoritiesException | IllegalArgumentException ex) {
       JwtAuthFailureReason reason = mapFailureReason(ex);
 
       String method = request.getMethod();
