@@ -15,14 +15,29 @@ import com.lanny.spring_security_template.infrastructure.security.jwt.exception.
 import com.nimbusds.jwt.JWTClaimsSet;
 
 /**
- * {@code StrictJwtValidator}
- *
- * High-level JWT validator enforcing semantic and domain-specific rules
- * on top of cryptographic validation.
+ * ============================================================
+ * StrictJwtValidator
+ * ============================================================
  *
  * <p>
- * ACCESS and REFRESH tokens are validated with different semantics.
+ * High-level JWT validator enforcing semantic and domain-specific
+ * rules on top of cryptographic validation.
  * </p>
+ *
+ * <h2>Responsibilities</h2>
+ * <ul>
+ * <li>Validate issuer and audience</li>
+ * <li>Enforce {@code token_use} semantics</li>
+ * <li>Ensure presence of mandatory claims</li>
+ * <li>Prevent cross-boundary token misuse</li>
+ * </ul>
+ *
+ * <h2>Security contract</h2>
+ * <ul>
+ * <li>Never returns {@code null}</li>
+ * <li>No silent fallbacks for critical claims</li>
+ * <li>Any semantic violation results in a security exception</li>
+ * </ul>
  */
 @Component
 public class StrictJwtValidator implements JwtValidator {
@@ -34,9 +49,7 @@ public class StrictJwtValidator implements JwtValidator {
     private final JwtUtils jwtUtils;
     private final SecurityJwtProperties props;
 
-    public StrictJwtValidator(
-            JwtUtils jwtUtils,
-            SecurityJwtProperties props) {
+    public StrictJwtValidator(JwtUtils jwtUtils, SecurityJwtProperties props) {
         this.jwtUtils = jwtUtils;
         this.props = props;
     }
@@ -74,12 +87,7 @@ public class StrictJwtValidator implements JwtValidator {
             throw new MissingJwtClaimException(CLAIM_TOKEN_USE);
         }
 
-        TokenUse tokenUse;
-        try {
-            tokenUse = TokenUse.from((String) rawTokenUse);
-        } catch (Exception ex) {
-            throw new InvalidTokenTypeException();
-        }
+        TokenUse tokenUse = TokenUse.from((String) rawTokenUse);
 
         // --------------------------------------------------
         // 4. Audience validation (depends on token_use)
@@ -99,7 +107,7 @@ public class StrictJwtValidator implements JwtValidator {
         }
 
         // --------------------------------------------------
-        // 5. Controlled extraction
+        // 5. Controlled extraction of optional claims
         // --------------------------------------------------
         List<String> roles = safeStringList(claims, CLAIM_ROLES);
         List<String> scopes = safeStringList(claims, CLAIM_SCOPES);
@@ -142,8 +150,8 @@ public class StrictJwtValidator implements JwtValidator {
      * Safely extracts a list claim as an immutable list.
      *
      * <p>
-     * Any malformed or unexpected claim value results in an empty list,
-     * never an exception.
+     * Any malformed or unexpected claim value results in an empty list.
+     * This method must never throw exceptions.
      * </p>
      */
     private List<String> safeStringList(JWTClaimsSet claims, String name) {
