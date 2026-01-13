@@ -1,42 +1,64 @@
 package com.lanny.spring_security_template.infrastructure.config.validation.bootstrap.guard;
 
+import java.util.Map;
+
 import com.lanny.spring_security_template.application.auth.port.out.RoleProvider;
 import com.lanny.spring_security_template.infrastructure.config.validation.InvalidSecurityConfigurationException;
-
-import java.util.Map;
+import com.lanny.spring_security_template.infrastructure.security.provider.InMemoryRoleProvider;
 
 /**
  * =====================================================================
  * RoleProviderProdGuard
  * =====================================================================
  *
- * Stateless guard that ensures a production-grade {@link RoleProvider}
- * is configured when running in production-like environments.
+ * Stateless production guard enforcing a production-grade RoleProvider
+ * configuration.
  *
  * <p>
- * In-memory role providers are strictly forbidden in production.
+ * Role resolution is a critical authorization component. In production,
+ * role data MUST originate from a controlled, persistent source.
+ * </p>
+ *
+ * <p>
+ * Security guarantees:
+ * </p>
+ * <ul>
+ * <li>At least one {@link RoleProvider} must be configured</li>
+ * <li>In-memory or development-only providers are forbidden</li>
+ * <li>Authorization behavior must be deterministic and auditable</li>
+ * </ul>
+ *
+ * <p>
+ * Any violation aborts application startup immediately.
+ * There are no fallbacks in production.
  * </p>
  */
 public final class RoleProviderProdGuardConfig {
 
+    private static final String SOURCE = "role-provider";
+
     public void validate(Map<String, RoleProvider> providers) {
 
-        if (providers.isEmpty()) {
+        if (providers == null || providers.isEmpty()) {
             throw new InvalidSecurityConfigurationException(
-                    "role-provider",
-                    "No RoleProvider bean configured. At least one production provider is required.");
+                    SOURCE,
+                    "No RoleProvider configured. A production-grade RoleProvider is required.");
         }
 
-        boolean hasProductionProvider = providers.values().stream()
-                .anyMatch(provider -> !provider.getClass()
-                        .getSimpleName()
-                        .contains("InMemory"));
-
-        if (!hasProductionProvider) {
+        if (providers.size() > 1) {
             throw new InvalidSecurityConfigurationException(
-                    "role-provider",
-                    "Only in-memory RoleProvider implementations detected. " +
-                            "In-memory providers are not allowed in production.");
+                    SOURCE,
+                    "Multiple RoleProvider implementations detected. " +
+                            "Exactly one production-grade RoleProvider must be configured.");
+        }
+
+        RoleProvider provider = providers.values().iterator().next();
+
+        if (provider instanceof InMemoryRoleProvider) {
+            throw new InvalidSecurityConfigurationException(
+                    SOURCE,
+                    "InMemoryRoleProvider is not allowed in production. " +
+                            "Configure a persistent, production-grade RoleProvider.");
         }
     }
 }

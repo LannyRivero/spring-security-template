@@ -8,24 +8,57 @@ import com.lanny.spring_security_template.infrastructure.security.network.Networ
  * NetworkSecurityProdGuard
  * =====================================================================
  *
- * Stateless guard enforcing correct network security configuration
- * for production environments.
+ * Stateless production guard enforcing strict network security configuration.
  *
  * <p>
- * Prevents insecure client IP resolution when running behind proxies.
+ * This guard prevents insecure client IP resolution when the application
+ * is deployed behind proxies or load balancers.
+ * </p>
+ *
+ * <p>
+ * Security rationale:
+ * </p>
+ * <ul>
+ * <li>Without trusted proxy prefixes, client IPs can be spoofed</li>
+ * <li>IP spoofing compromises rate limiting, auditing and logging</li>
+ * <li>Production deployments must explicitly define trusted proxies</li>
+ * </ul>
+ *
+ * <p>
+ * If validation fails, application startup is aborted immediately.
+ * There are no fallbacks or relaxed defaults in production.
  * </p>
  */
 public final class NetworkSecurityProdGuard {
 
+    private static final String SOURCE = "network-security";
+
     public void validate(NetworkSecurityProperties props) {
+
+        if (props == null) {
+            throw new InvalidSecurityConfigurationException(
+                    SOURCE,
+                    "Network security properties are missing. " +
+                            "Production requires explicit network security configuration.");
+        }
 
         if (props.trustedProxyPrefixes() == null
                 || props.trustedProxyPrefixes().isEmpty()) {
 
             throw new InvalidSecurityConfigurationException(
-                    "network-security",
+                    SOURCE,
                     "No trusted proxy prefixes configured. " +
                             "Configure 'security.network.trusted-proxy-prefixes' for production.");
+        }
+
+        boolean hasValidPrefix = props.trustedProxyPrefixes().stream()
+                .anyMatch(prefix -> prefix != null && !prefix.isBlank());
+
+        if (!hasValidPrefix) {
+            throw new InvalidSecurityConfigurationException(
+                    SOURCE,
+                    "Trusted proxy prefixes are empty or invalid. " +
+                            "At least one non-blank proxy prefix must be configured for production.");
         }
     }
 }
