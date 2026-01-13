@@ -100,33 +100,15 @@ public class NimbusJwtTokenProvider implements TokenProvider {
 
     @Override
     public String extractSubject(String token) {
-        try {
-            JWTClaimsSet claims = jwtUtils.validateAndParse(token);
-            String subject = claims.getSubject();
-
-            if (subject == null || subject.isBlank()) {
-                throw new IllegalArgumentException("JWT subject (sub) claim is missing or blank");
-            }
-            return subject;
-        } catch (Exception ex) {
-            throw new IllegalArgumentException("Invalid JWT token", ex);
-        }
+        JwtClaimsDTO claims = jwtValidator.validate(token);
+        return claims.sub();
     }
 
     @Override
     public String extractJti(String token) {
-        try {
-            JWTClaimsSet claims = jwtUtils.validateAndParse(token);
+        JwtClaimsDTO claims = jwtValidator.validate(token);
+        return claims.jti();
 
-            String jti = claims.getJWTID();
-
-            if (jti == null || jti.isBlank()) {
-                throw new IllegalArgumentException("JWT token does not contain a non-blank jti (JWT ID) claim");
-            }
-            return jti;
-        } catch (Exception ex) {
-                throw new IllegalArgumentException("Invalid JWT token", ex);
-        }
     }
 
     // ============================================================
@@ -151,8 +133,13 @@ public class NimbusJwtTokenProvider implements TokenProvider {
                     claims.getSubject(),
                     extractStringListClaim(claims, "roles"),
                     extractStringListClaim(claims, "scopes"),
-                    claims.getIssueTime().toInstant().getEpochSecond(),
-                    claims.getExpirationTime().toInstant().getEpochSecond(),
+                    claims.getIssueTime() != null
+                            ? claims.getIssueTime().toInstant().getEpochSecond()
+                            : 0,
+                    claims.getExpirationTime() != null
+                            ? claims.getExpirationTime().toInstant().getEpochSecond()
+                            : 0,
+
                     claims.getJWTID(),
                     claims.getIssuer(),
                     claims.getAudience() != null ? claims.getAudience() : List.of()));
