@@ -10,6 +10,7 @@ import com.lanny.spring_security_template.infrastructure.config.SecurityJwtPrope
 import com.lanny.spring_security_template.infrastructure.jwt.nimbus.JwtUtils;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidJwtAudienceException;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidJwtIssuerException;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidTokenTypeException;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.MissingJwtClaimException;
 import com.nimbusds.jwt.JWTClaimsSet;
 
@@ -73,7 +74,12 @@ public class StrictJwtValidator implements JwtValidator {
             throw new MissingJwtClaimException(CLAIM_TOKEN_USE);
         }
 
-        TokenUse tokenUse = TokenUse.from((String) rawTokenUse);
+        TokenUse tokenUse;
+        try {
+            tokenUse = TokenUse.from((String) rawTokenUse);
+        } catch (Exception ex) {
+            throw new InvalidTokenTypeException();
+        }
 
         // --------------------------------------------------
         // 4. Audience validation (depends on token_use)
@@ -95,10 +101,14 @@ public class StrictJwtValidator implements JwtValidator {
         // --------------------------------------------------
         // 5. Controlled extraction
         // --------------------------------------------------
-        // Roles and scopes are ONLY expected for ACCESS tokens.
-        // REFRESH tokens must not carry authorization data.
         List<String> roles = safeStringList(claims, CLAIM_ROLES);
         List<String> scopes = safeStringList(claims, CLAIM_SCOPES);
+
+        // Enforce token_use semantics
+        if (tokenUse == TokenUse.REFRESH &&
+                (!roles.isEmpty() || !scopes.isEmpty())) {
+            throw new InvalidTokenTypeException();
+        }
 
         long issuedAt = claims.getIssueTime() != null
                 ? claims.getIssueTime().toInstant().getEpochSecond()
