@@ -1,9 +1,11 @@
 package com.lanny.spring_security_template.infrastructure.security.jwt;
 
-import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidJwtAudienceException;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidTokenTypeException;
 
 /**
+ * ============================================================
  * TokenUse
+ * ============================================================
  *
  * <p>
  * Enumerates the allowed usages of a JWT within the security domain.
@@ -21,10 +23,13 @@ import com.lanny.spring_security_template.infrastructure.security.jwt.exception.
  * <li>{@link #REFRESH} – Refresh tokens for token rotation</li>
  * </ul>
  *
- * <p>
- * Any other value is considered invalid and will result in a
- * security exception.
- * </p>
+ * <h2>Security contract</h2>
+ * <ul>
+ * <li>Parsing is case-insensitive</li>
+ * <li>Never returns {@code null}</li>
+ * <li>No fallback or default behavior</li>
+ * <li>Any invalid value results in a security exception</li>
+ * </ul>
  */
 public enum TokenUse {
 
@@ -34,18 +39,20 @@ public enum TokenUse {
     /**
      * Parses and validates the {@code token_use} claim.
      *
-     * @param raw raw claim value
-     * @return parsed {@link TokenUse}
-     * @throws InvalidJwtAudienceException if the value is invalid
+     * @param raw raw claim value (may be null or blank)
+     * @return validated {@link TokenUse}
+     * @throws InvalidTokenTypeException if the value is missing or invalid
      */
     public static TokenUse from(String raw) {
+
         if (raw == null || raw.isBlank()) {
-            throw new InvalidJwtAudienceException();
+            throw new InvalidTokenTypeException();
         }
+
         try {
-            return TokenUse.valueOf(raw.toUpperCase());
+            return TokenUse.valueOf(raw.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            throw new InvalidJwtAudienceException();
+            throw new InvalidTokenTypeException();
         }
     }
 }
