@@ -24,7 +24,7 @@ import java.util.Map;
  * Any violation results in {@link InvalidSecurityConfigurationException}.
  * </p>
  */
-public final class RsaKeyProviderGuardConfig {
+public final class RsaKeyProviderGuard {
 
     public void validate(
             SecurityJwtProperties props,

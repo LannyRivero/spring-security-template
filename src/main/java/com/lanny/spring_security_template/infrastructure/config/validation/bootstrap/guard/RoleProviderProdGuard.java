@@ -33,7 +33,7 @@ import com.lanny.spring_security_template.infrastructure.security.provider.InMem
  * There are no fallbacks in production.
  * </p>
  */
-public final class RoleProviderProdGuardConfig {
+public final class RoleProviderProdGuard {
 
     private static final String SOURCE = "role-provider";
 

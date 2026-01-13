@@ -112,18 +112,28 @@ public interface RefreshTokenStore {
 
     /**
      * Deletes all refresh tokens for a user.
-     * Used for "logout-all-devices" flows and account deletion.
+     *
+     * <p>
+     * This operation performs a physical deletion of token records.
+     * Use {@link #revokeFamily(String)} when auditability or reuse
+     * detection is required.
+     * </p>
      *
      * @param username user identifier
      */
     void deleteAllForUser(String username);
 
     /**
-     * Retrieves all refresh token JTIs linked to the user.
-     * Useful for auditing, session management, or admin consoles.
+     * Retrieves refresh token JTIs linked to the user.
+     *
+     * <p>
+     * Implementations should return only non-revoked tokens.
+     * Expired tokens may or may not be included depending on
+     * the underlying storage strategy.
+     * </p>
      *
      * @param username target user
-     * @return list of active refresh token IDs
+     * @return list of refresh token IDs
      */
     List<String> findAllForUser(String username);
 
