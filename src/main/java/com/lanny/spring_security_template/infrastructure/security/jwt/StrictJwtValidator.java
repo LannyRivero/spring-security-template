@@ -1,5 +1,9 @@
 package com.lanny.spring_security_template.infrastructure.security.jwt;
 
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
 import com.lanny.spring_security_template.application.auth.port.out.JwtValidator;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.infrastructure.config.SecurityJwtProperties;
@@ -8,45 +12,15 @@ import com.lanny.spring_security_template.infrastructure.security.jwt.exception.
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidJwtIssuerException;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.MissingJwtClaimException;
 import com.nimbusds.jwt.JWTClaimsSet;
-import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 /**
  * {@code StrictJwtValidator}
  *
- * <p>
- * High-level JWT validator enforcing <b>semantic and domain-specific security
- * rules</b>
- * on top of low-level cryptographic validation.
- * </p>
- *
- * <h2>Responsibilities</h2>
- * <ul>
- * <li>Delegate <b>all cryptographic and temporal validation</b>
- * (signature, alg, kid, exp, iat, nbf)
- * to {@link JwtUtils}</li>
- * <li>Enforce <b>issuer, audience and token_use semantics</b></li>
- * <li>Validate presence of mandatory claims</li>
- * <li>Produce a {@link JwtClaimsDTO} for the security layer</li>
- * </ul>
- *
- * <h2>Explicitly NOT responsible for</h2>
- * <ul>
- * <li>Signature verification</li>
- * <li>Time-based validation</li>
- * <li>Authorization decisions</li>
- * </ul>
- *
- * <h2>Security guarantees</h2>
- * <ul>
- * <li>Only tokens issued by the configured issuer are accepted</li>
- * <li>Audience is validated according to {@code token_use}</li>
- * <li>Malformed or forged claims are rejected deterministically</li>
- * </ul>
+ * High-level JWT validator enforcing semantic and domain-specific rules
+ * on top of cryptographic validation.
  *
  * <p>
- * This design follows OWASP ASVS and is suitable for banking-grade systems.
+ * ACCESS and REFRESH tokens are validated with different semantics.
  * </p>
  */
 @Component
@@ -94,14 +68,15 @@ public class StrictJwtValidator implements JwtValidator {
             throw new MissingJwtClaimException("jti");
         }
 
-        // --------------------------------------------------
-        // 4. token_use semantics
-        // --------------------------------------------------
-        TokenUse tokenUse = TokenUse.from(
-                (String) claims.getClaim(CLAIM_TOKEN_USE));
+        Object rawTokenUse = claims.getClaim(CLAIM_TOKEN_USE);
+        if (!(rawTokenUse instanceof String)) {
+            throw new MissingJwtClaimException(CLAIM_TOKEN_USE);
+        }
+
+        TokenUse tokenUse = TokenUse.from((String) rawTokenUse);
 
         // --------------------------------------------------
-        // 5. Audience validation (depends on token_use)
+        // 4. Audience validation (depends on token_use)
         // --------------------------------------------------
         List<String> audience = claims.getAudience();
         if (audience == null || audience.isEmpty()) {
@@ -118,20 +93,32 @@ public class StrictJwtValidator implements JwtValidator {
         }
 
         // --------------------------------------------------
-        // 6. Controlled extraction
+        // 5. Controlled extraction
         // --------------------------------------------------
+        // Roles and scopes are ONLY expected for ACCESS tokens.
+        // REFRESH tokens must not carry authorization data.
         List<String> roles = safeStringList(claims, CLAIM_ROLES);
         List<String> scopes = safeStringList(claims, CLAIM_SCOPES);
+
+        long issuedAt = claims.getIssueTime() != null
+                ? claims.getIssueTime().toInstant().getEpochSecond()
+                : 0L;
+
+        long notBefore = claims.getNotBeforeTime() != null
+                ? claims.getNotBeforeTime().toInstant().getEpochSecond()
+                : 0L;
+
+        long expiresAt = claims.getExpirationTime() != null
+                ? claims.getExpirationTime().toInstant().getEpochSecond()
+                : 0L;
 
         return new JwtClaimsDTO(
                 subject,
                 jti,
                 audience,
-                claims.getIssueTime().toInstant().getEpochSecond(),
-                claims.getNotBeforeTime() != null
-                        ? claims.getNotBeforeTime().toInstant().getEpochSecond()
-                        : 0L,
-                claims.getExpirationTime().toInstant().getEpochSecond(),
+                issuedAt,
+                notBefore,
+                expiresAt,
                 roles,
                 scopes,
                 tokenUse.name().toLowerCase());
