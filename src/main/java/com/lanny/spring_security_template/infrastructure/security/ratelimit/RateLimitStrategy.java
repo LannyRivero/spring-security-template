@@ -17,5 +17,9 @@ public enum RateLimitStrategy {
     /**
      * Rate limit by resolved client IP + hashed username.
      */
-    IP_USER
+    IP_USER,
+    /**
+     * Rate limit by hashed username only.
+     */
+    USER
 }

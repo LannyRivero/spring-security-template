@@ -65,36 +65,15 @@ public class IpUserRateLimitKeyResolver implements RateLimitKeyResolver {
         return KEY_PREFIX + "ip-user:" + ip + ":" + hashUser(username);
     }
 
-    // ======================================================
-    // Helpers
-    // ======================================================
-
-    /**
-     * Extracts the username from request parameters, if present.
-     *
-     * <p>
-     * This method intentionally does not parse JSON bodies to keep
-     * key resolution fast, safe and side-effect free.
-     * </p>
-     */
     private String extractUsernameSafely(HttpServletRequest request) {
         String raw = request.getParameter("username");
         if (raw == null) {
             return null;
         }
-
         String normalized = raw.trim();
         return normalized.isEmpty() ? null : normalized;
     }
 
-    /**
-     * Hashes the username to avoid PII leakage.
-     *
-     * <p>
-     * Fail-safe by design: any hashing error results in a deterministic,
-     * non-PII fallback value.
-     * </p>
-     */
     private String hashUser(String username) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");

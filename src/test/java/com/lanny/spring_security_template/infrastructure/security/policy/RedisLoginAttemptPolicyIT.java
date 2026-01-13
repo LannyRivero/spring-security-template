@@ -2,7 +2,6 @@ package com.lanny.spring_security_template.infrastructure.security.policy;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -15,6 +14,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.lanny.spring_security_template.application.auth.policy.LoginAttemptResult;
 import com.lanny.spring_security_template.application.auth.port.out.AuthMetricsService;
 import com.lanny.spring_security_template.infrastructure.config.RateLimitingProperties;
+import com.lanny.spring_security_template.infrastructure.security.ratelimit.RateLimitStrategy;
 
 @Testcontainers
 class RedisLoginAttemptPolicyIT {
@@ -87,7 +87,7 @@ class RedisLoginAttemptPolicyIT {
 
         RateLimitingProperties props = new RateLimitingProperties(
                 true,
-                "IP_USER",
+                RateLimitStrategy.IP_USER,
                 3, // maxAttempts
                 60, // window
                 60, // blockSeconds
@@ -123,7 +123,7 @@ class RedisLoginAttemptPolicyIT {
         StringRedisTemplate template = redisTemplate();
 
         RateLimitingProperties props = new RateLimitingProperties(
-                true, "IP", 1, 60, 5, 5, "/api/v1/auth/login");
+                true, RateLimitStrategy.IP, 1, 60, 5, 5, "/api/v1/auth/login");
 
         MetricsStub metrics = new MetricsStub();
         RedisLoginAttemptPolicy policy = new RedisLoginAttemptPolicy(template, props, metrics);
