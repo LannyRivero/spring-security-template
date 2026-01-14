@@ -17,43 +17,38 @@ import com.lanny.spring_security_template.infrastructure.config.SecurityJwtPrope
  * RedisRefreshTokenConsumer
  * ============================================================
  *
+ * Single source of truth for refresh token replay protection.
+ *
  * <p>
- * Redis-based, atomic refresh token consumer used to prevent refresh token
- * replay attacks in distributed environments.
+ * Provides atomic, Redis-backed "consume-once" semantics for refresh
+ * tokens using Lua scripting.
  * </p>
  *
  * <h2>Security guarantees</h2>
  * <ul>
- * <li>Atomic check-and-set semantics via Redis Lua scripting</li>
- * <li>First-consumer-wins behavior</li>
+ * <li>First-consumer-wins semantics</li>
+ * <li>Replay attempts are reliably detected</li>
  * <li>Safe under concurrent, multi-instance deployments</li>
  * </ul>
  *
- * <h2>Key lifecycle</h2>
- * <p>
- * A consumption marker key is stored with a TTL equal to the remaining lifetime
- * of the refresh token. Redis automatically removes expired markers.
- * </p>
- *
- * <h2>Design notes</h2>
+ * <h2>Operational guarantees</h2>
  * <ul>
- * <li>This component only marks consumption</li>
- * <li>Token family revocation and reactions are handled elsewhere</li>
- * <li>No background jobs or schedulers are required</li>
+ * <li>Single Redis key prefix</li>
+ * <li>Issuer-aware namespacing</li>
+ * <li>Single TTL unit: milliseconds</li>
  * </ul>
  *
  * <h2>Profiles</h2>
  * <ul>
- * <li><b>prod</b>, <b>demo</b> → enabled</li>
- * <li>test / local → replaced by NoOp adapter</li>
+ * <li><b>prod</b>, <b>demo</b></li>
  * </ul>
  */
 @Component
 @Profile({ "prod", "demo" })
-public class RedisRefreshTokenConsumer {
+public final class RedisRefreshTokenConsumer {
 
     /**
-     * Redis key prefix for consumed refresh tokens.
+     * Redis key prefix for refresh token consumption markers.
      *
      * <pre>
      * security:{issuer}:refresh:consumed:{jti}
@@ -69,60 +64,51 @@ public class RedisRefreshTokenConsumer {
             StringRedisTemplate redis,
             SecurityJwtProperties props) {
 
-        this.redis = redis;
-        this.issuer = props.issuer();
+        this.redis = Objects.requireNonNull(redis, "redis");
+        this.issuer = Objects.requireNonNull(props.issuer(), "issuer");
         this.consumeScript = buildScript();
     }
 
     /**
-     * Attempts to consume a refresh token atomically.
+     * Atomically consumes a refresh token identifier (JTI).
      *
-     * @param jti unique refresh token identifier (must not be null or blank)
-     * @param ttl remaining lifetime of the refresh token
-     *
-     * @return {@code true} if this call successfully consumed the token
-     *         {@code false} if the token was already consumed
-     *
-     * @throws IllegalArgumentException if {@code jti} is null or blank,
-     *                                  or if {@code ttl} is null, zero or negative
+     * @param jti          unique refresh token identifier
+     * @param remainingTtl remaining lifetime of the refresh token
+     * @return {@code true} if consumed for the first time, {@code false} if replay
+     *         detected
      */
-    public boolean consume(String jti, Duration ttl) {
+    public boolean consumeOnce(String jti, Duration remainingTtl) {
 
         if (jti == null || jti.isBlank()) {
-            throw new IllegalArgumentException("Refresh token JTI must not be null or blank");
+            throw new IllegalArgumentException("Refresh token JTI must not be blank");
         }
 
-        if (ttl == null || ttl.isZero() || ttl.isNegative()) {
-            throw new IllegalArgumentException("Refresh token TTL must be positive");
+        if (remainingTtl == null || remainingTtl.isZero() || remainingTtl.isNegative()) {
+            // Secure by default: expired or invalid TTL => reject
+            return false;
+        }
+
+        long ttlMillis = remainingTtl.toMillis();
+        if (ttlMillis <= 0) {
+            return false;
         }
 
         String key = String.format(KEY_PREFIX, issuer) + jti;
-        List<String> keys = List.of(key);
 
         Long result = redis.execute(
-                Objects.requireNonNull(consumeScript),
-                Objects.requireNonNull(keys),
-                String.valueOf(ttl.toSeconds()));
+                Objects.requireNonNull(consumeScript, "consumeScript"),
+                Objects.requireNonNull(List.of(key), "keys"),
+                String.valueOf(ttlMillis));
 
         return result != null && result == 1L;
     }
 
-    /**
-     * Builds the Lua script used for atomic refresh token consumption.
-     *
-     * <p>
-     * Script semantics:
-     * </p>
-     * <ol>
-     * <li>If the key already exists → return 0</li>
-     * <li>Otherwise → SET key with TTL (NX) → return 1</li>
-     * </ol>
-     */
     private RedisScript<Long> buildScript() {
 
         String lua = """
-                if redis.call('SET', KEYS[1], '1', 'EX', ARGV[1], 'NX') then
-                    return 1
+                if redis.call("SETNX", KEYS[1], "1") == 1 then
+                  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+                  return 1
                 end
                 return 0
                 """;
