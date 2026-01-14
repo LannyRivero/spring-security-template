@@ -141,7 +141,7 @@ public class UserJpaRepositoryTest {
 
             UserEntity saved = givenPersistedUserWithRelations();
 
-            Optional<UserEntity> found = userJpaRepository.fetchWithRelations(saved.getId());
+            Optional<UserEntity> found = userJpaRepository.fetchWithRelations(Objects.requireNonNull(saved.getId()));
 
             assertThat(found).isPresent();
             assertThat(found.get().getRoles()).hasSize(1);
