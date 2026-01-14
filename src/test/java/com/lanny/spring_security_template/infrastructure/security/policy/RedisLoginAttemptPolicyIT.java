@@ -2,11 +2,12 @@ package com.lanny.spring_security_template.infrastructure.security.policy;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.Objects;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
-
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -69,7 +70,8 @@ class RedisLoginAttemptPolicyIT {
     }
 
     private StringRedisTemplate redisTemplate() {
-        String host = redis.getHost();
+        Objects.requireNonNull(redis);
+        String host = Objects.requireNonNull(redis.getHost());
         Integer port = redis.getMappedPort(6379);
 
         LettuceConnectionFactory factory = new LettuceConnectionFactory(host, port);

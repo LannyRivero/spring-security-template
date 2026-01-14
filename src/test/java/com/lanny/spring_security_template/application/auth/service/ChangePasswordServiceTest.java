@@ -61,8 +61,7 @@ class ChangePasswordServiceTest {
                                 EmailAddress.of("user@example.com"),
                                 PasswordHash.of(VALID_HASH),
                                 UserStatus.ACTIVE,
-                                DomainModelMapper.toRoles(List.of("ROLE_USER")),
-                                DomainModelMapper.toScopes(List.of("read:profile")));
+                                DomainModelMapper.toRoles(List.of("ROLE_USER")));
         }
 
         // -------------------------------------------------------------------------

@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -33,8 +33,7 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
                         EmailAddress.of("admin@example.com"),
                         PasswordHash.of("{noop}admin123"),
                         UserStatus.ACTIVE,
-                        DomainModelMapper.toRoles(List.of("ROLE_ADMIN")),
-                        DomainModelMapper.toScopes(List.of("profile:read", "profile:write"))));
+                        DomainModelMapper.toRoles(List.of("ROLE_ADMIN"))));
 
         demoUsers.put("2",
                 User.rehydrate(
@@ -43,8 +42,7 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
                         EmailAddress.of("user@example.com"),
                         PasswordHash.of("{noop}user123"),
                         UserStatus.ACTIVE,
-                        DomainModelMapper.toRoles(List.of("ROLE_USER")),
-                        DomainModelMapper.toScopes(List.of("profile:read"))));
+                        DomainModelMapper.toRoles(List.of("ROLE_USER"))));
     }
 
     @Override
@@ -85,12 +83,11 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
                 oldUser.email(),
                 oldUser.passwordHash(),
                 status,
-                oldUser.roles(),
-                oldUser.scopes()));
+                oldUser.roles()));
     }
 
     @Override
-    public Page<User> findAll(Pageable pageable) {
+    public Page<User> findAll(@NonNull Pageable pageable) {
 
         List<User> users = new ArrayList<>(demoUsers.values());
 
@@ -107,7 +104,7 @@ public class AuthPersistenceAdapter implements UserAccountGateway {
 
         return new PageImpl<>(
                 Objects.requireNonNull(pageContent),
-                pageable,
+                Objects.requireNonNull(pageable),
                 users.size());
     }
 

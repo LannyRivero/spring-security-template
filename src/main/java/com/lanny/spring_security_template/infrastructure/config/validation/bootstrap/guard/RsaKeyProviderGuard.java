@@ -6,6 +6,7 @@ import com.lanny.spring_security_template.infrastructure.config.validation.Inval
 import com.lanny.spring_security_template.infrastructure.jwt.key.RsaKeyProvider;
 
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * =====================================================================
@@ -64,7 +65,7 @@ public final class RsaKeyProviderGuard {
 
             throw new InvalidSecurityConfigurationException(
                     "rsa-key-provider",
-                    message);
+                   Objects.requireNonNull(message));
         }
 
     }

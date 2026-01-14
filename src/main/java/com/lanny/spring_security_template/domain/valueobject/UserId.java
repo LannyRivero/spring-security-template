@@ -2,10 +2,21 @@ package com.lanny.spring_security_template.domain.valueobject;
 
 import java.util.UUID;
 
+import org.springframework.lang.NonNull;
+
 /**
- * Value Object representing a strongly-typed User identifier.
+ * Value Object representing a strongly-typed user identifier.
+ *
+ * <p>
+ * Contract:
+ * <ul>
+ * <li>Never holds a null value</li>
+ * <li>Immutable</li>
+ * <li>Safe to expose as String via {@link #toString()}</li>
+ * </ul>
+ * </p>
  */
-public record UserId(UUID value) {
+public record UserId(@NonNull UUID value) {
 
     public UserId {
         if (value == null) {
@@ -13,12 +24,23 @@ public record UserId(UUID value) {
         }
     }
 
-    public static UserId from(String raw) {
+    public static @NonNull UserId from(@NonNull String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("UserId raw value cannot be null/blank");
+        }
         return new UserId(UUID.fromString(raw));
     }
 
-    public static UserId newId() {
+    public static @NonNull UserId newId() {
         return new UserId(UUID.randomUUID());
+    }
+
+    /**
+     * Explicit accessor to make nullability visible to analysis tools.
+     */
+    @Override
+    public @NonNull UUID value() {
+        return value;
     }
 
     @Override
@@ -26,4 +48,3 @@ public record UserId(UUID value) {
         return value.toString();
     }
 }
-

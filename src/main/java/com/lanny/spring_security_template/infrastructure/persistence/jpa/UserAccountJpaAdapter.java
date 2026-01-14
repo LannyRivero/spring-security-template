@@ -1,14 +1,14 @@
 package com.lanny.spring_security_template.infrastructure.persistence.jpa;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Profile;
-import org.springframework.lang.NonNull;
-import org.springframework.stereotype.Component;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Component;
 
 import com.lanny.spring_security_template.application.auth.port.out.UserAccountGateway;
 import com.lanny.spring_security_template.domain.model.User;
@@ -18,23 +18,30 @@ import com.lanny.spring_security_template.domain.valueobject.PasswordHash;
 import com.lanny.spring_security_template.domain.valueobject.UserId;
 import com.lanny.spring_security_template.domain.valueobject.Username;
 import com.lanny.spring_security_template.infrastructure.mapper.DomainModelMapper;
+import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.RoleEntity;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.entity.UserEntity;
 import com.lanny.spring_security_template.infrastructure.persistence.jpa.repository.UserJpaRepository;
 
 /**
- * JPA adapter implementing the {@link UserAccountGateway} outbound port.
+ * JPA adapter implementing the {@link UserAccountGateway}.
  *
  * <p>
- * Acts as a bridge between domain aggregates and JPA entities.
- * Converts {@link UserEntity} ↔ {@link User} using factory methods
- * such as {@code User.rehydrate}.
- * </p>
+ * This adapter is responsible ONLY for:
+ * <ul>
+ * <li>Loading persisted {@link UserEntity} instances</li>
+ * <li>Rehydrating {@link User} domain aggregates</li>
+ * <li>Persisting already-valid domain state</li>
+ * </ul>
  *
  * <p>
- * This class contains ONLY mapping and simple persistence logic.
- * All domain rules live inside the aggregate or services.
- * </p>
+ * It MUST NOT:
+ * <ul>
+ * <li>Apply business rules</li>
+ * <li>Mutate domain invariants</li>
+ * <li>Reconstruct entities field-by-field</li>
+ * </ul>
  */
+@SuppressWarnings("null")
 @Component
 @Profile({ "dev", "prod" })
 public class UserAccountJpaAdapter implements UserAccountGateway {
@@ -45,13 +52,13 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
         this.userRepository = userRepository;
     }
 
-    // ======================================================================
+    // ======================================================
     // QUERIES
-    // ======================================================================
+    // ======================================================
 
     @Override
-    public Optional<User> findByUsernameOrEmail(String usernameOrEmail) {
-        return userRepository.findByUsernameOrEmail(usernameOrEmail)
+    public Optional<User> findByUsernameOrEmail(String value) {
+        return userRepository.findByUsernameOrEmail(value)
                 .map(this::toDomain);
     }
 
@@ -69,9 +76,14 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
                 .map(this::toDomain);
     }
 
-    // ======================================================================
+    @Override
+    public Page<User> findAll(@NonNull Pageable pageable) {
+        return userRepository.findAll(pageable).map(this::toDomain);
+    }
+
+    // ======================================================
     // COMMANDS
-    // ======================================================================
+    // ======================================================
 
     @Override
     public void save(User user) {
@@ -87,65 +99,70 @@ public class UserAccountJpaAdapter implements UserAccountGateway {
     public void updateStatus(String userId, UserStatus status) {
         if (userId == null)
             return;
+
         userRepository.findById(userId).ifPresent(entity -> {
-            entity.setEnabled(status == UserStatus.ACTIVE);
+            if (status == UserStatus.ACTIVE) {
+                entity.enable();
+            } else {
+                entity.disable();
+            }
             userRepository.save(entity);
         });
     }
 
-    // ======================================================================
+    // ======================================================
     // ENTITY → DOMAIN
-    // ======================================================================
+    // ======================================================
 
-    private User toDomain(UserEntity entity) {
+    @NonNull
+    private User toDomain(@NonNull UserEntity entity) {
+
+        Objects.requireNonNull(entity, "UserEntity must not be null");
 
         UserStatus status = entity.isEnabled()
                 ? UserStatus.ACTIVE
                 : UserStatus.DISABLED;
 
-        List<String> roles = entity.getRoles().stream()
-                .map(r -> r.getName())
+        List<String> roleNames = entity.getRoles().stream()
+                .map(RoleEntity::getName)
                 .toList();
 
-        List<String> scopes = entity.getScopes().stream()
-                .map(s -> s.getName())
-                .toList();
-
-        return User.rehydrate(
-                UserId.from(entity.getId()),
-                Username.of(entity.getUsername()),
-                EmailAddress.of(entity.getEmail()),
-                PasswordHash.of(entity.getPasswordHash()),
-                status,
-                DomainModelMapper.toRoles(roles),
-                DomainModelMapper.toScopes(scopes));
+        return Objects.requireNonNull(
+                User.rehydrate(
+                        UserId.from(entity.getId()),
+                        Username.of(entity.getUsername()),
+                        EmailAddress.of(entity.getEmail()),
+                        PasswordHash.of(entity.getPasswordHash()),
+                        status,
+                        DomainModelMapper.toRoles(roleNames)),
+                "Rehydrated User must not be null");
     }
 
-    // ======================================================================
+    // ======================================================
     // DOMAIN → ENTITY
-    // ======================================================================
+    // ======================================================
 
     @NonNull
-    private UserEntity toEntity(User domain) {
-        UserEntity entity = new UserEntity();
+    private UserEntity toEntity(@NonNull User domain) {
+
+        Objects.requireNonNull(domain, "User domain object must not be null");
 
         if (domain.id() != null) {
-            entity.setId(domain.id().value().toString());
+            final String entityId = Objects.requireNonNull(
+                    domain.id().toString(),
+                    "UserId string representation must not be null");
+
+            return userRepository.findById(entityId)
+                    .map(existing -> Objects.requireNonNull(
+                            existing.updateFromDomain(domain),
+                            "Updated UserEntity must not be null"))
+                    .orElseThrow(() -> new IllegalStateException("User not found: " + entityId));
         }
 
-        entity.setUsername(domain.username().value());
-        entity.setEmail(domain.email().value());
-        entity.setPasswordHash(domain.passwordHash().value());
-        entity.setEnabled(domain.status() == UserStatus.ACTIVE);
-
-        // Roles y scopes NO se setean aquí (se gestionan por repos dedicados)
-        return entity;
-    }
-
-    @Override
-    public Page<User> findAll(@NonNull Pageable pageable) {
-        return userRepository.findAll(pageable)
-                .map(this::toDomain);
+        return new UserEntity(
+                Objects.requireNonNull(domain.username().value(), "Username must not be null"),
+                Objects.requireNonNull(domain.email().value(), "Email must not be null"),
+                Objects.requireNonNull(domain.passwordHash().value(), "Password hash must not be null"));
     }
 
 }
