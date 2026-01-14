@@ -79,9 +79,7 @@ public final class User {
             EmailAddress email,
             PasswordHash passwordHash,
             UserStatus status,
-            List<Role> roles,
-            List<Scope> scopes) {
-
+            List<Role> roles) {
         return new User(
                 id,
                 username,
@@ -89,7 +87,8 @@ public final class User {
                 passwordHash,
                 status,
                 sanitizeRoles(roles),
-                sanitizeScopes(scopes));
+                List.of() // scopes NO persistidas
+        );
     }
 
     // ======================================================

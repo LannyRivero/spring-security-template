@@ -84,8 +84,8 @@ class UserTest {
                 buildActiveUser().email(),
                 PasswordHash.of(VALID_HASH),
                 UserStatus.LOCKED,
-                buildActiveUser().roles(),
-                buildActiveUser().scopes());
+                buildActiveUser().roles()
+                );
 
         assertThrows(UserLockedException.class, locked::ensureCanAuthenticate);
     }

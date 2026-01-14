@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import org.hibernate.exception.ConstraintViolationException;
 
+import java.util.Objects;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -83,7 +84,7 @@ public class UserJpaRepositoryTest {
         @Test
         @DisplayName("Should save user successfully")
         void testShouldSaveUserSuccessfully() {
-            UserEntity user = UserTestData.defaultUser();
+            UserEntity user = Objects.requireNonNull(UserTestData.defaultUser());
 
             UserEntity saved = userJpaRepository.save(user);
             entityManager.flush();
@@ -144,7 +145,6 @@ public class UserJpaRepositoryTest {
 
             assertThat(found).isPresent();
             assertThat(found.get().getRoles()).hasSize(1);
-            assertThat(found.get().getScopes()).hasSize(1);
         }
 
         @Test
@@ -361,7 +361,6 @@ public class UserJpaRepositoryTest {
 
             assertThat(found).isPresent();
             assertThat(found.get().getRoles()).isEmpty();
-            assertThat(found.get().getScopes()).isEmpty();
         }
 
         @Test
@@ -410,7 +409,6 @@ public class UserJpaRepositoryTest {
     private UserEntity givenPersistedUserWithRelations() {
         UserEntity user = UserTestData.defaultUser();
         user.getRoles().add(adminRole);
-        user.getScopes().add(profileReadScope);
         return entityManager.persistAndFlush(user);
     }
 

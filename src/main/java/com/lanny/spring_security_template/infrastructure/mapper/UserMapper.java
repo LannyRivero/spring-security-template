@@ -67,16 +67,14 @@ public class UserMapper {
             String email,
             String passwordHash,
             UserStatus status,
-            List<String> roles,
-            List<String> scopes) {
+            List<String> roles) {
         return User.rehydrate(
-                UserId.from(id),
-                Username.of(username),
-                EmailAddress.of(email),
-                PasswordHash.of(passwordHash),
-                status,
-                toRoleList(roles),
-                toScopeList(scopes));
+                UserId.from(Objects.requireNonNull(id)),
+                Username.of(Objects.requireNonNull(username)),
+                EmailAddress.of(Objects.requireNonNull(email)),
+                PasswordHash.of(Objects.requireNonNull(passwordHash)),
+                Objects.requireNonNull(status),
+                toRoleList(Objects.requireNonNull(roles)));
     }
 
     // ========================================================================
