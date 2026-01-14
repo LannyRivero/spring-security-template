@@ -1,8 +1,7 @@
 package com.lanny.spring_security_template.infrastructure.security.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -10,25 +9,41 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
+ * ============================================================
  * CustomAccessDeniedHandler
- *
- * Handles authorization failures (HTTP 403) and returns
- * a standardized JSON error response.
+ * ============================================================
  *
  * <p>
- * Responsibilities:
+ * Handles authorization failures (HTTP 403 Forbidden) in a
+ * secure and consistent manner.
+ * </p>
+ *
+ * <h2>Responsibilities</h2>
  * <ul>
  * <li>Translate {@link AccessDeniedException} into HTTP 403 responses</li>
  * <li>Delegate error construction to {@link ApiErrorFactory}</li>
- * <li>Serialize the response using Spring-managed {@link ObjectMapper}</li>
+ * <li>Serialize client-safe JSON responses</li>
  * </ul>
  *
- * <p>
- * This handler contains no business logic and no temporal logic.
- * All error structure decisions are centralized in {@link ApiErrorFactory}.
+ * <h2>Security guarantees</h2>
+ * <ul>
+ * <li>No internal exception messages are exposed</li>
+ * <li>No role, scope or authorization details are leaked</li>
+ * <li>Response format is always deterministic</li>
+ * </ul>
+ *
+ * <h2>Design notes</h2>
+ * <ul>
+ * <li>This handler performs no authorization logic</li>
+ * <li>This handler performs no logging of sensitive data</li>
+ * <li>Error semantics are centralized in {@link ApiErrorFactory}</li>
+ * </ul>
  */
 @Component
 public class CustomAccessDeniedHandler implements AccessDeniedHandler {
@@ -51,12 +66,15 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
             HttpServletResponse response,
             AccessDeniedException ex) throws IOException {
 
-        log.warn("Access denied: {}", ex.getMessage());
+        // Log minimal, non-sensitive information only
+        log.warn("Access denied (403) for path={}", request.getRequestURI());
 
         ApiError error = errorFactory.forbidden(request);
 
+        response.resetBuffer(); // defensive: avoid mixed responses
         response.setStatus(error.status());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+
         mapper.writeValue(response.getWriter(), error);
     }
 }
