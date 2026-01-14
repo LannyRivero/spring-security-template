@@ -32,14 +32,8 @@ public final class CorsSecurityValidator {
         if (origins.contains("*")) {
             throw new InvalidSecurityConfigurationException(
                     "cors-configuration",
-                    "CORS wildcard '*' is not allowed in production");
+                    "CORS wildcard '*' is forbidden in production environments");
         }
 
-        if (corsProperties.allowCredentials() && origins.contains("*")) {
-
-            throw new InvalidSecurityConfigurationException(
-                    "cors-configuration",
-                    "CORS allowCredentials=true cannot be used with wildcard origins");
-        }
     }
 }

@@ -1,11 +1,12 @@
 package com.lanny.spring_security_template.infrastructure.config;
 
+import java.util.List;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.constraints.NotEmpty;
-import java.util.List;
 
 /**
  * Strongly-typed configuration for Cross-Origin Resource Sharing (CORS).
@@ -24,7 +25,7 @@ import java.util.List;
 public record SecurityCorsProperties(
 
                 /** Allowed origin URLs (e.g. https://app.company.com) */
-                @NotEmpty @DefaultValue( {
+                @NotEmpty @DefaultValue({
                                 "*" }) List<String> allowedOrigins,
 
                 /** Allowed HTTP methods for cross-origin requests */
@@ -33,74 +34,34 @@ public record SecurityCorsProperties(
                 /** Allowed headers received in CORS requests */
                 @NotEmpty @DefaultValue({ "Authorization", "Content-Type" }) List<String> allowedHeaders,
 
-                /** Headers exposed to the browser (e.g., X-Correlation-Id) */
+                /** Headers exposed to the browser */
                 @DefaultValue({ "X-Correlation-Id" }) List<String> exposedHeaders,
 
                 /** Whether cookies / Authorization headers can be sent cross-origin */
-                @DefaultValue("false") boolean allowCredentials){
+                @DefaultValue("false") boolean allowCredentials) {
 
         /**
-         * Compact constructor for validation at bind-time.
-         * Enforces strict CORS rules for enterprise environments.
+         * Bind-time invariant validation.
+         *
+         * <p>
+         * These rules are ALWAYS true, regardless of environment.
+         * Environment-specific security rules are enforced via StartupChecks.
+         * </p>
          */
         public SecurityCorsProperties {
-                validateWildcardOriginWithCredentials(allowedOrigins, allowCredentials);
-                validateWildcardOriginInRestrictedProfiles(allowedOrigins);
+                validateWildcardWithCredentials(allowedOrigins, allowCredentials);
         }
 
-        private static void validateWildcardOriginWithCredentials(
-                        List<String> allowedOrigins,
+        private static void validateWildcardWithCredentials(
+                        List<String> origins,
                         boolean allowCredentials) {
 
-                if (allowCredentials && allowedOrigins.contains("*")) {
+                if (allowCredentials && origins.contains("*")) {
                         throw new IllegalArgumentException("""
                                         Invalid CORS configuration:
-                                        allowCredentials=true cannot be combined with allowedOrigins="*".
-                                        Browsers block this combination for security reasons.
+                                        allowCredentials=true cannot be combined with wildcard origins.
+                                        Browsers block this combination by specification.
                                         """);
                 }
-        }
-
-        private static void validateWildcardOriginInRestrictedProfiles(
-                        List<String> allowedOrigins) {
-
-                String activeProfiles = resolveActiveProfiles();
-
-                if (activeProfiles.contains("prod")
-                                || activeProfiles.contains("stage")
-                                || activeProfiles.contains("qa")) {
-
-                        if (allowedOrigins.contains("*")) {
-                                throw new IllegalStateException("""
-                                                SECURITY ERROR:
-                                                Wildcard CORS origins ("*") are forbidden in restricted environments.
-                                                You MUST explicitly configure trusted origins, for example:
-                                                  - https://dashboard.company.com
-                                                  - https://app.company.com
-                                                """);
-                        }
-                }
-        }
-
-        /**
-         * Resolves active Spring profiles in a container-safe way.
-         *
-         * Priority:
-         * 1. SPRING_PROFILES_ACTIVE env var
-         * 2. spring.profiles.active JVM property
-         * 3. "dev" fallback
-         */
-        private static String resolveActiveProfiles() {
-                String envProfiles = System.getenv("SPRING_PROFILES_ACTIVE");
-                if (envProfiles != null && !envProfiles.isBlank()) {
-                        return envProfiles.toLowerCase();
-                }
-
-                String sysProfiles = System.getProperty("spring.profiles.active");
-                if (sysProfiles != null && !sysProfiles.isBlank()) {
-                        return sysProfiles.toLowerCase();
-                }
-
-                return "dev";
         }
 }
