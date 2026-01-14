@@ -6,6 +6,7 @@ import com.lanny.spring_security_template.infrastructure.persistence.jpa.reposit
 import com.lanny.spring_security_template.infrastructure.security.util.TokenHashUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -103,7 +104,7 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
     public Optional<RefreshTokenData> findByJti(String jti) {
         String hash = TokenHashUtil.hashJti(jti);
 
-        return repo.findByJtiHash(hash)
+        return repo.findByJtiHash(Objects.requireNonNull(hash, "Hashed JTI must not be null"))
                 .map(entity -> new RefreshTokenData(
                         entity.getJtiHash(), // hash, never clear-text
                         entity.getUsername(),
@@ -126,7 +127,8 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
      */
     @Override
     public void revoke(String refreshJti) {
-        repo.revokeByHash(TokenHashUtil.hashJti(refreshJti));
+
+        repo.revokeByHash(Objects.requireNonNull(TokenHashUtil.hashJti(refreshJti), "Hashed JTI must not be null"));
     }
 
     /**
@@ -141,7 +143,7 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
      */
     @Override
     public void revokeFamily(String familyId) {
-        repo.revokeByFamilyId(familyId);
+        repo.revokeByFamilyId(Objects.requireNonNull(familyId, "Family ID must not be null"));
     }
 
     /**
@@ -159,7 +161,7 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
      */
     @Override
     public void deleteAllForUser(String username) {
-        repo.deleteByUsername(username);
+        repo.deleteByUsername(Objects.requireNonNull(username, "Username must not be null"));
     }
 
     /**
@@ -176,7 +178,7 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
      */
     @Override
     public List<String> findAllForUser(String username) {
-        return repo.findAllByUsername(username)
+        return repo.findAllByUsername(Objects.requireNonNull(username, "Username must not be null"))
                 .stream()
                 .map(RefreshTokenEntity::getJtiHash)
                 .toList();
@@ -194,6 +196,6 @@ public class RefreshTokenStoreJpa implements RefreshTokenStore {
      */
     @Override
     public int deleteExpiredTokens(Instant before) {
-        return repo.deleteByExpiresAtBefore(before);
+        return repo.deleteByExpiresAtBefore(Objects.requireNonNull(before, "Expiration cutoff must not be null"));
     }
 }
