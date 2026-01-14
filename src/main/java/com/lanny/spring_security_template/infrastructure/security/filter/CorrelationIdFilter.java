@@ -21,38 +21,34 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * {@code CorrelationIdFilter}
+ * ============================================================
+ * CorrelationIdFilter
+ * ============================================================
  *
  * <p>
- * Establishes a request-scoped correlation context for:
+ * Establishes a request-scoped correlation context used for
+ * logging, security auditing, metrics and distributed tracing.
  * </p>
- * <ul>
- * <li>Structured logging</li>
- * <li>Security auditing</li>
- * <li>Metrics and tracing</li>
- * </ul>
  *
  * <h2>Responsibilities</h2>
  * <ul>
  * <li>Propagate or generate a correlation ID</li>
  * <li>Expose the correlation ID in the response</li>
  * <li>Populate MDC with request metadata</li>
- * <li>Ensure safe MDC cleanup</li>
+ * <li>Ensure deterministic MDC cleanup</li>
  * </ul>
  *
- * <h2>Important design decision</h2>
+ * <h2>Design guarantees</h2>
+ * <ul>
+ * <li>Never throws exceptions</li>
+ * <li>Never alters response status or body</li>
+ * <li>Never clears MDC keys it did not introduce</li>
+ * <li>Safe for async and error dispatches</li>
+ * </ul>
+ *
  * <p>
- * This filter does <b>NOT</b> resolve the client IP directly.
- * IP resolution is delegated to {@link ClientIpResolver} to avoid
- * security issues related to spoofed forwarded headers.
- * </p>
- * 
- * 
- * <p>
- * NOTE:
- * This filter is compatible with distributed tracing systems
- * (e.g. OpenTelemetry, Sleuth) and intentionally does not override
- * existing trace/span identifiers if present.
+ * This filter runs at the highest precedence to ensure
+ * correlation data is available to all downstream components.
  * </p>
  */
 @Slf4j
@@ -69,18 +65,24 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
+        // Skip async and error dispatches
+        return isAsyncDispatch(request) || request.getDispatcherType().name().equals("ERROR");
+    }
+
+    @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
-            @NonNull FilterChain chain) throws ServletException, IOException {
+            @NonNull FilterChain chain)
+            throws ServletException, IOException {
 
         String correlationId = resolveCorrelationId(request);
 
         try {
-            // Propagate correlation ID
+            // This service is the authority for the correlation ID
             response.setHeader(CORRELATION_HEADER, correlationId);
 
-            // Populate MDC
             MDC.put(CORRELATION_ID, correlationId);
             MDC.put(REQUEST_PATH, request.getMethod() + " " + request.getRequestURI());
             MDC.put(CLIENT_IP, ipResolver.resolve(request));
@@ -88,7 +90,6 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
 
         } finally {
-            // Remove ONLY keys introduced by this filter
             MDC.remove(CORRELATION_ID);
             MDC.remove(REQUEST_PATH);
             MDC.remove(CLIENT_IP);

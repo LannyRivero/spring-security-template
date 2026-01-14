@@ -3,16 +3,24 @@ package com.lanny.spring_security_template.infrastructure.security.filter;
 import org.springframework.core.Ordered;
 
 /**
- * {@code FilterOrder}
+ * ============================================================
+ * FilterOrder
+ * ============================================================
  *
  * <p>
- * Centralized registry defining the relative execution order of
- * custom security filters within the Spring Security filter chain.
+ * Centralized registry defining the <b>relative execution order</b>
+ * of custom security filters within the Spring Security filter chain.
+ * </p>
+ *
+ * <p>
+ * This class defines ordering <b>only between application-defined
+ * security filters</b>. It does not override or replace Spring
+ * Security's internal filter ordering.
  * </p>
  *
  * <p>
  * Using a shared ordering contract avoids hardcoded values and
- * guarantees a predictable, auditable filter execution sequence.
+ * guarantees a predictable, auditable and evolvable filter sequence.
  * </p>
  *
  * <h2>Filter execution order</h2>
@@ -28,6 +36,11 @@ import org.springframework.core.Ordered;
  * <p>
  * Gaps between order values are intentional to allow future filters
  * to be inserted without breaking the existing chain.
+ * </p>
+ *
+ * <p>
+ * This class is part of the <b>security execution contract</b> and
+ * must be treated as a stable infrastructure component.
  * </p>
  */
 public final class FilterOrder {
