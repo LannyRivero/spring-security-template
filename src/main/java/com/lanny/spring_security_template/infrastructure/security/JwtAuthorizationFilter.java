@@ -19,8 +19,10 @@ import com.lanny.spring_security_template.application.auth.port.out.JwtValidator
 import com.lanny.spring_security_template.application.auth.port.out.TokenBlacklistGateway;
 import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaimsDTO;
 import com.lanny.spring_security_template.infrastructure.jwt.JwtAuthoritiesMapper;
+import com.lanny.spring_security_template.infrastructure.jwt.exception.JwtValidationException;
 import com.lanny.spring_security_template.infrastructure.security.jwt.JwtAuthFailureReason;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidTokenTypeException;
+import com.lanny.spring_security_template.infrastructure.security.jwt.exception.JwtAuthenticationException;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.NoAuthoritiesException;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.TokenRevokedException;
 
@@ -33,8 +35,8 @@ import jakarta.servlet.http.HttpServletResponse;
  * {@code JwtAuthorizationFilter}
  *
  * <p>
- * Spring Security filter responsible for <b>JWT-based authorization</b>
- * using <b>ACCESS tokens only</b>.
+ * Enterprise-grade JWT authorization filter responsible for validating
+ * <b>ACCESS tokens only</b> and populating the Spring Security context.
  * </p>
  *
  * <h2>Responsibilities</h2>
@@ -46,31 +48,21 @@ import jakarta.servlet.http.HttpServletResponse;
  * <li>Populate {@link SecurityContextHolder}</li>
  * </ul>
  *
- * <h2>Security guarantees</h2>
+ * <h2>Failure semantics</h2>
  * <ul>
- * <li>No tokens are logged</li>
- * <li>No PII leakage</li>
- * <li>Fail-safe: authentication is NEVER partially set</li>
- * <li>Malformed or invalid JWT claims are treated as authorization
- * failures</li>
- * 
+ * <li>All JWT validation failures are translated to
+ * {@link JwtAuthenticationException}</li>
+ * <li>Never returns HTTP responses directly</li>
+ * <li>Delegates error handling to Spring Security entry points</li>
+ * <li>JWT errors must NEVER result in HTTP 500</li>
  * </ul>
  *
- * <h2>Observability</h2>
+ * <h2>Security guarantees</h2>
  * <ul>
- * <li>Structured logs with correlationId</li>
- * <li>Method + path always present</li>
- * <li>Controlled failure reasons (finite enum)</li>
+ * <li>No partial authentication is ever left in the context</li>
+ * <li>No tokens or claims are logged</li>
+ * <li>PII-safe structured logging</li>
  * </ul>
- * 
- * <h2>Failure behavior</h2>
- * <p>
- * This filter never sends HTTP responses directly.
- * On authorization failure, the {@link SecurityContextHolder} remains empty
- * and the request is handled downstream by Spring Security's
- * authentication entry point or access denied handler.
- * </p>
- * 
  */
 @Component
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
@@ -130,22 +122,29 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
       MDC.put(USERNAME, claims.sub());
 
-    } catch (
+    }
+    // --------------------------------------------------
+    // JWT validation errors → AUTHENTICATION FAILURE (401)
+    // --------------------------------------------------
+    catch (JwtValidationException ex) {
+      SecurityContextHolder.clearContext();
+      throw new JwtAuthenticationException("Invalid JWT token", ex);
+    }
+    // --------------------------------------------------
+    // Authorization-level failures → ACCESS DENIED / 401
+    // --------------------------------------------------
+    catch (
         InvalidTokenTypeException | TokenRevokedException | NoAuthoritiesException | IllegalArgumentException ex) {
-      JwtAuthFailureReason reason = mapFailureReason(ex);
 
-      String method = request.getMethod();
-      String path = resolvePath(request);
-      String correlationId = MDC.get(CORRELATION_ID);
+      JwtAuthFailureReason reason = mapFailureReason(ex);
 
       log.warn(
           "JWT authorization failed reason={} method={} path={} correlationId={}",
           reason,
-          method,
-          path,
-          correlationId);
+          request.getMethod(),
+          resolvePath(request),
+          MDC.get(CORRELATION_ID));
 
-      // FAIL-SAFE: never leave partial authentication
       SecurityContextHolder.clearContext();
     }
 
