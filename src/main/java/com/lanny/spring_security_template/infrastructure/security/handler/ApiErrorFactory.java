@@ -12,9 +12,14 @@ import com.lanny.spring_security_template.domain.time.ClockProvider;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * {@code ApiErrorFactory}
+ * ============================================================
+ * ApiErrorFactory
+ * ============================================================
  *
- * Centralized factory for building {@link ApiError} responses.
+ * <p>
+ * Centralized factory responsible for building {@link ApiError}
+ * instances in a safe, consistent and deterministic way.
+ * </p>
  *
  * <h2>Responsibilities</h2>
  * <ul>
@@ -27,10 +32,10 @@ import jakarta.servlet.http.HttpServletRequest;
  * <ul>
  * <li>No internal exception messages are exposed</li>
  * <li>No stack traces or technical details leak to clients</li>
- * <li>Correlation ID is always propagated when available</li>
+ * <li>Correlation ID is propagated when available</li>
  * </ul>
  *
- * <h2>Design notes</h2>
+ * <h2>Design constraints</h2>
  * <ul>
  * <li>This factory does <b>not</b> perform logging</li>
  * <li>This factory does <b>not</b> make authorization decisions</li>
@@ -38,8 +43,8 @@ import jakarta.servlet.http.HttpServletRequest;
  * </ul>
  *
  * <p>
- * This component is infrastructure-only and must remain framework-agnostic
- * beyond servlet request access.
+ * Infrastructure-only component. Intended to be used by
+ * security filters and exception handlers.
  * </p>
  */
 @Component
@@ -61,16 +66,17 @@ public class ApiErrorFactory {
      * Builds a generic {@link ApiError}.
      *
      * <p>
-     * IMPORTANT:
-     * <ul>
-     * <li>Do NOT pass raw exception messages here</li>
-     * <li>Messages must be safe for external clients</li>
-     * </ul>
+     * <b>IMPORTANT</b>:
      * </p>
+     * <ul>
+     * <li>Do NOT pass raw exception messages</li>
+     * <li>Do NOT include technical or sensitive information</li>
+     * <li>Messages must be safe for external API consumers</li>
+     * </ul>
      *
      * @param status  HTTP status code
      * @param message client-safe error message
-     * @param request current HTTP request
+     * @param request current HTTP request (must not be {@code null})
      * @return immutable {@link ApiError}
      */
     public ApiError create(int status, String message, HttpServletRequest request) {
@@ -78,7 +84,7 @@ public class ApiErrorFactory {
                 now(),
                 status,
                 message,
-                request.getRequestURI(),
+                resolvePath(request),
                 resolveCorrelationId(request));
     }
 
@@ -86,23 +92,14 @@ public class ApiErrorFactory {
     // Semantic helpers (preferred usage)
     // ======================================================
 
-    /**
-     * Builds a standard {@code 401 Unauthorized} error.
-     */
     public ApiError unauthorized(HttpServletRequest request) {
         return create(401, "Unauthorized", request);
     }
 
-    /**
-     * Builds a standard {@code 403 Forbidden} error.
-     */
     public ApiError forbidden(HttpServletRequest request) {
         return create(403, "Forbidden", request);
     }
 
-    /**
-     * Builds a standard {@code 429 Too Many Requests} error.
-     */
     public ApiError tooManyRequests(HttpServletRequest request) {
         return create(429, "Too many requests", request);
     }
@@ -111,18 +108,6 @@ public class ApiErrorFactory {
     // Internals
     // ======================================================
 
-    /**
-     * Resolves the correlation ID in a defensive way.
-     *
-     * <p>
-     * Resolution order:
-     * <ol>
-     * <li>Request header ({@code X-Correlation-Id})</li>
-     * <li>MDC fallback (if filter already populated it)</li>
-     * <li>{@code null} (allowed, but discouraged)</li>
-     * </ol>
-     * </p>
-     */
     private String resolveCorrelationId(HttpServletRequest request) {
 
         String headerValue = request.getHeader(CORRELATION_HEADER);
@@ -135,7 +120,15 @@ public class ApiErrorFactory {
             return mdcValue;
         }
 
-        return null;
+        return null; // Allowed: consumers must tolerate missing correlationId
+    }
+
+    private String resolvePath(HttpServletRequest request) {
+        try {
+            return request.getRequestURI();
+        } catch (Exception ex) {
+            return "unknown";
+        }
     }
 
     private Instant now() {
