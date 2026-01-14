@@ -12,28 +12,36 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * {@code SecurityHeadersFilter}
+ * ============================================================
+ * SecurityHeadersFilter
+ * ============================================================
  *
  * <p>
  * Servlet filter responsible for applying a comprehensive set of
- * <b>HTTP security headers</b> to all HTTP responses.
+ * HTTP security headers to all HTTP responses.
  * </p>
  *
- * <p>
- * These headers provide browser-level hardening against common
- * web vulnerabilities such as XSS, clickjacking, MIME sniffing
- * and information leakage.
- * </p>
+ * <h2>Scope</h2>
+ * <ul>
+ * <li>Applies to all responses (authenticated and unauthenticated)</li>
+ * <li>Stateless and idempotent</li>
+ * <li>Does not depend on authentication state</li>
+ * </ul>
  *
- * <p>
- * Designed for <b>production-grade, enterprise APIs</b> and aligned
- * with OWASP ASVS and modern browser security recommendations.
- * </p>
+ * <h2>Security goals</h2>
+ * <ul>
+ * <li>Mitigate XSS and injection attacks</li>
+ * <li>Prevent clickjacking and UI redressing</li>
+ * <li>Disable MIME sniffing</li>
+ * <li>Reduce information leakage via referrers</li>
+ * </ul>
  *
- * <p>
- * NOTE: Filter ordering is explicitly defined in {@code SecurityConfig}.
- * This filter must not declare its own {@code @Order}.
- * </p>
+ * <h2>Design notes</h2>
+ * <ul>
+ * <li>Headers are only set if absent to remain compatible with gateways</li>
+ * <li>Cache-control is handled by {@link AuthNoCacheFilter}</li>
+ * <li>No environment-specific logic is embedded</li>
+ * </ul>
  */
 @Component
 public class SecurityHeadersFilter extends OncePerRequestFilter {
@@ -42,13 +50,8 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
          * Strong default Content Security Policy suitable for REST APIs.
          *
          * <p>
-         * Swagger UI or embedded consoles may require a relaxed CSP
-         * in non-production environments.
-         * </p>
-         *
-         * <p>
-         * This value is intentionally strict and should only be overridden
-         * via configuration, never weakened by default.
+         * Note: {@code frame-ancestors 'none'} supersedes {@code X-Frame-Options}.
+         * The latter is still sent for legacy browser compatibility.
          * </p>
          */
         private static final String CSP_DEFAULT = "default-src 'self'; " +
@@ -68,8 +71,6 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
                         @NonNull FilterChain filterChain)
                         throws ServletException, IOException {
 
-                // Enforce HTTPS-only transport security when applicable
-                // (avoid breaking local or non-TLS dev environments)
                 if (request.isSecure()) {
                         setIfAbsent(
                                         response,
@@ -78,10 +79,7 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
                 }
 
                 setIfAbsent(response, "X-Content-Type-Options", "nosniff");
-
-                // Explicitly disable legacy XSS auditor (deprecated in modern browsers)
                 setIfAbsent(response, "X-XSS-Protection", "0");
-
                 setIfAbsent(response, "X-Frame-Options", "DENY");
                 setIfAbsent(response, "Referrer-Policy", "no-referrer");
 
@@ -93,10 +91,6 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
                 setIfAbsent(response, "Cross-Origin-Opener-Policy", "same-origin");
                 setIfAbsent(response, "Cross-Origin-Resource-Policy", "same-origin");
                 setIfAbsent(response, "Content-Security-Policy", CSP_DEFAULT);
-
-                // Prevent caching of sensitive responses
-                setIfAbsent(response, "Cache-Control", "no-store, no-cache, must-revalidate");
-                setIfAbsent(response, "Pragma", "no-cache");
 
                 filterChain.doFilter(request, response);
         }
