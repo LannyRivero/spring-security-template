@@ -1,68 +1,62 @@
 package com.lanny.spring_security_template.infrastructure.security.filter;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 import org.springframework.core.annotation.Order;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import java.io.IOException;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * {@code AuthNoCacheFilter}
+ * ============================================================
+ * AuthNoCacheFilter
+ * ============================================================
  *
  * <p>
- * Servlet filter that enforces <b>no-cache HTTP headers</b> on
- * <b>authenticated responses only</b>.
+ * Enforces strict no-cache HTTP headers on responses generated
+ * for authenticated requests only.
  * </p>
  *
+ * <h2>Purpose</h2>
  * <p>
- * This filter prevents sensitive data returned by protected endpoints
- * (e.g. user profiles, tokens, personal information) from being cached by:
+ * Prevents sensitive data returned by protected endpoints
+ * (profiles, tokens, personal information, etc.)
+ * from being cached by browsers, proxies or intermediate caches.
  * </p>
- * <ul>
- * <li>Web browsers (including back/forward cache)</li>
- * <li>Intermediate HTTP proxies</li>
- * <li>Shared or private caches</li>
- * </ul>
  *
  * <h2>Scope</h2>
- * <p>
- * The filter is intentionally applied <b>only</b> when a user is authenticated.
- * Public and unauthenticated endpoints (such as health checks, OpenAPI,
- * or static resources) are excluded to avoid unnecessary performance impact.
- * </p>
+ * <ul>
+ * <li>Applied only when a user is authenticated</li>
+ * <li>Public and unauthenticated endpoints are excluded</li>
+ * <li>No path-based assumptions are made</li>
+ * </ul>
  *
  * <h2>Security guarantees</h2>
  * <ul>
- * <li>Prevents caching of sensitive authenticated responses</li>
- * <li>Reduces risk of data leakage after logout or session termination</li>
- * <li>Complies with OWASP recommendations for REST API security</li>
+ * <li>No-store policy for authenticated responses</li>
+ * <li>Prevents back/forward cache leakage after logout</li>
+ * <li>Compliant with OWASP REST security recommendations</li>
  * </ul>
  *
  * <h2>Design notes</h2>
  * <ul>
- * <li>No hardcoded paths or resource assumptions</li>
- * <li>Relies on {@code SecurityContext} state rather than request URIs</li>
- * <li>Safe for use behind API gateways, CDNs and reverse proxies</li>
+ * <li>Stateless and side-effect free</li>
+ * <li>Does not alter response status or body</li>
+ * <li>Safe for use behind gateways, CDNs and reverse proxies</li>
  * </ul>
- *
- * <p>
- * This filter is designed for <b>stateless, JWT-based APIs</b> and is suitable
- * for enterprise and regulated environments.
- * </p>
  */
-
 @Order(FilterOrder.AUTH_NO_CACHE)
 @Component
 public class AuthNoCacheFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
-
+        // Apply only to authenticated requests
         return request.getUserPrincipal() == null;
     }
 
@@ -70,10 +64,13 @@ public class AuthNoCacheFilter extends OncePerRequestFilter {
     protected void doFilterInternal(
             @NonNull HttpServletRequest req,
             @NonNull HttpServletResponse res,
-            @NonNull FilterChain chain) throws ServletException, IOException {
+            @NonNull FilterChain chain)
+            throws ServletException, IOException {
 
+        // Enforce no-cache semantics for authenticated responses
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
 
         chain.doFilter(req, res);
     }
