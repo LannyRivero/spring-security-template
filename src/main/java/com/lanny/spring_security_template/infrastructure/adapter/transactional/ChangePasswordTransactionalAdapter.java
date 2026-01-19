@@ -47,7 +47,7 @@ public class ChangePasswordTransactionalAdapter implements ChangePasswordPort {
      * @param newPassword     new password to set
      */
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
 
     public void changePassword(String username, String currentPassword, String newPassword) {
         delegate.changePassword(username, currentPassword, newPassword);
