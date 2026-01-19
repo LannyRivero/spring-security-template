@@ -21,6 +21,7 @@ import com.lanny.spring_security_template.application.auth.port.out.dto.JwtClaim
 import com.lanny.spring_security_template.infrastructure.jwt.JwtAuthoritiesMapper;
 import com.lanny.spring_security_template.infrastructure.jwt.exception.JwtValidationException;
 import com.lanny.spring_security_template.infrastructure.security.jwt.JwtAuthFailureReason;
+import com.lanny.spring_security_template.infrastructure.security.jwt.JwtAuthFailureTranslator;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.InvalidTokenTypeException;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.JwtAuthenticationException;
 import com.lanny.spring_security_template.infrastructure.security.jwt.exception.NoAuthoritiesException;
@@ -72,15 +73,18 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
   private final JwtValidator jwtValidator;
   private final TokenBlacklistGateway tokenBlacklistGateway;
   private final JwtAuthoritiesMapper authoritiesMapper;
+  private final JwtAuthFailureTranslator failureTranslator;
 
   public JwtAuthorizationFilter(
       JwtValidator jwtValidator,
       TokenBlacklistGateway tokenBlacklistGateway,
-      JwtAuthoritiesMapper authoritiesMapper) {
+      JwtAuthoritiesMapper authoritiesMapper,
+      JwtAuthFailureTranslator failureTranslator) {
 
     this.jwtValidator = jwtValidator;
     this.tokenBlacklistGateway = tokenBlacklistGateway;
     this.authoritiesMapper = authoritiesMapper;
+    this.failureTranslator = failureTranslator;
   }
 
   @Override
@@ -113,43 +117,30 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
       var authorities = authoritiesMapper.map(claims);
 
       var authentication = new UsernamePasswordAuthenticationToken(
-          claims.sub(),
-          null,
-          authorities);
+          claims.sub(), null, authorities);
 
       SecurityContextHolder.getContext()
           .setAuthentication(authentication);
 
       MDC.put(USERNAME, claims.sub());
 
-    }
-    // --------------------------------------------------
-    // JWT validation errors → AUTHENTICATION FAILURE (401)
-    // --------------------------------------------------
-    catch (JwtValidationException ex) {
+      chain.doFilter(request, response);
+
+    } catch (Exception ex) {
+
       SecurityContextHolder.clearContext();
-      throw new JwtAuthenticationException("Invalid JWT token", ex);
-    }
-    // --------------------------------------------------
-    // Authorization-level failures → ACCESS DENIED / 401
-    // --------------------------------------------------
-    catch (
-        InvalidTokenTypeException | TokenRevokedException | NoAuthoritiesException | IllegalArgumentException ex) {
 
       JwtAuthFailureReason reason = mapFailureReason(ex);
 
       log.warn(
-          "JWT authorization failed reason={} method={} path={} correlationId={}",
+          "JWT authentication failed reason={} method={} path={} correlationId={}",
           reason,
           request.getMethod(),
           resolvePath(request),
           MDC.get(CORRELATION_ID));
 
-      SecurityContextHolder.clearContext();
-    }
+      throw failureTranslator.translate(reason, ex);
 
-    try {
-      chain.doFilter(request, response);
     } finally {
       MDC.remove(USERNAME);
     }
@@ -168,6 +159,9 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
   private JwtAuthFailureReason mapFailureReason(Exception ex) {
 
+    if (ex instanceof JwtValidationException) {
+      return JwtAuthFailureReason.INVALID_SIGNATURE;
+    }
     if (ex instanceof TokenRevokedException) {
       return JwtAuthFailureReason.TOKEN_REVOKED;
     }
