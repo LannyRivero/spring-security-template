@@ -409,10 +409,12 @@ class JwtAuthenticationIntegrationTest {
 ## References
 
 - [RFC 7519 - JSON Web Token (JWT)](https://datatracker.ietf.org/doc/html/rfc7519)
+- [RFC 6750 - OAuth 2.0 Bearer Token Usage](https://datatracker.ietf.org/doc/html/rfc6750)
 - [OWASP JWT Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html)
-- [Spring Security - OAuth2 Resource Server](https://docs.spring.io/spring-security/reference/servlet/oauth2/resource-server/jwt.html)
-- [Auth0 - JWT Introduction](https://jwt.io/introduction)
-- [OWASP ASVS - Session Management](https://owasp.org/www-project-application-security-verification-standard/)
+- [OWASP ASVS - Authentication](https://owasp.org/www-project-application-security-verification-standard/)
+- [Spring Security - Exception Handling](https://docs.spring.io/spring-security/reference/servlet/architecture.html#servlet-security-exceptionhandling)
+- [Spring Security - OAuth2 Resource Server JWT](https://docs.spring.io/spring-security/reference/servlet/oauth2/resource-server/jwt.html)
+
 
 ## Review
 

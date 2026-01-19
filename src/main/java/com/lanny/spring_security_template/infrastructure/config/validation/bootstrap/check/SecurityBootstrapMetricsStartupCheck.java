@@ -30,7 +30,7 @@ public final class SecurityBootstrapMetricsStartupCheck implements SecurityStart
 
     @Override
     public String name() {
-        return "Security bootstrap metrics enforcement";
+        return SOURCE;
     }
 
     @Override
